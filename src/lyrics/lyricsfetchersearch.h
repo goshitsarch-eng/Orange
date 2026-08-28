@@ -1,45 +1,73 @@
-#ifndef STRAWBERRY_LYRICSFETCHERSEARCH_H
-#define STRAWBERRY_LYRICSFETCHERSEARCH_H
+/*
+ * Strawberry Music Player
+ * Copyright 2018-2026, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "core/signal.h"
-#include "lyrics/lyricssearchrequest.h"
-#include "lyrics/lyricssearchresult.h"
+#ifndef LYRICSFETCHERSEARCH_H
+#define LYRICSFETCHERSEARCH_H
 
-#include <glib.h>
+#include "config.h"
 
-#include <cstdint>
-#include <string>
+#include <QtGlobal>
+#include <QObject>
+#include <QMap>
+#include <QString>
 
+#include "includes/shared_ptr.h"
+#include "lyricssearchrequest.h"
+#include "lyricssearchresult.h"
+
+class QTimer;
+class LyricsProvider;
 class LyricsProviders;
 
-class LyricsFetcherSearch {
- public:
-  LyricsFetcherSearch(uint64_t id, LyricsSearchRequest request, LyricsProviders *providers);
-  ~LyricsFetcherSearch();
-  void Start();
-  void HandleTimeout(bool hard);
-  uint64_t id() const { return id_; }
-  const LyricsSearchResults &results() const { return results_; }
+class LyricsFetcherSearch : public QObject {
+  Q_OBJECT
 
-  Signal<uint64_t, std::string, std::string> LyricsFetched;
-  Signal<uint64_t, LyricsSearchResults> SearchFinished;
+ public:
+  explicit LyricsFetcherSearch(const quint64 id, const LyricsSearchRequest &request, QObject *parent);
+
+  void Start(SharedPtr<LyricsProviders> lyrics_providers);
+  void Cancel();
+
+ Q_SIGNALS:
+  void SearchFinished(const quint64 id, const LyricsSearchResults &results);
+  void LyricsFetched(const quint64 id, const QString &provider = QString(), const QString &lyrics = QString());
+
+ private Q_SLOTS:
+  void ProviderSearchFinished(const int id, const LyricsSearchResults &results);
+  void EarlyTimeout();
+  void SearchTimeout();
 
  private:
-  void OnProviderFinished(const LyricsSearchResults &found);
-  void Finish();
-  void CancelTimeouts();
-  int ElapsedMs() const;
+  void CancelRequests();
+  void FinishSearch();
+  static bool ProviderCompareOrder(LyricsProvider *a, LyricsProvider *b);
+  static bool LyricsSearchResultCompareScore(const LyricsSearchResult &a, const LyricsSearchResult &b);
 
-  uint64_t id_ = 0;
-  LyricsSearchRequest request_;
-  LyricsProviders *providers_ = nullptr;
+ private:
+  quint64 id_;
+  const LyricsSearchRequest request_;
+  QTimer *timer_search_early_timeout_;
+  QTimer *timer_search_timeout_;
   LyricsSearchResults results_;
-  int pending_ = 0;
-  bool finished_ = false;
-  float best_score_ = 0.0f;
-  gint64 started_us_ = 0;
-  guint early_timeout_id_ = 0;
-  guint hard_timeout_id_ = 0;
+  QMap<int, LyricsProvider*> pending_requests_;
+  bool cancel_requested_;
+  bool finished_;
 };
 
-#endif
+#endif  // LYRICSFETCHERSEARCH_H

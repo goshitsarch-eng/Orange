@@ -1,19 +1,39 @@
-#ifndef STRAWBERRY_ENGINEDEVICE_H
-#define STRAWBERRY_ENGINEDEVICE_H
+/*
+ * Strawberry Music Player
+ * Copyright 2021-2023, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include <string>
-#include <vector>
+#ifndef ENGINEDEVICE_H
+#define ENGINEDEVICE_H
 
-struct EngineDevice {
-  std::string description;
-  std::string value;
-  std::string iconname = "audio-card-symbolic";
-  int card = -1;
-  int device = -1;
+#include <QList>
+#include <QVariant>
+#include <QString>
 
-  std::string GuessIconName() const;
+class EngineDevice {
+ public:
+  explicit EngineDevice();
+  QString GuessIconName() const;
+  QString description;
+  QVariant value;
+  QString iconname;
+  int card;
+  int device;
 };
+using EngineDeviceList = QList<EngineDevice>;
 
-using EngineDeviceList = std::vector<EngineDevice>;
-
-#endif
+#endif  // ENGINEDEVICE_H

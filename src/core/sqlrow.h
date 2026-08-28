@@ -1,18 +1,48 @@
-#ifndef STRAWBERRY_SQLROW_H
-#define STRAWBERRY_SQLROW_H
+/*
+ * Strawberry Music Player
+ * Copyright 2018-2024, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include <string>
-#include <vector>
+#ifndef SQLROW_H
+#define SQLROW_H
+
+#include "config.h"
+
+#include <QList>
+#include <QVariant>
+#include <QSqlRecord>
+
+#include "sqlquery.h"
 
 class SqlRow {
+
  public:
-  void Add(const std::string &value) { values_.push_back(value); }
-  const std::string &value(int index) const { return values_.at(static_cast<size_t>(index)); }
-  int columns() const { return static_cast<int>(values_.size()); }
-  const std::vector<std::string> &values() const { return values_; }
+  explicit SqlRow(const SqlQuery &query);
+
+  int columns() const { return record_.count(); }
+  const QSqlRecord &record() const { return record_; }
+  QVariant value(const int n) const;
 
  private:
-  std::vector<std::string> values_;
+  void Init(const SqlQuery &query);
+
+  QSqlRecord record_;
 };
 
-#endif
+using SqlRowList = QList<SqlRow>;
+
+#endif  // SQLROW_H

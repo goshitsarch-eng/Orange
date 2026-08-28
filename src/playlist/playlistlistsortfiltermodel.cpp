@@ -1,39 +1,36 @@
-#include "playlist/playlistlistsortfiltermodel.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2024, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "playlist/playlistfolders.h"
+#include "playlistlistsortfiltermodel.h"
 
-PlaylistListSortFilterModel::PlaylistListSortFilterModel(PlaylistListModel *source) : source_(source) {}
+PlaylistListSortFilterModel::PlaylistListSortFilterModel(QObject *parent)
+    : QSortFilterProxyModel(parent) {}
 
-void PlaylistListSortFilterModel::SetFilter(const std::string &filter) { filter_ = filter; }
+bool PlaylistListSortFilterModel::lessThan(const QModelIndex &left, const QModelIndex &right) const {
 
-void PlaylistListSortFilterModel::SetFavoritesOnly(bool favorites_only) { favorites_only_ = favorites_only; }
+  // Compare the display text first.
+  const int ret = left.data().toString().localeAwareCompare(right.data().toString());
+  if (ret < 0) return true;
+  if (ret > 0) return false;
 
-std::vector<PlaylistListDrop::Row> PlaylistListSortFilterModel::VisibleRows() const {
-  std::vector<PlaylistFolders::PlaylistRef> playlists;
-  if (!source_) {
-    return {};
-  }
-  for (int i = 0; i < source_->Count(); ++i) {
-    PlaylistFolders::PlaylistRef playlist;
-    playlist.name = source_->At(i);
-    playlist.favorite = i < static_cast<int>(source_->favorites().size()) && source_->favorites()[static_cast<size_t>(i)];
-    if (i < static_cast<int>(source_->paths().size())) {
-      playlist.ui_path = source_->paths()[static_cast<size_t>(i)];
-    }
-    if (i < static_cast<int>(source_->ids().size())) {
-      playlist.id = source_->ids()[static_cast<size_t>(i)];
-    }
-    playlists.push_back(playlist);
-  }
-  return PlaylistFolders::Flatten(playlists, extra_folders_, collapsed_, filter_, favorites_only_);
-}
-
-std::vector<std::string> PlaylistListSortFilterModel::Visible() const {
-  std::vector<std::string> names;
-  for (const PlaylistListDrop::Row &row : VisibleRows()) {
-    if (!row.folder) {
-      names.push_back(row.name);
-    }
-  }
-  return names;
+  // Now use the source model row order to ensure we always get a deterministic sorting even when two items are named the same.
+  return left.row() < right.row();
 }

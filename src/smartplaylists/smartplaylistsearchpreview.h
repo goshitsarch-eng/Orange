@@ -1,48 +1,85 @@
-#ifndef STRAWBERRY_SMARTPLAYLISTSEARCHPREVIEW_H
-#define STRAWBERRY_SMARTPLAYLISTSEARCHPREVIEW_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "core/song.h"
-#include "smartplaylists/smartplaylist.h"
+#ifndef SMARTPLAYLISTSEARCHPREVIEW_H
+#define SMARTPLAYLISTSEARCHPREVIEW_H
 
-#include <functional>
-#include <memory>
+#include "config.h"
 
-#include <gtk/gtk.h>
+#include <QWidget>
+#include <QList>
 
-class SmartPlaylistSearchPreview {
+#include "includes/shared_ptr.h"
+
+#include "smartplaylistsearch.h"
+#include "playlistgenerator_fwd.h"
+
+class QShowEvent;
+
+class Player;
+class PlaylistManager;
+class CollectionBackend;
+class CurrentAlbumCoverLoader;
+class Playlist;
+class Ui_SmartPlaylistSearchPreview;
+
+#ifdef HAVE_MOODBAR
+class MoodbarLoader;
+#endif
+
+class SmartPlaylistSearchPreview : public QWidget {
+  Q_OBJECT
+
  public:
-  SmartPlaylistSearchPreview();
-  ~SmartPlaylistSearchPreview();
+  explicit SmartPlaylistSearchPreview(QWidget *parent = nullptr);
+  ~SmartPlaylistSearchPreview() override;
 
-  using FinishedCallback = std::function<void(int)>;
+  void Init(const SharedPtr<Player> player,
+            const SharedPtr<PlaylistManager> playlist_manager,
+            const SharedPtr<CollectionBackend> collection_backend,
+#ifdef HAVE_MOODBAR
+            const SharedPtr<MoodbarLoader> moodbar_loader,
+#endif
+            const SharedPtr<CurrentAlbumCoverLoader> current_albumcover_loader);
 
-  GtkWidget *widget() const { return widget_; }
-  void Update(const SmartPlaylistSearch &search, const SongList &songs);
-  void SetFinishedCallback(FinishedCallback callback) { finished_ = std::move(callback); }
-  int match_count() const { return match_count_; }
+  void Update(const SmartPlaylistSearch &search);
 
-  void OnSearchFinished(guint generation, const SmartPlaylistSearch &search, SongList matches);
-  void OnMapped();
+ protected:
+  void showEvent(QShowEvent *e) override;
 
  private:
-  bool Hidden() const;
   void RunSearch(const SmartPlaylistSearch &search);
-  void ApplyResults(const SongList &matches);
 
-  GtkWidget *widget_ = nullptr;
-  GtkWidget *label_ = nullptr;
-  GtkWidget *header_ = nullptr;
-  GtkWidget *list_ = nullptr;
-  int match_count_ = 0;
+ private Q_SLOTS:
+  void SearchFinished();
+
+ private:
+  Ui_SmartPlaylistSearchPreview *ui_;
+  QList<SmartPlaylistSearchTerm::Field> fields_;
+
+  SharedPtr<CollectionBackend> collection_backend_;
+  Playlist *model_;
+
+  SmartPlaylistSearch pending_search_;
   SmartPlaylistSearch last_search_;
-  bool have_last_search_ = false;
-  SmartPlaylistSearch pending_;
-  bool have_pending_ = false;
-  bool busy_ = false;
-  guint generation_ = 0;
-  SongList library_;
-  std::shared_ptr<bool> alive_ = std::make_shared<bool>(true);
-  FinishedCallback finished_;
+  PlaylistGeneratorPtr generator_;
 };
 
-#endif
+#endif  // SMARTPLAYLISTSEARCHPREVIEW_H

@@ -66,14 +66,22 @@ jobs:
             update-desktop-files
             appstream-glib
             hicolor-icon-theme
-            gtk4-devel
-            libadwaita-devel
-            libsoup-3_0-devel
-            json-glib-devel
+            qt6-core-devel
+            qt6-gui-devel
+            qt6-gui-private-devel
+            qt6-widgets-devel
+            qt6-concurrent-devel
+            qt6-network-devel
+            qt6-sql-devel
+            qt6-dbus-devel
+            qt6-test-devel
+            qt6-base-common-devel
+            qt6-sql-sqlite
+            qt6-linguist-devel
             gtest
             gmock
             sparsehash-devel
-            libsecret-devel
+            kdsingleapplication-qt6-devel
       - name: Checkout
         uses: actions/checkout@v7
         with:
@@ -92,7 +100,7 @@ jobs:
         run: mkdir -p ~/rpmbuild/SOURCES /usr/src/packages/SOURCES
       - name: Copy source tarball
         working-directory: build
-        run: cp strawberry-*.tar.xz /usr/src/packages/SOURCES/
+        run: cp orange-*.tar.xz /usr/src/packages/SOURCES/
       - name: Build RPM
         env:
           RPM_BUILD_NCPUS: 4
@@ -159,9 +167,9 @@ jobs:
             pulseaudio-libs-devel
             libnotify-devel
             libicu-devel
-            gtk4-devel
-            libadwaita-devel
-            libsoup3-devel json-glib-devel libsecret-devel
+            qt6-qtbase-devel
+            qt6-qtbase-private-devel
+            qt6-qttools-devel
             gstreamer1-devel
             gstreamer1-plugins-base-devel
             gstreamer1-plugins-base
@@ -176,7 +184,7 @@ jobs:
             desktop-file-utils
             libappstream-glib
             hicolor-icon-theme
-            libsecret-devel
+            kdsingleapplication-qt6-devel
             gtest-devel
             gmock-devel
             sparsehash-devel
@@ -199,7 +207,7 @@ jobs:
         run: mkdir -p ~/rpmbuild/SOURCES /usr/src/packages/SOURCES
       - name: Copy source tarball
         working-directory: build
-        run: cp strawberry-*.tar.xz ~/rpmbuild/SOURCES/
+        run: cp orange-*.tar.xz ~/rpmbuild/SOURCES/
       - name: Build RPM
         env:
           RPM_BUILD_NCPUS: 4
@@ -258,20 +266,31 @@ jobs:
           lib64cdio-devel
           lib64gpod-devel
           lib64mtp-devel
-          lib64gtk4-devel
-          lib64adwaita-devel
-          lib64soup3.0-devel
-          lib64json-glib-devel
+          lib64Qt6Core-devel
+          lib64Qt6Concurrent-devel
+          lib64Qt6Network-devel
+          lib64Qt6Sql-devel
+          lib64Qt6DBus-devel
+          lib64Qt6Gui-devel
+          lib64Qt6Widgets-devel
+          lib64Qt6Test-devel
+          lib64kdsingleapplication-devel
           lib64xkbcommon-devel
           lib64gtest-devel
           lib64gmock-devel
           sparsehash-devel
+          qt6-cmake
+          qt6-qtbase-tools
+          qt6-qttools-linguist
+          qt6-qtbase-theme-gtk3
           desktop-file-utils
           appstream
           appstream-util
           hicolor-icon-theme
           gstreamer1.0-plugins-base
           gstreamer1.0-plugins-good
+      - name: Remove files
+        run: rm -rf /usr/lib64/qt6/lib/cmake/Qt6Sql/{Qt6QMYSQL*,Qt6QODBCD*,Qt6QPSQL*,Qt6QIBase*}
       - name: Checkout
         uses: actions/checkout@v7
         with:
@@ -291,7 +310,7 @@ jobs:
         run: mkdir -p ~/rpmbuild/SOURCES /usr/src/packages/SOURCES
       - name: Copy source tarball
         working-directory: build
-        run: cp strawberry-*.tar.xz ~/rpmbuild/SOURCES/
+        run: cp orange-*.tar.xz ~/rpmbuild/SOURCES/
       - name: Build RPM
         env:
           RPM_BUILD_NCPUS: 4
@@ -353,17 +372,31 @@ jobs:
           lib64fftw-devel
           lib64dbus-devel
           lib64appstream-devel
-          lib64gtk4-devel
-          lib64adwaita-devel
-          lib64soup3.0-devel
-          lib64json-glib-devel
+          lib64qt6core-devel
+          lib64qt6gui-devel
+          lib64qt6widgets-devel
+          lib64qt6network-devel
+          lib64qt6concurrent-devel
+          lib64qt6sql-devel
+          lib64qt6dbus-devel
+          lib64qt6help-devel
+          lib64qt6test-devel
           lib64sparsehash-devel
+          lib64kdsingleapplication-devel
           desktop-file-utils
           appstream-util
           hicolor-icon-theme
           gtest
           gstreamer1.0-plugins-base
           gstreamer1.0-plugins-good
+      - name: Build and install KDSingleApplication
+        if: matrix.mageia_version == '9'
+        run: |
+          git clone --depth 1 --recurse-submodules https://github.com/KDAB/KDSingleApplication
+          cd KDSingleApplication
+          cmake -S . -B build -DCMAKE_BUILD_TYPE="Release" -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON -DKDSingleApplication_STATIC=ON
+          cmake --build build --config Release --parallel 4
+          cmake --install build
       - name: Checkout
         uses: actions/checkout@v7
         with:
@@ -383,7 +416,7 @@ jobs:
         run: mkdir -p ~/rpmbuild/SOURCES /usr/src/packages/SOURCES
       - name: Copy source tarball
         working-directory: build
-        run: cp strawberry-*.tar.xz ~/rpmbuild/SOURCES/
+        run: cp orange-*.tar.xz ~/rpmbuild/SOURCES/
       - name: Build RPM
         env:
           RPM_BUILD_NCPUS: 4
@@ -450,11 +483,23 @@ jobs:
             libgpod-dev
             libxkbcommon-dev
             libsparsehash-dev
-            libgtk-4-dev
-            libadwaita-1-dev
-            libsoup-3.0-dev
-            libjson-glib-dev
-            libsecret-1-dev
+            qt6-base-dev
+            qt6-base-private-dev
+            qt6-base-dev-tools
+            qt6-tools-dev
+            qt6-tools-dev-tools
+            qt6-l10n-tools
+      - name: Install KDSingleApplication
+        if: matrix.debian_version != 'bookworm'
+        run: apt install -y libkdsingleapplication-qt6-dev
+      - name: Build and install KDSingleApplication
+        if: matrix.debian_version == 'bookworm'
+        run: |
+          git clone --depth 1 --recurse-submodules https://github.com/KDAB/KDSingleApplication
+          cd KDSingleApplication
+          cmake -S . -B build -DCMAKE_BUILD_TYPE="Release" -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON -DKDSingleApplication_STATIC=ON
+          cmake --build build --config Release --parallel 4
+          cmake --install build
       - name: Checkout
         uses: actions/checkout@v7
         with:
@@ -534,11 +579,23 @@ jobs:
             libgpod-dev
             libxkbcommon-dev
             libsparsehash-dev
-            libgtk-4-dev
-            libadwaita-1-dev
-            libsoup-3.0-dev
-            libjson-glib-dev
-            libsecret-1-dev
+            qt6-base-dev
+            qt6-base-private-dev
+            qt6-base-dev-tools
+            qt6-tools-dev
+            qt6-tools-dev-tools
+            qt6-l10n-tools
+      - name: Install KDSingleApplication
+        if: matrix.ubuntu_version != 'noble'
+        run: apt install -y libkdsingleapplication-qt6-dev
+      - name: Build and install KDSingleApplication
+        if: matrix.ubuntu_version == 'noble'
+        run: |
+          git clone --depth 1 --recurse-submodules https://github.com/KDAB/KDSingleApplication
+          cd KDSingleApplication
+          cmake -S . -B build -DCMAKE_BUILD_TYPE="Release" -DBUILD_SHARED_LIBS=OFF -DBUILD_STATIC_LIBS=ON -DKDSingleApplication_STATIC=ON
+          cmake --build build --config Release --parallel 4
+          cmake --install build
       - name: Checkout
         uses: actions/checkout@v7
         with:
@@ -617,13 +674,15 @@ jobs:
             libgpod-dev
             libxkbcommon-dev
             libsparsehash-dev
-            libgtk-4-dev
-            libadwaita-1-dev
-            libsoup-3.0-dev
-            libjson-glib-dev
-            libsecret-1-dev
+            qt6-base-dev
+            qt6-base-private-dev
+            qt6-base-dev-tools
+            qt6-tools-dev
+            qt6-tools-dev-tools
+            qt6-l10n-tools
             gstreamer1.0-alsa
             gstreamer1.0-pulseaudio
+            libkdsingleapplication-qt6-dev
       - name: Install keyboxd
         if: matrix.ubuntu_version == 'noble'
         env:
@@ -636,6 +695,10 @@ jobs:
           submodules: recursive
       - name: Add safe git directory
         run: git config --global --add safe.directory ${GITHUB_WORKSPACE}
+      - name: Modify required KDSingleApplication version
+        run: |
+          sed -i 's/^find_package(KDSingleApplication-qt\${QT_VERSION_MAJOR} 1.1.0 REQUIRED)$/find_package(KDSingleApplication-qt\${QT_VERSION_MAJOR} 1.0.0 REQUIRED)/g' CMakeLists.txt
+          sed -i 's/, KDSingleApplication::Option::IncludeUsernameInSocketName);$/);/g' src/main.cpp
       - name: Create Build Environment
         run: cmake -E make_directory build
       - name: Configure CMake
@@ -721,14 +784,23 @@ jobs:
             appstream-glib
             hicolor-icon-theme
             glib-networking
-            gtk4-devel
-            libadwaita-devel
-            libsoup-3_0-devel
-            json-glib-devel
+            qt6-core-devel
+            qt6-gui-devel
+            qt6-gui-private-devel
+            qt6-widgets-devel
+            qt6-concurrent-devel
+            qt6-network-devel
+            qt6-sql-devel
+            qt6-dbus-devel
+            qt6-test-devel
+            qt6-base-common-devel
+            qt6-sql-sqlite
+            qt6-imageformats
+            qt6-linguist-devel
             gtest
             gmock
             sparsehash-devel
-            libsecret-devel
+            kdsingleapplication-qt6-devel
             AppStream
       - name: Checkout
         uses: actions/checkout@v7
@@ -758,7 +830,7 @@ jobs:
           APPIMAGE_EXTRACT_AND_RUN: '1'
         run: >
             ./appimagedeploy.AppImage
-            AppDir/usr/share/applications/org.strawberrymusicplayer.strawberry.desktop
+            AppDir/usr/share/applications/org.orangemusicplayer.orange.desktop
             --qt-sql-plugins=sqlite
             --gstreamer-plugins=list
             --gstreamer-plugin-list=adaptivedemux2,aiff,alsa,apetag,app,asf,asfmux,audioconvert,audiofx,audioparsers,audioresample,autodetect,bs2b,cdio,coreelements,dash,dsd,equalizer,faac,faad,fdkaac,flac,gme,hls,icydemux,id3demux,isomp4,lame,libav,matroska,mpegtsdemux,mpg123,musepack,ogg,openmpt,opus,pbtypes,playback,pulseaudio,replaygain,rtp,rtpmanager,rtsp,soup,spectrum,speex,spotify,taglib,typefindfunctions,udp,volume,vorbis,wavenc,wavpack,wavparse,xingmux
@@ -816,7 +888,7 @@ jobs:
       with:
         usesh: true
         mem: 8192
-        prepare: pkg install -y git cmake pkgconf boost-libs alsa-lib glib gtk4 libadwaita libsoup3 json-glib sqlite gstreamer1 gstreamer1-plugins chromaprint libebur128 taglib libcdio libmtp gdk-pixbuf2 fftw3 icu googletest pulseaudio sparsehash
+        prepare: pkg install -y git cmake pkgconf boost-libs alsa-lib glib qt6-base qt6-tools sqlite gstreamer1 gstreamer1-plugins chromaprint libebur128 taglib libcdio libmtp gdk-pixbuf2 fftw3 icu kdsingleapplication googletest pulseaudio sparsehash
         run: |
           set -e
           git config --global --add safe.directory ${GITHUB_WORKSPACE}
@@ -842,7 +914,7 @@ jobs:
       with:
         usesh: true
         mem: 4096
-        prepare: pkg_add git cmake pkgconf boost glib2 gtk4 libadwaita libsoup3 json-glib sqlite gstreamer1 gstreamer1-plugins-base chromaprint libebur128 taglib libcdio libmtp gdk-pixbuf libgpod fftw3 icu4c pulseaudio sparsehash
+        prepare: pkg_add git cmake pkgconf boost glib2 qt6-qtbase qt6-qttools sqlite gstreamer1 gstreamer1-plugins-base chromaprint libebur128 taglib libcdio libmtp gdk-pixbuf libgpod fftw3 icu4c kdsingleapplication pulseaudio sparsehash
         run: |
           set -e
           export LDFLAGS="-L/usr/local/lib"
@@ -960,7 +1032,7 @@ jobs:
       - name: Verify code-signing
         if: github.repository == 'strawberrymusicplayer/strawberry' && github.event.pull_request.head.repo.fork == false
         working-directory: build
-        run: codesign --deep -v strawberry.app
+        run: codesign --deep -v orange.app
 
       - name: Create DMG
         working-directory: build
@@ -1094,7 +1166,7 @@ jobs:
 
       - name: Verify code-signing
         working-directory: build
-        run: codesign --deep -v strawberry.app
+        run: codesign --deep -v orange.app
 
       - name: Create DMG
         working-directory: build
@@ -1318,7 +1390,7 @@ jobs:
 
       - name: rsync
         if: steps.set-upload-path.outputs.upload_path != ''
-        run: rsync -e "ssh -p ${{secrets.SSH_PORT}} -o StrictHostKeyChecking=no" -var build/StrawberrySetup*.exe ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{steps.set-upload-path.outputs.upload_path}}/
+        run: rsync -e "ssh -p ${{secrets.SSH_PORT}} -o StrictHostKeyChecking=no" -var build/OrangeSetup*.exe ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{steps.set-upload-path.outputs.upload_path}}/
 
 
   build-windows-msvc:
@@ -1676,7 +1748,7 @@ jobs:
       - name: rsync
         if: steps.set-upload-path.outputs.upload_path != ''
         shell: bash
-        run: rsync -e "/c/ProgramData/chocolatey/lib/rsync/tools/bin/ssh.exe -p ${{secrets.SSH_PORT}} -o StrictHostKeyChecking=no" -var build/StrawberrySetup*.exe ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{steps.set-upload-path.outputs.upload_path}}/
+        run: rsync -e "/c/ProgramData/chocolatey/lib/rsync/tools/bin/ssh.exe -p ${{secrets.SSH_PORT}} -o StrictHostKeyChecking=no" -var build/OrangeSetup*.exe ${{secrets.SSH_USER}}@${{secrets.SSH_HOST}}:${{steps.set-upload-path.outputs.upload_path}}/
 
 
   upload:

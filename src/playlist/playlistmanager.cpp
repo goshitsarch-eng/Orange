@@ -1,758 +1,621 @@
-#include "playlist/playlistmanager.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2025, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "collection/collectionbackend.h"
-#include "playlist/playlistcollectionsync.h"
-#include "playlist/playlistcrossundopair.h"
-#include "playlist/playlistrating.h"
-#include "playlist/playlistsaveschedule.h"
-#include "constants/playlistsettings.h"
+#include "config.h"
+
+#include <utility>
+
+#include <QtGlobal>
+#include <QObject>
+#include <QDialog>
+#include <QtConcurrentRun>
+#include <QFuture>
+#include <QFutureWatcher>
+#include <QDir>
+#include <QFileDialog>
+#include <QFileInfo>
+#include <QList>
+#include <QSet>
+#include <QString>
+#include <QRegularExpression>
+#include <QUrl>
+#include <QAbstractItemModel>
+#include <QScrollBar>
+#include <QSettings>
+#include <QMessageBox>
+
+#include "includes/shared_ptr.h"
 #include "core/settings.h"
-#include "core/songloader.h"
-#include "playlist/songloaderinserter.h"
+#include "constants/filenameconstants.h"
+#include "utilities/timeutils.h"
+#include "collection/collectionbackend.h"
+#include "covermanager/currentalbumcoverloader.h"
+#include "constants/playlistsettings.h"
+#include "playlist.h"
+#include "playlistbackend.h"
+#include "playlistcontainer.h"
+#include "playlistmanager.h"
+#include "playlistitem.h"
+#include "playlistview.h"
+#include "playlistsaveoptionsdialog.h"
 #include "playlistparsers/playlistparser.h"
-#include "smartplaylists/playlistgeneratorinserter.h"
-#include "smartplaylists/playlistquerygenerator.h"
-#include "smartplaylists/smartplaylistsmodel.h"
-#include "tagreader/tagreader.h"
-#include "tagreader/tagreaderclient.h"
-#include "tagreader/tagreaderclientpump.h"
-#include "utilities/fileutils.h"
+#include "dialogs/saveplaylistsdialog.h"
 
-#include <algorithm>
+using namespace Qt::Literals::StringLiterals;
 
-PlaylistManager::PlaylistManager(TaskManager *task_manager, TagReader *tagreader, UrlHandlers *url_handlers, PlaylistBackend *backend,
-                                 CollectionBackend *collection_backend)
-    : task_manager_(task_manager),
-      tagreader_(tagreader),
+class ParserBase;
+
+PlaylistManager::PlaylistManager(const SharedPtr<TaskManager> task_manager,
+                                 const SharedPtr<TagReaderClient> tagreader_client,
+                                 const SharedPtr<UrlHandlers> url_handlers,
+                                 const SharedPtr<PlaylistBackend> playlist_backend,
+                                 const SharedPtr<CollectionBackend> collection_backend,
+                                 const SharedPtr<CurrentAlbumCoverLoader> current_albumcover_loader,
+                                 QObject *parent)
+    : PlaylistManagerInterface(parent),
+      task_manager_(task_manager),
+      tagreader_client_(tagreader_client),
       url_handlers_(url_handlers),
-      backend_(backend),
-      collection_backend_(collection_backend) {}
+      playlist_backend_(playlist_backend),
+      collection_backend_(collection_backend),
+      current_albumcover_loader_(current_albumcover_loader),
+      sequence_(nullptr),
+      parser_(nullptr),
+      playlist_container_(nullptr),
+      current_(-1),
+      active_(-1),
+      playlists_loading_(0) {
 
-namespace {
+  setObjectName(QLatin1String(QObject::metaObject()->className()));
 
-gboolean PlaylistManagerTagPumpCb(gpointer data) {
-  auto *self = static_cast<PlaylistManager *>(data);
-  return self->PumpTagReader() ? G_SOURCE_CONTINUE : G_SOURCE_REMOVE;
 }
-
-}  // namespace
 
 PlaylistManager::~PlaylistManager() {
-  if (tag_pump_id_) {
-    g_source_remove(tag_pump_id_);
-    tag_pump_id_ = 0;
-  }
-  FlushPendingSaves();
+
+  const QList<Data> datas = playlists_.values();
+  for (const Data &data : datas) delete data.p;
+
 }
 
-void PlaylistManager::Init() {
-  LoadAll();
-  if (collection_backend_) {
-    collection_backend_->SongsChanged.Connect([this](const SongList &songs) { UpdateCollectionSongs(songs); });
-    collection_backend_->SongsStatisticsChanged.Connect([this](const SongList &songs) { UpdateCollectionSongs(songs); });
-    collection_backend_->SongsRatingChanged.Connect([this](const SongList &songs) { UpdateCollectionSongs(songs); });
+void PlaylistManager::Init(PlaylistSequence *sequence, PlaylistContainer *playlist_container) {
+
+  sequence_ = sequence;
+  playlist_container_ = playlist_container;
+
+  parser_ = new PlaylistParser(tagreader_client_, collection_backend_, this);
+
+  QObject::connect(&*collection_backend_, &CollectionBackend::SongsChanged, this, &PlaylistManager::UpdateCollectionSongs);
+  QObject::connect(&*collection_backend_, &CollectionBackend::SongsStatisticsChanged, this, &PlaylistManager::UpdateCollectionSongs);
+  QObject::connect(&*collection_backend_, &CollectionBackend::SongsRatingChanged, this, &PlaylistManager::UpdateCollectionSongs);
+
+  QObject::connect(parser_, &PlaylistParser::Error, this, &PlaylistManager::Error);
+
+  const PlaylistBackend::PlaylistList playlists = playlist_backend_->GetAllOpenPlaylists();
+  for (const PlaylistBackend::Playlist &p : playlists) {
+    ++playlists_loading_;
+    Playlist *ret = AddPlaylist(p.id, p.name, p.special_type, p.ui_path, p.favorite);
+    QObject::connect(ret, &Playlist::PlaylistLoaded, this, &PlaylistManager::PlaylistLoaded);
   }
+
+  // If no playlist exists then make a new one
+  if (playlists_.isEmpty()) New(tr("Playlist"));
+
+  Q_EMIT PlaylistManagerInitialized();
+
 }
 
-void PlaylistManager::UpdateCollectionSongs(const SongList &songs) { PlaylistCollectionSync::PatchAll(GetAllPlaylists(), songs); }
+void PlaylistManager::PlaylistLoaded() {
 
-void PlaylistManager::set_tagreader_client(TagReaderClient *client) {
-  tagreader_client_ = client;
-  for (const auto &playlist : playlists_) {
-    playlist->set_tagreader_client(client);
+  Playlist *playlist = qobject_cast<Playlist*>(sender());
+  if (!playlist) return;
+  QObject::disconnect(playlist, &Playlist::PlaylistLoaded, this, &PlaylistManager::PlaylistLoaded);
+  --playlists_loading_;
+  if (playlists_loading_ == 0) {
+    Q_EMIT AllPlaylistsLoaded();
   }
+
 }
 
-void PlaylistManager::WatchSaves(Playlist *playlist) {
-  if (!playlist) {
-    return;
+QList<Playlist*> PlaylistManager::GetAllPlaylists() const {
+
+  QList<Playlist*> result;
+
+  const QList<Data> datas = playlists_.values();
+  result.reserve(datas.count());
+  for (const Data &data : datas) {
+    result.append(data.p);
   }
-  playlist->set_tagreader_client(tagreader_client_);
-  playlist->SaveQueued.Connect([this]() { ArmTagReaderPump(); });
-  playlist->ItemSaved.Connect([this](const Song &song) {
-    if (collection_backend_ && (song.id() > 0 || song.is_collection_song())) {
-      collection_backend_->AddOrUpdateSong(song);
-    }
-  });
-  playlist->Error.Connect([this](const std::string &message) { Error.Emit(message); });
-  playlist->Changed.Connect([this, playlist]() { PlaylistChanged.Emit(playlist); });
-}
 
-void PlaylistManager::ArmTagReaderPump() {
-  if (!TagReaderClientPump::ShouldArm(tagreader_client_ && tagreader_client_->HaveRequests(), tag_pump_id_ != 0)) {
-    return;
-  }
-  tag_pump_id_ = g_idle_add(PlaylistManagerTagPumpCb, this);
-}
-
-bool PlaylistManager::PumpTagReader() {
-  if (!tagreader_client_ || !tagreader_client_->ProcessNext()) {
-    tag_pump_id_ = 0;
-    return false;
-  }
-  return TagReaderClientPump::ShouldContinue(tagreader_client_->HaveRequests());
-}
-
-void PlaylistManager::LoadAll() {
-  playlists_.clear();
-  current_ = nullptr;
-  active_ = nullptr;
-  if (backend_) {
-    for (const PlaylistMetadata &metadata : backend_->GetAllPlaylists()) {
-      playlists_.push_back(backend_->LoadPlaylist(metadata.id));
-    }
-  }
-  if (playlists_.empty()) {
-    New("Playlist");
-  } else {
-    current_ = playlists_.front().get();
-    active_ = current_;
-    for (const auto &playlist : playlists_) {
-      WatchSaves(playlist.get());
-      if (playlist->id() >= next_id_) {
-        next_id_ = playlist->id() + 1;
-      }
-    }
-    Settings settings;
-    settings.BeginGroup(PlaylistSettings::kSettingsGroup);
-    if (settings.BoolValue(PlaylistSettings::kGreyoutSongsStartup, PlaylistSettings::kDefaultGreyoutSongsStartup)) {
-      for (const auto &playlist : playlists_) {
-        playlist->InvalidateDeletedSongs(tagreader_);
-      }
-    }
-  }
-  playlists_loaded_ = true;
-  PlaylistsLoaded.Emit();
-}
-
-int PlaylistManager::current_id() const { return current_ ? current_->id() : -1; }
-
-int PlaylistManager::active_id() const { return active_ ? active_->id() : -1; }
-
-std::vector<int> PlaylistManager::playlist_ids() const {
-  std::vector<int> ids;
-  ids.reserve(playlists_.size());
-  for (const auto &playlist : playlists_) {
-    ids.push_back(playlist->id());
-  }
-  return ids;
-}
-
-std::string PlaylistManager::playlist_name(int id) const {
-  if (const Playlist *found = FindById(id)) {
-    return found->name();
-  }
-  return {};
-}
-
-Playlist *PlaylistManager::playlist(int id) const { return FindById(id); }
-
-std::vector<Playlist *> PlaylistManager::GetAllPlaylists() const {
-  std::vector<Playlist *> result;
-  result.reserve(playlists_.size());
-  for (const auto &playlist : playlists_) {
-    result.push_back(playlist.get());
-  }
   return result;
+
 }
 
-std::vector<std::string> PlaylistManager::playlist_names() const {
-  std::vector<std::string> names;
-  names.reserve(playlists_.size());
-  for (const auto &playlist : playlists_) {
-    names.push_back(playlist->name());
-  }
-  return names;
+QItemSelection PlaylistManager::selection(const int id) const {
+  QMap<int, Data>::const_iterator it = playlists_.find(id);
+  if (it == playlists_.constEnd()) return QItemSelection();
+  return it->selection;
 }
 
-void PlaylistManager::RemoveDeletedSongs() {
-  for (const auto &playlist : playlists_) {
-    playlist->RemoveUnavailable();
-    Persist(playlist.get());
-  }
-}
+Playlist *PlaylistManager::AddPlaylist(const int id, const QString &name, const QString &special_type, const QString &ui_path, const bool favorite) {
 
-Playlist *PlaylistManager::New(const std::string &name, const SongList &songs) {
-  auto playlist = std::make_unique<Playlist>();
-  playlist->set_name(name);
-  if (!songs.empty()) {
-    playlist->AppendSongs(songs);
-  }
-  PersistNow(playlist.get());
-  if (playlist->id() < 0) {
-    playlist->set_id(next_id_++);
-  } else if (playlist->id() >= next_id_) {
-    next_id_ = playlist->id() + 1;
-  }
-  current_ = playlist.get();
-  if (!active_) {
-    active_ = current_;
-  }
-  playlists_.push_back(std::move(playlist));
-  WatchSaves(current_);
-  PlaylistAdded.Emit(current_);
-  CurrentChanged.Emit(current_);
-  return current_;
-}
+  Playlist *ret = new Playlist(task_manager_, url_handlers_, playlist_backend_, collection_backend_, tagreader_client_, id, special_type, favorite);
+  ret->set_sequence(sequence_);
+  ret->set_ui_path(ui_path);
 
-void PlaylistManager::Load(const std::string &filename) {
-  const SongList songs = PlaylistParser(collection_backend_).Load(filename);
-  std::string name = FileUtils::BaseName(filename);
-  const auto dot = name.rfind('.');
-  if (dot != std::string::npos && dot > 0) {
-    name = name.substr(0, dot);
-  }
-  if (name.empty()) {
-    name = "Playlist";
-  }
-  New(name, songs);
-}
+  QObject::connect(ret, &Playlist::CurrentSongChanged, this, &PlaylistManager::CurrentSongChanged);
+  QObject::connect(ret, &Playlist::CurrentSongMetadataChanged, this, &PlaylistManager::CurrentSongMetadataChanged);
+  QObject::connect(ret, &Playlist::PlaylistChanged, this, &PlaylistManager::OneOfPlaylistsChanged);
+  QObject::connect(ret, &Playlist::PlaylistChanged, this, &PlaylistManager::UpdateSummaryText);
+  QObject::connect(ret, &Playlist::EditingFinished, this, &PlaylistManager::EditingFinished);
+  QObject::connect(ret, &Playlist::Error, this, &PlaylistManager::Error);
+  QObject::connect(ret, &Playlist::PlayRequested, this, &PlaylistManager::PlayRequested);
+  QObject::connect(ret, &Playlist::Rename, this, &PlaylistManager::Rename);
+  QObject::connect(ret, &Playlist::PlaylistItemsAdded, this, &PlaylistManager::PlaylistItemsAdded);
+  QObject::connect(ret, &Playlist::PlaylistItemsRemoved, this, &PlaylistManager::PlaylistItemsRemoved);
+  QObject::connect(ret, &Playlist::PlaylistItemMetadataChanged, this, &PlaylistManager::PlaylistItemMetadataChanged);
+  QObject::connect(playlist_container_->view(), &PlaylistView::ColumnAlignmentChanged, ret, &Playlist::SetColumnAlignment);
+  QObject::connect(&*current_albumcover_loader_, &CurrentAlbumCoverLoader::AlbumCoverLoaded, ret, &Playlist::AlbumCoverLoaded);
 
-void PlaylistManager::Save(int id, const std::string &filename) {
-  if (Playlist *found = FindById(id)) {
-    PlaylistParser().Save(filename, found->songs());
-  }
-}
+  playlists_[id] = Data(ret, name);
 
-void PlaylistManager::Rename(int id, const std::string &new_name) {
-  Playlist *found = FindById(id);
-  if (!found || new_name.empty()) {
-    return;
-  }
-  found->set_name(new_name);
-  if (backend_) {
-    backend_->RenamePlaylist(id, new_name);
-  }
-  PlaylistRenamed.Emit(id, new_name);
-  PlaylistChanged.Emit(found);
-}
+  Q_EMIT PlaylistAdded(id, name, favorite);
 
-void PlaylistManager::Favorite(int id, bool favorite) {
-  if (Playlist *found = FindById(id)) {
-    found->set_favorite(favorite);
-    if (backend_) {
-      backend_->SetFavorite(id, favorite);
-    }
-    PlaylistFavorited.Emit(id, favorite);
-  }
-}
-
-void PlaylistManager::SetPlaylistUiPath(int id, const std::string &path) {
-  if (Playlist *found = FindById(id)) {
-    found->set_ui_path(path);
-  }
-  if (backend_) {
-    backend_->SetPlaylistUiPath(id, path);
-  }
-}
-
-void PlaylistManager::Delete(int id) {
-  if (Playlist *found = FindById(id)) {
-    found->set_favorite(false);
-  }
-  if (!Close(id)) {
-    if (backend_) {
-      backend_->DeletePlaylist(id);
-    }
-    PlaylistDeleted.Emit(id);
-  }
-}
-
-bool PlaylistManager::Close(int id) {
-  FlushPendingSaves();
-  Playlist *found = FindById(id);
-  if (!found) {
-    return false;
-  }
-  const bool favorite = found->favorite();
-  playlists_.erase(std::remove_if(playlists_.begin(), playlists_.end(),
-                                  [id](const std::unique_ptr<Playlist> &playlist) { return playlist->id() == id; }),
-                   playlists_.end());
-  if (current_ && current_->id() == id) {
-    current_ = playlists_.empty() ? nullptr : playlists_.front().get();
-  }
-  if (active_ && active_->id() == id) {
-    active_ = current_;
-  }
-  if (playlists_.empty()) {
-    New("Playlist");
-  } else if (current_) {
-    CurrentChanged.Emit(current_);
-  }
-  PlaylistClosed.Emit(id);
-  if (!favorite && backend_) {
-    backend_->DeletePlaylist(id);
-    PlaylistDeleted.Emit(id);
-  }
-  return true;
-}
-
-void PlaylistManager::Open(int id) {
-  if (Playlist *found = FindById(id)) {
+  if (current_ == -1) {
     SetCurrentPlaylist(id);
-    (void)found;
-    return;
   }
-  if (!backend_) {
-    return;
+  if (active_ == -1) {
+    SetActivePlaylist(id);
   }
-  auto playlist = backend_->LoadPlaylist(id);
-  if (!playlist) {
-    return;
-  }
-  current_ = playlist.get();
-  if (current_->id() >= next_id_) {
-    next_id_ = current_->id() + 1;
-  }
-  playlists_.push_back(std::move(playlist));
-  WatchSaves(current_);
-  PlaylistAdded.Emit(current_);
-  CurrentChanged.Emit(current_);
+
+  return ret;
+
 }
 
-void PlaylistManager::ChangePlaylistOrder(const std::vector<int> &ids) {
-  std::vector<std::unique_ptr<Playlist>> reordered;
-  reordered.reserve(playlists_.size());
-  for (int id : ids) {
-    auto it = std::find_if(playlists_.begin(), playlists_.end(),
-                           [id](const std::unique_ptr<Playlist> &playlist) { return playlist && playlist->id() == id; });
-    if (it != playlists_.end()) {
-      reordered.push_back(std::move(*it));
-      playlists_.erase(it);
+void PlaylistManager::New(const QString &name, const SongList &songs, const QString &special_type) {
+
+  if (name.isNull()) return;
+
+  int id = playlist_backend_->CreatePlaylist(name, special_type);
+
+  if (id == -1) qFatal("Couldn't create playlist");
+
+  Playlist *playlist = AddPlaylist(id, name, special_type, QString(), false);
+  playlist->InsertSongsOrCollectionItems(songs);
+
+  SetCurrentPlaylist(id);
+
+  // If the name is just "Playlist", append the id
+  if (name == tr("Playlist")) {
+    Rename(id, QStringLiteral("%1 %2").arg(name).arg(id));
+  }
+
+}
+
+void PlaylistManager::Load(const QString &filename) {
+
+  QFileInfo fileinfo(filename);
+
+  const int id = playlist_backend_->CreatePlaylist(fileinfo.completeBaseName(), QString());
+
+  if (id == -1) {
+    Q_EMIT Error(tr("Couldn't create playlist"));
+    return;
+  }
+
+  Playlist *playlist = AddPlaylist(id, fileinfo.completeBaseName(), QString(), QString(), false);
+
+  playlist->InsertUrls(QList<QUrl>() << QUrl::fromLocalFile(filename));
+
+}
+
+void PlaylistManager::Save(const int id, const QString &playlist_name, const QString &filename, const PlaylistSettings::PathType path_type) {
+
+  if (playlists_.contains(id)) {
+    parser_->Save(playlist_name, playlist(id)->GetAllSongs(), filename, path_type);
+  }
+  else {
+    // Playlist is not in the playlist manager: probably save action was triggered from the left sidebar and the playlist isn't loaded.
+    QFuture<SongList> future = QtConcurrent::run(&PlaylistBackend::GetPlaylistSongs, playlist_backend_, id);
+    QFutureWatcher<SongList> *watcher = new QFutureWatcher<SongList>(this);
+    QObject::connect(watcher, &QFutureWatcher<SongList>::finished, this, [this, watcher, playlist_name, filename, path_type]() {
+      ItemsLoadedForSavePlaylist(playlist_name, watcher->result(), filename, path_type);
+      watcher->deleteLater();
+    });
+    watcher->setFuture(future);
+  }
+
+}
+
+void PlaylistManager::ItemsLoadedForSavePlaylist(const QString &playlist_name, const SongList &songs, const QString &filename, const PlaylistSettings::PathType path_type) {
+
+  parser_->Save(playlist_name, songs, filename, path_type);
+
+}
+
+void PlaylistManager::SaveWithUI(const int id, const QString &playlist_name) {
+
+  Settings s;
+  s.beginGroup(PlaylistSettings::kSettingsGroup);
+  QString last_save_filter = s.value(PlaylistSettings::kLastSaveFilter, parser()->default_filter()).toString();
+  QString last_save_path = s.value(PlaylistSettings::kLastSavePath, QDir::homePath()).toString();
+  QString last_save_extension = s.value(PlaylistSettings::kLastSaveExtension, parser()->default_extension()).toString();
+  s.endGroup();
+
+  QString suggested_filename = playlist_name;
+  QString filename = last_save_path + QLatin1Char('/') + suggested_filename.remove(u'/').remove(QRegularExpression(QLatin1String(kProblematicCharactersRegex), QRegularExpression::CaseInsensitiveOption)) + QLatin1Char('.') + last_save_extension;
+
+  QFileInfo fileinfo;
+  Q_FOREVER {
+    filename = QFileDialog::getSaveFileName(nullptr, tr("Save playlist", "Title of the playlist save dialog."), filename, parser()->filters(PlaylistParser::Type::Save), &last_save_filter);
+    if (filename.isEmpty()) return;
+    fileinfo.setFile(filename);
+    ParserBase *parser = parser_->ParserForExtension(PlaylistParser::Type::Save, fileinfo.suffix());
+    if (parser) break;
+    QMessageBox::warning(nullptr, tr("Unknown playlist extension"), tr("Unknown file extension for playlist."));
+  }
+
+  s.beginGroup(PlaylistSettings::kSettingsGroup);
+  PlaylistSettings::PathType path_type = static_cast<PlaylistSettings::PathType>(s.value(PlaylistSettings::kPathType, static_cast<int>(PlaylistSettings::kDefaultPathType)).toInt());
+  s.endGroup();
+  if (path_type == PlaylistSettings::PathType::Ask_User) {
+    PlaylistSaveOptionsDialog optionsdialog;
+    optionsdialog.setModal(true);
+    if (optionsdialog.exec() != QDialog::Accepted) return;
+    path_type = optionsdialog.path_type();
+  }
+
+  s.beginGroup(PlaylistSettings::kSettingsGroup);
+  s.setValue(PlaylistSettings::kLastSaveFilter, last_save_filter);
+  s.setValue(PlaylistSettings::kLastSavePath, fileinfo.path());
+  s.setValue(PlaylistSettings::kLastSaveExtension, fileinfo.suffix());
+  s.endGroup();
+
+  Save(id == -1 ? current_id() : id, playlist_name, filename, path_type);
+
+}
+
+void PlaylistManager::Rename(const int id, const QString &new_name) {
+
+  Q_ASSERT(playlists_.contains(id));
+
+  playlist_backend_->RenamePlaylist(id, new_name);
+  playlists_[id].name = new_name;
+
+  Q_EMIT PlaylistRenamed(id, new_name);
+
+}
+
+void PlaylistManager::Favorite(const int id, const bool favorite) {
+
+  if (playlists_.contains(id)) {
+    // If playlists_ contains this playlist, its means it's opened: star or unstar it.
+    playlist_backend_->FavoritePlaylist(id, favorite);
+    playlists_[id].p->set_favorite(favorite);
+  }
+  else {
+    Q_ASSERT(!favorite);
+    // Otherwise it means user wants to remove this playlist from the left panel,
+    // while it's not visible in the playlist tabbar either, because it has been closed: delete it.
+    playlist_backend_->RemovePlaylist(id);
+  }
+  Q_EMIT PlaylistFavorited(id, favorite);
+
+}
+
+bool PlaylistManager::Close(const int id) {
+
+  // Won't allow removing the last playlist
+  if (playlists_.count() <= 1 || !playlists_.contains(id)) return false;
+
+  int next_id = -1;
+  const QList<int> playlist_ids = playlists_.keys();
+  for (const int possible_next_id : playlist_ids) {
+    if (possible_next_id != id) {
+      next_id = possible_next_id;
+      break;
     }
   }
-  for (auto &playlist : playlists_) {
-    if (playlist) {
-      reordered.push_back(std::move(playlist));
-    }
+  if (next_id == -1) return false;
+
+  if (id == active_) SetActivePlaylist(next_id);
+  if (id == current_) SetCurrentPlaylist(next_id);
+
+  Data data = playlists_.take(id);
+  Q_EMIT PlaylistClosed(id);
+
+  if (!data.p->is_favorite()) {
+    playlist_backend_->RemovePlaylist(id);
+    Q_EMIT PlaylistDeleted(id);
   }
-  playlists_ = std::move(reordered);
+  delete data.p;
+
+  return true;
+
 }
 
-void PlaylistManager::SetCurrentPlaylist(const std::string &name) {
-  if (Playlist *found = FindByName(name)) {
-    current_ = found;
-    CurrentChanged.Emit(current_);
+void PlaylistManager::Delete(const int id) {
+
+  if (!Close(id)) {
+    return;
   }
+
+  playlist_backend_->RemovePlaylist(id);
+  Q_EMIT PlaylistDeleted(id);
+
 }
 
-void PlaylistManager::SetCurrentPlaylist(int id) {
-  if (Playlist *found = FindById(id)) {
-    current_ = found;
-    CurrentChanged.Emit(current_);
-  }
+void PlaylistManager::OneOfPlaylistsChanged() {
+  Q_EMIT PlaylistChanged(qobject_cast<Playlist*>(sender()));
 }
 
-void PlaylistManager::SetActivePlaylist(int id) {
-  if (Playlist *found = FindById(id)) {
-    active_ = found;
-    ActiveChanged.Emit(active_);
+void PlaylistManager::SetCurrentPlaylist(const int id) {
+
+  Q_ASSERT(playlists_.contains(id));
+
+  // Save the scroll position for the current playlist.
+  if (playlists_.contains(current_)) {
+    playlists_[current_].scroll_position = playlist_container_->view()->verticalScrollBar()->value();
   }
+
+  current_ = id;
+  Q_EMIT CurrentChanged(current(), playlists_.value(id).scroll_position);
+  UpdateSummaryText();
+
+}
+
+void PlaylistManager::SetActivePlaylist(const int id) {
+
+  Q_ASSERT(playlists_.contains(id));
+
+  // Kinda a hack: unset the current item from the old active playlist before setting the new one
+  if (active_ != -1 && active_ != id) active()->set_current_row(-1);
+
+  active_ = id;
+
+  Q_EMIT ActiveChanged(active());
+
 }
 
 void PlaylistManager::SetActiveToCurrent() {
-  if (current_ && active_ != current_) {
-    active_ = current_;
-    ActiveChanged.Emit(active_);
-  }
-}
 
-void PlaylistManager::SetCurrentRow(int row) {
-  if (Playlist *playlist = Visible()) {
-    playlist->RecordAndSetCurrentRow(row);
-    PersistLastPlayed(playlist);
-    if (active_ != playlist) {
-      active_ = playlist;
-      ActiveChanged.Emit(active_);
-    }
+  // Check if we need to update the active playlist.
+  // By calling SetActiveToCurrent, the playlist manager emits the signal "ActiveChanged".
+  // This signal causes the network remote module to send all playlists to the clients, even if no change happen.
+  if (current_id() != active_id()) {
+    SetActivePlaylist(current_id());
   }
-}
 
-int PlaylistManager::current_row() const {
-  if (const Playlist *playlist = Playing()) {
-    return playlist->current_row();
-  }
-  return -1;
-}
-
-Song PlaylistManager::current_song() const { return Playing() ? Playing()->current_song() : Song(); }
-
-Song PlaylistManager::PeekNextSong() const { return Playing() ? Playing()->PeekNextSong() : Song(); }
-
-void PlaylistManager::Next() {
-  if (Playlist *playlist = Playing()) {
-    playlist->Next();
-    PersistLastPlayed(playlist);
-    RefillDynamic();
-  }
-}
-
-void PlaylistManager::Previous() {
-  if (Playlist *playlist = Playing()) {
-    playlist->Previous();
-    PersistLastPlayed(playlist);
-  }
-}
-
-void PlaylistManager::AppendSongs(const SongList &songs) {
-  if (Playlist *playlist = Visible()) {
-    playlist->AppendSongs(songs);
-    Persist(playlist);
-  }
-}
-
-void PlaylistManager::InsertSongs(int id, const SongList &songs, int pos) {
-  Playlist *found = FindById(id);
-  if (!found) {
-    return;
-  }
-  if (pos < 0) {
-    found->AppendSongs(songs);
-  } else {
-    found->InsertSongs(pos, songs);
-  }
-  Persist(found);
-}
-
-void PlaylistManager::MoveRowsBetween(int source_id, int dest_id, const std::vector<int> &rows, int dest_pos) {
-  Playlist *source = FindById(source_id);
-  Playlist *dest = FindById(dest_id);
-  if (!source || !dest || source == dest || rows.empty()) {
-    return;
-  }
-  SongList songs;
-  for (int row : rows) {
-    if (row >= 0 && row < source->row_count()) {
-      songs.push_back(source->song(row));
-    }
-  }
-  if (songs.empty()) {
-    return;
-  }
-  if (dest_pos < 0) {
-    dest->AppendSongs(songs);
-  } else {
-    dest->InsertSongs(dest_pos, songs);
-  }
-  source->RemoveRows(rows);
-  Persist(dest);
-  Persist(source);
-}
-
-bool PlaylistManager::UndoCrossMove(int source_id, int dest_id) {
-  if (!PlaylistCrossUndoPair::ShouldPairUndo(source_id, dest_id)) {
-    return false;
-  }
-  Playlist *source = FindById(source_id);
-  Playlist *dest = FindById(dest_id);
-  if (!PlaylistCrossUndoPair::UndoBoth(source, dest)) {
-    return false;
-  }
-  Persist(dest);
-  Persist(source);
-  return true;
-}
-
-void PlaylistManager::InsertUrls(const std::vector<std::string> &urls, int row, bool play_now, bool enqueue, bool enqueue_next) {
-  Playlist *playlist = Visible();
-  if (!playlist) {
-    return;
-  }
-  auto *inserter = new SongLoaderInserter(tagreader_, task_manager_, url_handlers_, collection_backend_, network_);
-  SongLoaderInserter::StartOptions options;
-  options.row = row;
-  options.play_now = play_now;
-  options.enqueue = enqueue;
-  options.enqueue_next = enqueue_next;
-  options.finished = [this, playlist]() { Persist(playlist); };
-  options.play = [this](int play_row) { PlayRequested.Emit(play_row); };
-  options.error = [this](const std::string &message) { Error.Emit(message); };
-  inserter->Start(playlist, urls, options);
-}
-
-void PlaylistManager::LoadAudioCD(int row, bool play_now, bool enqueue, bool enqueue_next,
-                                  const std::vector<std::string> &cdda_fallbacks) {
-  Playlist *playlist = Visible();
-  if (!playlist) {
-    return;
-  }
-  auto *inserter = new SongLoaderInserter(tagreader_, task_manager_, url_handlers_, collection_backend_, network_);
-  SongLoaderInserter::StartOptions options;
-  options.row = row;
-  options.play_now = play_now;
-  options.enqueue = enqueue;
-  options.enqueue_next = enqueue_next;
-  options.cdda_fallbacks = cdda_fallbacks;
-  options.finished = [this, playlist]() { Persist(playlist); };
-  options.play = [this](int play_row) { PlayRequested.Emit(play_row); };
-  options.error = [this](const std::string &message) { Error.Emit(message); };
-  inserter->LoadAudioCD(playlist, options);
-}
-
-void PlaylistManager::RemoveCurrentSong() {
-  Playlist *playlist = Playing();
-  if (!playlist || playlist->current_row() < 0) {
-    return;
-  }
-  playlist->RemoveRows({playlist->current_row()});
-  Persist(playlist);
-}
-
-void PlaylistManager::RefillDynamic() {
-  if (Playlist *playlist = Playing()) {
-    if (playlist->is_dynamic()) {
-      if (playlist->dynamic_generator() && collection_backend_) {
-        playlist->dynamic_generator()->set_collection_backend(collection_backend_);
-      }
-      playlist->RefillDynamic(collection_backend_ ? collection_backend_->Songs() : SongList{});
-    }
-  }
-}
-
-void PlaylistManager::ExpandDynamic() {
-  if (Playlist *playlist = Visible()) {
-    if (playlist->is_dynamic() && collection_backend_) {
-      playlist->ExpandDynamic(collection_backend_->Songs());
-      Persist(playlist);
-    }
-  }
-}
-
-void PlaylistManager::RepopulateDynamic() {
-  if (Playlist *playlist = Visible()) {
-    if (playlist->is_dynamic() && collection_backend_) {
-      playlist->RepopulateDynamic(collection_backend_->Songs());
-      Persist(playlist);
-    }
-  }
-}
-
-void PlaylistManager::TurnOffDynamic() {
-  if (Playlist *playlist = Visible()) {
-    playlist->SetDynamic(false);
-    Persist(playlist);
-  }
-}
-
-void PlaylistManager::SaveActive() {
-  FlushPendingSaves();
-  PersistNow(Playing());
-}
-
-void PlaylistManager::SaveCurrent() {
-  FlushPendingSaves();
-  PersistNow(Visible());
 }
 
 void PlaylistManager::ClearCurrent() {
-  if (Playlist *playlist = Visible()) {
-    playlist->Clear();
-    Persist(playlist);
-  }
+  current()->Clear();
 }
 
 void PlaylistManager::ShuffleCurrent() {
-  if (Playlist *playlist = Visible()) {
-    playlist->Shuffle();
-    Persist(playlist);
-  }
+  current()->Shuffle();
 }
 
 void PlaylistManager::RemoveDuplicatesCurrent() {
-  if (Playlist *playlist = Visible()) {
-    playlist->RemoveDuplicates();
-    Persist(playlist);
-  }
+  current()->RemoveDuplicateSongs();
 }
 
 void PlaylistManager::RemoveUnavailableCurrent() {
-  if (Playlist *playlist = Visible()) {
-    playlist->RemoveUnavailable();
-    Persist(playlist);
-  }
+  current()->RemoveUnavailableSongs();
 }
 
-void PlaylistManager::SongChangeRequestProcessed(const std::string &url, bool valid) {
-  for (const auto &playlist : playlists_) {
-    if (playlist->ApplyValidityOnCurrentSong(url, valid)) {
-      Persist(playlist.get());
-      return;
-    }
-  }
+void PlaylistManager::SetActivePlaying() { active()->Playing(); }
+
+void PlaylistManager::SetActivePaused() { active()->Paused(); }
+
+void PlaylistManager::SetActiveStopped() { active()->Stopped(); }
+
+void PlaylistManager::ChangePlaylistOrder(const QList<int> &ids) {
+  playlist_backend_->SetPlaylistOrder(ids);
 }
 
-void PlaylistManager::RateCurrentSong(float rating) {
-  if (Playlist *playlist = Playing()) {
-    playlist->RateCurrentSong(rating);
-    SchedulePersist(playlist, PlaylistSaveSchedule::Intent::Items);
-    const Song song = playlist->current_song();
-    if (collection_backend_ && PlaylistRating::ShouldWriteCollectionRating(song)) {
-      collection_backend_->SetRating(song.id(), rating);
-    }
-  }
-}
+void PlaylistManager::UpdateSummaryText() {
 
-void PlaylistManager::RateCurrentSong2(int rating) {
-  const int clamped = std::clamp(rating, 0, 5);
-  RateCurrentSong(static_cast<float>(clamped) / 5.0f);
-}
+  int tracks = current()->rowCount();
+  quint64 nanoseconds = 0;
+  int selected = 0;
 
-void PlaylistManager::PlaySmartPlaylist(const std::string &name, bool as_new, bool clear) {
-  SmartPlaylistsModel model;
-  model.Reload();
-  const SmartPlaylistsItem *item = model.ItemByKey(name);
-  if (!item) {
-    for (const SmartPlaylistsItem &candidate : model.items()) {
-      if (candidate.title == name || candidate.key == name) {
-        item = &candidate;
-        break;
+  // Get the length of the selected tracks
+  const QItemSelection ranges = playlists_.value(current_id()).selection;
+  for (const QItemSelectionRange &range : ranges) {
+    if (!range.isValid()) continue;
+
+    selected += range.bottom() - range.top() + 1;
+    for (int i = range.top(); i <= range.bottom(); ++i) {
+      qint64 length = range.model()->index(i, static_cast<int>(Playlist::Column::Length)).data().toLongLong();
+      if (length > 0) {
+        nanoseconds += length;
       }
     }
   }
-  SmartPlaylistSearch search = item ? item->search : SmartPlaylistSearch();
-  const std::string title = item ? item->title : name;
-  auto generator = std::make_shared<PlaylistQueryGenerator>(title, search, true);
-  generator->set_collection_backend(collection_backend_);
-  Playlist *playlist = nullptr;
-  if (as_new || !Visible()) {
-    playlist = New(title);
-  } else {
-    playlist = Visible();
-    if (clear) {
-      playlist->Clear();
+
+  QString summary;
+  if (selected > 1) {
+    summary += tr("%1 selected of").arg(selected) + QLatin1Char(' ');
+  }
+  else {
+    nanoseconds = current()->GetTotalLength();
+  }
+
+  summary += tr("%n track(s)", "", tracks);
+
+  if (nanoseconds > 0) {
+    summary += " - [ "_L1 + Utilities::WordyTimeNanosec(nanoseconds) + " ]"_L1;
+  }
+
+  Q_EMIT SummaryTextChanged(summary);
+
+}
+
+void PlaylistManager::SelectionChanged(const QItemSelection &selection) {
+  playlists_[current_id()].selection = selection;
+  UpdateSummaryText();
+}
+
+void PlaylistManager::UpdateCollectionSongs(const SongList &songs) {
+
+  // Some songs might've changed in the collection, let's update any playlist items we have that match those songs
+
+  for (const Song &song : songs) {
+    for (const Data &data : std::as_const(playlists_)) {
+      const PlaylistItemPtrList items = data.p->collection_items(song.source(), song.id());
+      for (int i = 0; i < items.count(); ++i) {
+        PlaylistItemPtr item = items.at(i);
+        if (item->EffectiveMetadata().directory_id() != song.directory_id()) continue;
+        data.p->UpdateItemMetadata(item, song, false);
+      }
     }
   }
-  if (as_new || clear) {
-    playlist->SetDynamicGenerator(generator);
-  }
-  PlaylistGeneratorInserter inserter;
-  inserter.Insert(playlist, generator);
-  Persist(playlist);
+
 }
 
-void PlaylistManager::SetActivePlaying() {
-  if (active_) {
-    ActiveChanged.Emit(active_);
-  }
-}
+// When Player has processed the new song chosen by the user...
+void PlaylistManager::SongChangeRequestProcessed(const QUrl &url, const bool valid) {
 
-void PlaylistManager::SetActivePaused() {
-  if (active_) {
-    ActiveChanged.Emit(active_);
-  }
-}
-
-void PlaylistManager::SetActiveStopped() {
-  if (active_) {
-    ActiveChanged.Emit(active_);
-  }
-}
-
-void PlaylistManager::CycleRepeatMode() {
-  Playlist *playlist = Visible();
-  if (!playlist) {
-    return;
-  }
-  PlaylistSequence sequence;
-  sequence.SetRepeatMode(playlist->repeat_mode());
-  sequence.CycleRepeatMode();
-  playlist->SetRepeatMode(sequence.repeat_mode());
-  SequenceChanged.Emit();
-}
-
-void PlaylistManager::CycleShuffleMode() {
-  Playlist *playlist = Visible();
-  if (!playlist) {
-    return;
-  }
-  PlaylistSequence sequence;
-  sequence.SetShuffleMode(playlist->shuffle_mode());
-  sequence.CycleShuffleMode();
-  playlist->SetShuffleMode(sequence.shuffle_mode());
-  if (sequence.shuffle_mode() == PlaylistSequence::ShuffleMode::All) {
-    ShuffleCurrent();
-  }
-  SequenceChanged.Emit();
-}
-
-void PlaylistManager::Persist(Playlist *playlist) { SchedulePersist(playlist, PlaylistSaveSchedule::Intent::Full); }
-
-void PlaylistManager::PersistNow(Playlist *playlist) {
-  if (playlist && backend_) {
-    backend_->SavePlaylist(playlist);
-  }
-}
-
-void PlaylistManager::PersistLastPlayed(Playlist *playlist) {
-  SchedulePersist(playlist, PlaylistSaveSchedule::Intent::LastPlayed);
-}
-
-void PlaylistManager::SchedulePersist(Playlist *playlist, PlaylistSaveSchedule::Intent intent) {
-  if (!playlist || !backend_) {
-    return;
-  }
-  if (!PlaylistSaveSchedule::ShouldSchedule(playlist->loading(), playlist->id() >= 0)) {
-    PersistNow(playlist);
-    return;
-  }
-  pending_intent_ = PlaylistSaveSchedule::Merge(pending_intent_, intent);
-  pending_ids_.insert(playlist->id());
-  ArmSaveTimer();
-}
-
-void PlaylistManager::ArmSaveTimer() {
-  if (save_timeout_id_ != 0) {
-    return;
-  }
-  save_timeout_id_ = g_timeout_add_full(
-      G_PRIORITY_DEFAULT, PlaylistSaveSchedule::kDelayMs,
-      +[](gpointer data) -> gboolean {
-        auto *self = static_cast<PlaylistManager *>(data);
-        self->save_timeout_id_ = 0;
-        self->FlushPendingSaves();
-        return G_SOURCE_REMOVE;
-      },
-      this, nullptr);
-}
-
-void PlaylistManager::FlushPendingSaves() {
-  if (save_timeout_id_ != 0) {
-    g_source_remove(save_timeout_id_);
-    save_timeout_id_ = 0;
-  }
-  const PlaylistSaveSchedule::Intent intent = pending_intent_;
-  const std::set<int> ids = pending_ids_;
-  pending_intent_ = PlaylistSaveSchedule::Intent::None;
-  pending_ids_.clear();
-  for (int id : ids) {
-    Playlist *playlist = FindById(id);
-    if (!playlist) {
-      continue;
-    }
-    if (intent == PlaylistSaveSchedule::Intent::LastPlayed) {
-      backend_->SaveLastPlayed(playlist->id(), playlist->last_played_row());
-    } else if (intent == PlaylistSaveSchedule::Intent::Items) {
-      backend_->SavePlaylistItems(playlist->id(), playlist->uuids(), playlist->songs());
-    } else {
-      PersistNow(playlist);
+  const QList<Playlist*> playlists = GetAllPlaylists();
+  for (Playlist *playlist : playlists) {
+    if (playlist->ApplyValidityOnCurrentSong(url, valid)) {
+      return;
     }
   }
+
 }
 
-Playlist *PlaylistManager::FindByName(const std::string &name) const {
-  for (const auto &playlist : playlists_) {
-    if (playlist->name() == name) {
-      return playlist.get();
-    }
-  }
-  return nullptr;
+void PlaylistManager::InsertUrls(const int id, const QList<QUrl> &urls, const int pos, const bool play_now, const bool enqueue, const bool signal) {
+
+  Q_ASSERT(playlists_.contains(id));
+
+  playlists_.constFind(id)->p->InsertUrls(urls, pos, play_now, enqueue, /*enqueue_next=*/false, signal);
+
 }
 
-Playlist *PlaylistManager::FindById(int id) const {
-  for (const auto &playlist : playlists_) {
-    if (playlist->id() == id) {
-      return playlist.get();
-    }
+void PlaylistManager::InsertSongs(const int id, const SongList &songs, const int pos, const bool play_now, const bool enqueue, const bool signal) {
+
+  Q_ASSERT(playlists_.contains(id));
+
+  playlists_.constFind(id)->p->InsertSongs(songs, pos, play_now, enqueue, /*enqueue_next=*/false, signal);
+
+}
+
+void PlaylistManager::RemoveItemsWithoutUndo(const int id, const QList<int> &indices) {
+
+  Q_ASSERT(playlists_.contains(id));
+
+  playlists_.constFind(id)->p->RemoveItemsWithoutUndo(indices);
+
+}
+
+void PlaylistManager::RemoveCurrentSong() const {
+  active()->removeRows(active()->current_index().row(), 1);
+}
+
+void PlaylistManager::RemoveDeletedSongs() {
+
+  const QList<Playlist*> playlists = GetAllPlaylists();
+  for (Playlist *playlist : playlists) {
+    playlist->RemoveDeletedSongs();
   }
-  return nullptr;
+
+}
+
+void PlaylistManager::Open(const int id) {
+
+  if (playlists_.contains(id)) {
+    return;
+  }
+
+  const PlaylistBackend::Playlist &p = playlist_backend_->GetPlaylist(id);
+  if (p.id != id) {
+    return;
+  }
+
+  AddPlaylist(p.id, p.name, p.special_type, p.ui_path, p.favorite);
+
+}
+
+void PlaylistManager::SetCurrentOrOpen(const int id) {
+
+  Open(id);
+  SetCurrentPlaylist(id);
+
+}
+
+bool PlaylistManager::IsPlaylistOpen(const int id) {
+  return playlists_.contains(id);
+}
+
+void PlaylistManager::PlaySmartPlaylist(PlaylistGeneratorPtr generator, bool as_new, bool clear) {
+
+  if (as_new) {
+    New(generator->name());
+  }
+
+  if (clear) {
+    current()->Clear();
+  }
+
+  current()->InsertSmartPlaylist(generator);
+
+}
+
+void PlaylistManager::RateCurrentSong(const float rating) {
+  active()->RateSong(active()->current_index(), rating);
+}
+
+void PlaylistManager::RateCurrentSong2(const int rating) {
+  RateCurrentSong(static_cast<float>(rating) / 5.0F);
+}
+
+void PlaylistManager::SaveAllPlaylists() {
+
+  SavePlaylistsDialog dialog(parser()->file_extensions(PlaylistParser::Type::Save), parser()->default_extension());
+  if (dialog.exec() != QDialog::Accepted) {
+    return;
+  }
+
+  const QString path = dialog.path();
+  if (path.isEmpty() || !QDir().exists(path)) return;
+
+  QString extension = dialog.extension();
+  if (extension.isEmpty()) extension = parser()->default_extension();
+
+  Settings s;
+  s.beginGroup(PlaylistSettings::kSettingsGroup);
+  PlaylistSettings::PathType path_type = static_cast<PlaylistSettings::PathType>(s.value(PlaylistSettings::kPathType, static_cast<int>(PlaylistSettings::kDefaultPathType)).toInt());
+  s.endGroup();
+  if (path_type == PlaylistSettings::PathType::Ask_User) {
+    PlaylistSaveOptionsDialog optionsdialog;
+    optionsdialog.setModal(true);
+    if (optionsdialog.exec() != QDialog::Accepted) return;
+    path_type = optionsdialog.path_type();
+  }
+
+  for (QMap<int, Data>::const_iterator it = playlists_.constBegin(); it != playlists_.constEnd(); ++it) {
+    const Data &data = *it;
+    const QString filepath = path + QLatin1Char('/') + data.name + QLatin1Char('.') + extension;
+    Save(it.key(), data.name, filepath, path_type);
+  }
+
 }

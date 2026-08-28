@@ -1,28 +1,28 @@
+/* This file is part of Strawberry.
+   Copyright 2010, Andrea Decorte <adecorte@gmail.com>
+
+   Strawberry is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+
+   Strawberry is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include "clickablelabel.h"
 
-ClickableLabel::ClickableLabel(const std::string &text) {
-  button_ = gtk_button_new();
-  g_object_ref_sink(button_);
-  gtk_widget_add_css_class(button_, "flat");
-  gtk_widget_add_css_class(button_, "link");
-  label_ = gtk_label_new(text.c_str());
-  gtk_button_set_child(GTK_BUTTON(button_), label_);
-  g_signal_connect(button_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer self) {
-                     auto *w = static_cast<ClickableLabel *>(self);
-                     if (w->clicked_cb_) w->clicked_cb_();
-                   }),
-                   this);
-}
+#include <QWidget>
+#include <QLabel>
 
-ClickableLabel::~ClickableLabel() {
-  if (button_) g_object_unref(button_);
-}
+ClickableLabel::ClickableLabel(QWidget *parent) : QLabel(parent) {}
 
-void ClickableLabel::SetText(const std::string &text) {
-  gtk_label_set_text(GTK_LABEL(label_), text.c_str());
-}
-
-std::string ClickableLabel::text() const {
-  const char *t = gtk_label_get_text(GTK_LABEL(label_));
-  return t ? t : "";
+void ClickableLabel::mousePressEvent(QMouseEvent *event) {
+  Q_EMIT Clicked();
+  QLabel::mousePressEvent(event);
 }

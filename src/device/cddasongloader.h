@@ -1,49 +1,89 @@
-#ifndef STRAWBERRY_CDDASONGLOADER_H
-#define STRAWBERRY_CDDASONGLOADER_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2025, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "core/signal.h"
+#ifndef CDDASONGLOADER_H
+#define CDDASONGLOADER_H
+
+#include "config.h"
+
+#include <gst/gstelement.h>
+#include <gst/audio/gstaudiocdsrc.h>
+
+#include <QObject>
+#include <QMutex>
+#include <QFuture>
+#include <QMap>
+#include <QString>
+#include <QUrl>
+
+#include "includes/shared_ptr.h"
 #include "core/song.h"
+#ifdef HAVE_TAGFETCHER
+#  include "tagfetcher/musicbrainzclient.h"
+#endif
 
-#include <glib.h>
-
-#include <memory>
-#include <string>
-#include <vector>
-
-class MusicBrainzClient;
 class NetworkAccessManager;
 
-class CddaSongLoader {
+class CDDASongLoader : public QObject {
+  Q_OBJECT
+
  public:
-  CddaSongLoader();
-  ~CddaSongLoader();
+  explicit CDDASongLoader(const QUrl &url, QObject *parent = nullptr);
+  ~CDDASongLoader() override;
 
-  static SongList Songs(int first_track, int last_track, const std::vector<int64_t> &lengths_nanosec,
-                       const std::string &device_path = {});
-  static SongList LoadDevice(const std::string &device_path);
-  static SongList LoadDeviceWithFallbacks(const std::string &device_path, const std::vector<std::string> &fallbacks);
+  void LoadSongs();
 
-  // Heap-friendly async TOC + optional MusicBrainz. Do not call Start from unit tests.
-  void Start(const std::string &device_path, NetworkAccessManager *network, const std::vector<std::string> &fallbacks = {});
-
-  Signal<SongList> SongsLoaded;
-  Signal<SongList> SongsUpdated;
-  Signal<std::string> LoadError;
-  Signal<> LoadingFinished;
+  bool IsActive() const { return loading_future_.isRunning(); }
 
  private:
-  void LoadBlocking();
-  void FinishWithError(const std::string &error);
-  static gpointer Thread(gpointer data);
-  static gboolean IdleLoaded(gpointer data);
+  void LoadSongsFromCDDA();
+  void Error(const QString &error);
+  QUrl GetUrlFromTrack(const int track_number) const;
 
-  NetworkAccessManager *network_ = nullptr;
-  std::string device_path_;
-  std::vector<std::string> fallbacks_;
-  SongList songs_;
-  bool active_ = false;
-  std::shared_ptr<bool> alive_;
-  std::unique_ptr<MusicBrainzClient> musicbrainz_;
+ Q_SIGNALS:
+  void SongsLoaded(const SongList &songs);
+  void SongsUpdated(const SongList &songs);
+  void LoadError(const QString &error);
+  void LoadingFinished();
+  void LoadTagsFromMusicBrainz(const QString &musicbrainz_discid, const QMap<int, Song> &songs);
+
+ private Q_SLOTS:
+#ifdef HAVE_TAGFETCHER
+  void LoadTagsFromMusicBrainzSlot(const QString &musicbrainz_discid, const QMap<int, Song> &songs);
+  void LoadTagsFromMusicBrainzFinished(const QString &musicbrainz_discid, const MusicBrainzClient::ResultList &results, const QString &error);
+#endif
+
+ private:
+  const QUrl url_;
+#ifdef HAVE_TAGFETCHER
+  SharedPtr<NetworkAccessManager> network_;
+  MusicBrainzClient *musicbrainz_client_;
+#endif
+  QMutex mutex_load_;
+  QFuture<void> loading_future_;
+#ifdef HAVE_TAGFETCHER
+  QString musicbrainz_discid_;
+  QMap<int, Song> musicbrainz_songs_;
+#endif
+  bool whatever_;
 };
 
-#endif
+#endif  // CDDASONGLOADER_H

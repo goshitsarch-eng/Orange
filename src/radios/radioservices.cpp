@@ -1,200 +1,150 @@
-#include "radios/radioservices.h"
+/*
+ * Strawberry Music Player
+ * Copyright 2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "constants/radiobrowsersettings.h"
-#include "core/logging.h"
-#include "core/settings.h"
-#include "playlistparsers/playlistparser.h"
-#include "radios/radiobackend.h"
-#include "radios/radiobrowsersearchopts.h"
-#include "radios/radiobrowserservice.h"
-#include "radios/radioparadiseservice.h"
-#include "radios/somafmservice.h"
-
-#include <algorithm>
 #include <memory>
 
-RadioServices::RadioServices(Database *database, NetworkAccessManager *network)
-    : network_(network), backend_(std::make_unique<RadioBackend>(database)) {
-  Reload();
+#include <QObject>
+#include <QSortFilterProxyModel>
+
+#include "includes/shared_ptr.h"
+#include "core/logging.h"
+#include "core/database.h"
+#include "core/networkaccessmanager.h"
+#include "radioservices.h"
+#include "radiobackend.h"
+#include "radiomodel.h"
+#include "radioservice.h"
+#include "radiochannel.h"
+#include "somafmservice.h"
+#include "radioparadiseservice.h"
+#include "radiobrowserservice.h"
+
+using std::make_shared;
+
+RadioServices::RadioServices(const SharedPtr<TaskManager> task_manager,
+                             const SharedPtr<NetworkAccessManager> network,
+                             const SharedPtr<Database> database,
+                             const SharedPtr<AlbumCoverLoader> albumcover_loader,
+                             QObject *parent)
+    : QObject(parent),
+      network_(network),
+      backend_(nullptr),
+      model_(new RadioModel(albumcover_loader, this)),
+      sort_model_(new QSortFilterProxyModel(this)),
+      channels_refresh_(false) {
+
+  backend_ = make_shared<RadioBackend>(database);
+  backend_->moveToThread(database->thread());
+
+  QObject::connect(&*backend_, &RadioBackend::NewChannels, this, &RadioServices::GotChannelsFromBackend);
+
+  sort_model_->setSourceModel(model_);
+  sort_model_->setSortRole(RadioModel::Role_SortText);
+  sort_model_->setDynamicSortFilter(true);
+  sort_model_->setSortLocaleAware(true);
+  sort_model_->sort(0);
+
+  AddService(new SomaFMService(task_manager, network_, this));
+  AddService(new RadioParadiseService(task_manager, network_, this));
+  AddService(new RadioBrowserService(task_manager, network_, this));
+
 }
 
-void RadioServices::Reload() {
-  channels_.clear();
-  if (backend_) {
-    channels_ = backend_->Load();
+void RadioServices::AddService(RadioService *service) {
+
+  qLog(Debug) << "Adding radio service:" << service->name();
+  services_.insert(service->source(), service);
+
+  QObject::connect(service, &RadioService::NewChannels, this, &RadioServices::GotChannelsFromService);
+  QObject::connect(service, &RadioService::destroyed, this, &RadioServices::ServiceDeleted);
+
+}
+
+void RadioServices::RemoveService(RadioService *service) {
+
+  if (!services_.contains(service->source())) return;
+
+  services_.remove(service->source());
+  QObject::disconnect(service, nullptr, this, nullptr);
+
+}
+
+void RadioServices::ServiceDeleted() {
+
+  RadioService *service = qobject_cast<RadioService*>(sender());
+  if (service) RemoveService(service);
+
+}
+
+RadioService *RadioServices::ServiceBySource(const Song::Source source) const {
+
+  if (services_.contains(source)) return services_.value(source);
+  return nullptr;
+
+}
+
+void RadioServices::ReloadSettings() {
+
+  for (RadioService *service : std::as_const(services_)) {
+    service->ReloadSettings();
   }
+
 }
 
-void RadioServices::Persist(const RadioChannel &channel) {
-  if (backend_) {
-    backend_->Save(channel);
+void RadioServices::GetChannels() {
+
+  model_->Reset();
+  backend_->GetChannelsAsync();
+
+}
+
+void RadioServices::RefreshChannels() {
+
+  channels_refresh_ = true;
+  model_->Reset();
+  backend_->DeleteChannelsAsync();
+
+  for (RadioService *service : std::as_const(services_)) {
+    service->GetChannels();
   }
+
 }
 
-void RadioServices::RemoveSource(Song::Source source, bool persist) {
-  channels_.erase(std::remove_if(channels_.begin(), channels_.end(),
-                                 [source](const RadioChannel &channel) { return channel.source == source; }),
-                  channels_.end());
-  if (persist && backend_) {
-    backend_->RemoveSource(source);
-  }
-}
+void RadioServices::GotChannelsFromBackend(const RadioChannelList &channels) {
 
-void RadioServices::NotifyUpdated() {
-  if (updated_) {
-    updated_();
-  }
-}
-
-void RadioServices::AddCustomStream(const std::string &name, const std::string &url) {
-  RadioChannel channel;
-  channel.name = name;
-  channel.url = url;
-  channel.source = Song::Source::Stream;
-  channels_.push_back(channel);
-  Persist(channel);
-  NotifyUpdated();
-}
-
-void RadioServices::ResolveSomaFMPlaylists(std::vector<RadioChannel> channels) {
-  if (channels.empty()) {
-    NotifyUpdated();
-    return;
-  }
-  if (!network_) {
-    for (const RadioChannel &channel : channels) {
-      channels_.push_back(channel);
-      Persist(channel);
+  if (channels.isEmpty()) {
+    if (!channels_refresh_) {
+      RefreshChannels();
     }
-    NotifyUpdated();
-    return;
   }
-  auto remaining = std::make_shared<int>(static_cast<int>(channels.size()));
-  auto results = std::make_shared<std::vector<RadioChannel>>(std::move(channels));
-  for (size_t i = 0; i < results->size(); ++i) {
-    const std::string playlist_url = (*results)[i].url;
-    network_->Get(playlist_url, [this, remaining, results, i](const NetworkAccessManager::Response &response) {
-      if (response.ok()) {
-        PlaylistParser parser;
-        const SongList songs = parser.LoadFromData(response.body, (*results)[i].url);
-        if (!songs.empty() && !songs.front().url().empty()) {
-          (*results)[i].url = songs.front().url();
-        }
-      }
-      if (--(*remaining) == 0) {
-        for (const RadioChannel &channel : *results) {
-          channels_.push_back(channel);
-          Persist(channel);
-        }
-        NotifyUpdated();
-      }
-    });
+  else {
+    model_->AddChannels(channels);
+    channels_refresh_ = false;
   }
+
 }
 
-void RadioServices::FetchSomaFM() {
-  if (!network_) {
-    return;
-  }
-  network_->Get(SomaFMService::kApiChannelsUrl, [this](const NetworkAccessManager::Response &response) {
-    if (!response.ok()) {
-      return;
-    }
-    Settings settings;
-    settings.BeginGroup("SomaFM");
-    std::vector<RadioChannel> parsed = SomaFMService::ParseChannels(response.body, settings.Value("quality", SomaFMService::kQualityDefault));
-    RemoveSource(Song::Source::SomaFM, true);
-    if (parsed.empty()) {
-      RadioChannel channel;
-      channel.name = "SomaFM Groove Salad";
-      channel.url = "https://ice1.somafm.com/groovesalad-128-mp3";
-      channel.source = Song::Source::SomaFM;
-      channels_.push_back(channel);
-      Persist(channel);
-      NotifyUpdated();
-      return;
-    }
-    ResolveSomaFMPlaylists(std::move(parsed));
-  });
-}
+void RadioServices::GotChannelsFromService(const RadioChannelList &channels) {
 
-void RadioServices::FetchRadioParadise() {
-  if (!network_) {
-    return;
-  }
-  network_->Get(RadioParadiseService::kApiChannelsUrl, [this](const NetworkAccessManager::Response &response) {
-    if (!response.ok()) {
-      return;
-    }
-    std::vector<RadioChannel> parsed = RadioParadiseService::ParseChannels(response.body);
-    RemoveSource(Song::Source::RadioParadise, true);
-    if (parsed.empty()) {
-      RadioChannel channel;
-      channel.name = "Radio Paradise";
-      Settings settings;
-      settings.BeginGroup("RadioParadise");
-      channel.url = "https://stream.radioparadise.com/" + settings.Value("quality", "aac-320");
-      channel.source = Song::Source::RadioParadise;
-      parsed.push_back(channel);
-    }
-    for (const RadioChannel &channel : parsed) {
-      channels_.push_back(channel);
-      Persist(channel);
-    }
-    NotifyUpdated();
-  });
-}
+  RadioService *service = qobject_cast<RadioService*>(sender());
+  if (!service) return;
 
-void RadioServices::FetchRadioBrowser(const std::string &query) {
-  Settings settings;
-  settings.BeginGroup(RadioBrowserSettings::kSettingsGroup);
-  SearchRadioBrowser(query, settings.Value(RadioBrowserSettings::kDefaultCountry),
-                     settings.Value(RadioBrowserSettings::kDefaultSort, RadioBrowserSettings::kDefaultSortDefault),
-                     settings.IntValue(RadioBrowserSettings::kSearchLimit, RadioBrowserSettings::kSearchLimitDefault), 0,
-                     settings.BoolValue(RadioBrowserSettings::kHideBroken, RadioBrowserSettings::kHideBrokenDefault),
-                     [this](const std::vector<RadioChannel> &channels, bool, const std::string &) {
-                       search_results_ = channels;
-                       NotifyUpdated();
-                     });
-}
+  backend_->AddChannelsAsync(channels);
 
-void RadioServices::SearchRadioBrowser(const std::string &query, const std::string &country, const std::string &order, int limit,
-                                       int offset, bool hide_broken, SearchDone done) {
-  if (!network_) {
-    if (done) {
-      done({}, false, {});
-    }
-    return;
-  }
-  Settings settings;
-  settings.BeginGroup(RadioBrowserSettings::kSettingsGroup);
-  const std::string url = RadioBrowserService::SearchUrl(settings.Value("server", RadioBrowserService::DefaultServer()), query, country,
-                                                         hide_broken, limit, offset, order);
-  network_->Get(url, [done, limit](const NetworkAccessManager::Response &response) {
-    if (!response.ok()) {
-      if (done) {
-        done({}, false, RadioBrowserSearchOpts::SearchFailed(response.error));
-      }
-      return;
-    }
-    const RadioBrowserService::StationPage page = RadioBrowserService::ParseStationPage(response.body);
-    if (done) {
-      done(page.channels, RadioBrowserSearchOpts::HasMore(page.raw_count, limit), {});
-    }
-  });
-}
-
-void RadioServices::FetchCountries(CountriesDone done) {
-  if (!network_ || !done) {
-    return;
-  }
-  Settings settings;
-  settings.BeginGroup(RadioBrowserSettings::kSettingsGroup);
-  const std::string url = RadioBrowserService::CountriesUrl(settings.Value("server", RadioBrowserService::DefaultServer()));
-  network_->Get(url, [done](const NetworkAccessManager::Response &response) {
-    if (!RadioBrowserSearchOpts::ShouldInvokeCountriesCallback(response.ok())) {
-      return;
-    }
-    done(RadioBrowserService::ParseCountries(response.body));
-  });
 }

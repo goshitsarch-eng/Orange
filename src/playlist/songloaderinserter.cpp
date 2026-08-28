@@ -1,242 +1,245 @@
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2019-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
 #include "config.h"
-#include "playlist/songloaderinserter.h"
 
-#include "core/songloader.h"
+#include <utility>
+
+#include <QtConcurrentRun>
+#include <QtAlgorithms>
+#include <QList>
+#include <QUrl>
+
+#include "includes/shared_ptr.h"
+#include "core/logging.h"
+#include "core/urlhandlers.h"
 #include "core/taskmanager.h"
-#include "device/cddasongloader.h"
-#include "playlist/playlist.h"
-#include "playlist/playlistcdda.h"
-#include "playlist/songloaderinserterplan.h"
+#include "core/songloader.h"
+#include "playlist.h"
+#include "songloaderinserter.h"
 
-#include <glib.h>
-
-SongLoaderInserter::SongLoaderInserter(TagReader *tagreader, TaskManager *task_manager, UrlHandlers *url_handlers,
-                                       CollectionBackend *collection_backend, NetworkAccessManager *network)
-    : tagreader_(tagreader),
+SongLoaderInserter::SongLoaderInserter(const SharedPtr<TaskManager> task_manager,
+                                       const SharedPtr<TagReaderClient> tagreader_client,
+                                       const SharedPtr<UrlHandlers> url_handlers,
+                                       const SharedPtr<CollectionBackendInterface> collection_backend,
+                                       QObject *parent)
+    : QObject(parent),
       task_manager_(task_manager),
+      tagreader_client_(tagreader_client),
       url_handlers_(url_handlers),
       collection_backend_(collection_backend),
-      network_(network) {}
+      destination_(nullptr),
+      row_(-1),
+      play_now_(true),
+      enqueue_(false),
+      enqueue_next_(false),
+      signal_(false) {}
 
-SongLoaderInserter::~SongLoaderInserter() = default;
+SongLoaderInserter::~SongLoaderInserter() { qDeleteAll(pending_); }
 
-SongList SongLoaderInserter::Load(const std::vector<std::string> &urls) const {
-  if (!tagreader_) {
-    return {};
-  }
-  SongLoader loader(url_handlers_, collection_backend_, tagreader_);
-  const SongLoader::Result result = loader.LoadMany(urls);
-  if (result == SongLoader::Result::BlockingLoadRequired) {
-    loader.LoadFilenamesBlocking();
-  }
-  loader.LoadMetadataBlocking();
-  return loader.songs();
-}
+void SongLoaderInserter::Load(Playlist *destination, const int row, const bool play_now, const bool enqueue, const bool enqueue_next, const QList<QUrl> &urls, const bool signal) {
 
-int SongLoaderInserter::Insert(Playlist *playlist, const std::vector<std::string> &urls, int row) const {
-  const SongList songs = Load(urls);
-  if (!playlist || songs.empty()) {
-    return 0;
-  }
-  if (row < 0) {
-    playlist->AppendSongs(songs);
-  } else {
-    playlist->InsertSongs(row, songs);
-  }
-  return static_cast<int>(songs.size());
-}
-
-void SongLoaderInserter::Start(Playlist *destination, const std::vector<std::string> &urls, const StartOptions &options) {
   destination_ = destination;
-  row_ = options.row;
-  play_now_ = options.play_now;
-  enqueue_ = options.enqueue;
-  enqueue_next_ = options.enqueue_next;
-  finished_ = options.finished;
-  play_ = options.play;
-  error_ = options.error;
-  if (!tagreader_) {
-    NotifyFinished();
-    delete this;
-    return;
-  }
-  for (const std::string &url : urls) {
-    auto loader = std::make_unique<SongLoader>(url_handlers_, collection_backend_, tagreader_);
+  row_ = row;
+  play_now_ = play_now;
+  enqueue_ = enqueue;
+  enqueue_next_ = enqueue_next;
+  signal_ = signal;
+
+  QObject::connect(destination, &Playlist::destroyed, this, &SongLoaderInserter::DestinationDestroyed);
+  QObject::connect(this, &SongLoaderInserter::PreloadFinished, this, &SongLoaderInserter::InsertSongs);
+  QObject::connect(this, &SongLoaderInserter::EffectiveLoadFinished, destination, &Playlist::UpdateItems);
+
+  for (const QUrl &url : urls) {
+    SongLoader *loader = new SongLoader(url_handlers_, collection_backend_, tagreader_client_, this);
+
     const SongLoader::Result result = loader->Load(url);
+
     if (result == SongLoader::Result::BlockingLoadRequired) {
-      pending_.push_back(std::move(loader));
+      pending_.append(loader);
       continue;
     }
+
     if (result == SongLoader::Result::Success) {
-      songs_.insert(songs_.end(), loader->songs().begin(), loader->songs().end());
-      if (!loader->playlist_name().empty()) {
-        playlist_name_ = loader->playlist_name();
+      songs_ << loader->songs();
+      playlist_name_ = loader->playlist_name();
+    }
+    
+    // Always check for errors, even on success (e.g., playlist parsed but some songs failed to load)
+    const QStringList errors = loader->errors();
+    for (const QString &error : errors) {
+      Q_EMIT Error(error);
+    }
+    
+    delete loader;
+  }
+
+  if (pending_.isEmpty()) {
+    InsertSongs();
+    deleteLater();
+  }
+  else {
+    (void)QtConcurrent::run(&SongLoaderInserter::AsyncLoad, this);
+  }
+
+}
+
+// Load audio CD tracks:
+// First, we add tracks (without metadata) into the playlist
+// In the meantime, MusicBrainz will be queried to get songs' metadata.
+// AudioCDTagsLoaded will be called next, and playlist's items will be updated.
+void SongLoaderInserter::LoadAudioCD(Playlist *destination, const int row, const bool play_now, const bool enqueue, const bool enqueue_next) {
+
+  destination_ = destination;
+  row_ = row;
+  play_now_ = play_now;
+  enqueue_ = enqueue;
+  enqueue_next_ = enqueue_next;
+
+  SongLoader *loader = new SongLoader(url_handlers_, collection_backend_, tagreader_client_, this);
+  QObject::connect(loader, &SongLoader::AudioCDTracksLoaded, this, &SongLoaderInserter::AudioCDTracksLoadedSlot);
+  QObject::connect(loader, &SongLoader::AudioCDTracksUpdated, this, &SongLoaderInserter::AudioCDTracksUpdatedSlot);
+  QObject::connect(loader, &SongLoader::AudioCDLoadingFinished, this, &SongLoaderInserter::AudioCDLoadingFinishedSlot);
+  qLog(Info) << "Loading audio CD...";
+  const SongLoader::Result result = loader->LoadAudioCD();
+  if (result == SongLoader::Result::Error) {
+    if (loader->errors().isEmpty()) {
+      Q_EMIT Error(tr("Error while loading audio CD."));
+    }
+    else {
+      const QStringList errors = loader->errors();
+      for (const QString &error : errors) {
+        Q_EMIT Error(error);
       }
     }
+    delete loader;
   }
-  if (pending_.empty()) {
+
+  // Songs will be loaded later: see AudioCDTracksLoadFinished and AudioCDTagsLoaded slots
+
+}
+
+void SongLoaderInserter::DestinationDestroyed() { destination_ = nullptr; }
+
+void SongLoaderInserter::AudioCDTracksLoadedSlot() {
+
+  SongLoader *loader = qobject_cast<SongLoader*>(sender());
+  if (!loader) return;
+
+  songs_ = loader->songs();
+  if (songs_.isEmpty()) {
+    const QStringList errors = loader->errors();
+    for (const QString &error : errors) {
+      Q_EMIT Error(error);
+    }
+  }
+  else {
     InsertSongs();
-    NotifyFinished();
-    delete this;
-    return;
   }
-  g_thread_unref(g_thread_new("song-loader", SongLoaderInserter::AsyncThread, this));
+
+}
+
+void SongLoaderInserter::AudioCDTracksUpdatedSlot() {
+
+  SongLoader *loader = qobject_cast<SongLoader*>(sender());
+  if (!loader || loader->songs().isEmpty() || !destination_) return;
+
+  destination_->UpdateItems(loader->songs());
+
+}
+
+void SongLoaderInserter::AudioCDLoadingFinishedSlot(const bool success) {
+
+  Q_UNUSED(success)
+
+  deleteLater();
+
 }
 
 void SongLoaderInserter::InsertSongs() {
-  if (!destination_ || songs_.empty()) {
-    return;
-  }
-  const int insert_at = SongLoaderInserterPlan::InsertAt(row_, destination_->row_count());
-  if (row_ < 0) {
-    destination_->AppendSongs(songs_);
-  } else {
-    destination_->InsertSongs(row_, songs_);
-  }
-  if (enqueue_) {
-    for (size_t i = 0; i < songs_.size(); ++i) {
-      destination_->queue()->Append(songs_[i], destination_->id(), insert_at + static_cast<int>(i));
-    }
-  } else if (enqueue_next_) {
-    for (int i = static_cast<int>(songs_.size()) - 1; i >= 0; --i) {
-      destination_->queue()->InsertNext(songs_[static_cast<size_t>(i)], destination_->id(), insert_at + i);
-    }
-  }
-  if (play_now_ && play_) {
-    play_(insert_at);
-  }
-}
 
-void SongLoaderInserter::NotifyFinished() {
-  if (finished_) {
-    finished_();
+  // Insert songs (that haven't been completely loaded) to allow user to see and play them while not loaded completely
+  if (destination_) {
+    destination_->InsertSongsOrCollectionItems(songs_, playlist_name_, row_, play_now_, enqueue_, enqueue_next_, signal_);
   }
-}
 
-void SongLoaderInserter::EmitError(const std::string &error) {
-  if (error_) {
-    error_(PlaylistCdda::ErrorOrFallback(error));
-  }
-}
-
-void SongLoaderInserter::DeleteLater() { g_idle_add(SongLoaderInserter::DeleteIdle, this); }
-
-gboolean SongLoaderInserter::DeleteIdle(gpointer data) {
-  delete static_cast<SongLoaderInserter *>(data);
-  return G_SOURCE_REMOVE;
-}
-
-void SongLoaderInserter::LoadAudioCD(Playlist *destination, const StartOptions &options) {
-  destination_ = destination;
-  row_ = options.row;
-  play_now_ = options.play_now;
-  enqueue_ = options.enqueue;
-  enqueue_next_ = options.enqueue_next;
-  finished_ = options.finished;
-  play_ = options.play;
-  error_ = options.error;
-#ifndef HAVE_AUDIOCD
-  EmitError(PlaylistCdda::MissingPlaybackError());
-  NotifyFinished();
-  delete this;
-  return;
-#else
-  cdda_ = std::make_unique<CddaSongLoader>();
-  cdda_->SongsLoaded.Connect([this](const SongList &songs) {
-    songs_ = songs;
-    if (songs_.empty()) {
-      EmitError(PlaylistCdda::EmptyError());
-      return;
-    }
-    InsertSongs();
-  });
-  cdda_->SongsUpdated.Connect([this](const SongList &songs) {
-    if (destination_) {
-      destination_->UpdateItems(songs);
-    }
-  });
-  cdda_->LoadError.Connect([this](const std::string &message) { EmitError(message); });
-  cdda_->LoadingFinished.Connect([this]() {
-    NotifyFinished();
-    DeleteLater();
-  });
-  cdda_->Start(options.cdda_device, network_, options.cdda_fallbacks);
-#endif
-}
-
-gpointer SongLoaderInserter::AsyncThread(gpointer data) {
-  static_cast<SongLoaderInserter *>(data)->AsyncLoad();
-  return nullptr;
 }
 
 void SongLoaderInserter::AsyncLoad() {
-  int task_id = 0;
-  if (task_manager_) {
-    task_id = task_manager_->StartTask(SongLoaderInserterPlan::PreloadTaskName());
-    task_manager_->SetTaskProgress(task_id, 0, static_cast<int>(pending_.size()));
-  }
+
+  // First, quick load raw songs.
+  int async_progress = 0;
+  int async_load_id = task_manager_->StartTask(tr("Loading tracks"));
+  task_manager_->SetTaskProgress(async_load_id, static_cast<quint64>(async_progress), static_cast<quint64>(pending_.count()));
   bool first_loaded = false;
   int first_loaded_index = -1;
-  for (size_t i = 0; i < pending_.size(); ++i) {
-    SongLoader *loader = pending_[i].get();
+  for (int i = 0; i < pending_.count(); ++i) {
+    SongLoader *loader = pending_.value(i);
     const SongLoader::Result result = loader->LoadFilenamesBlocking();
-    if (task_manager_) {
-      task_manager_->SetTaskProgress(task_id, static_cast<int>(i + 1), static_cast<int>(pending_.size()));
+    task_manager_->SetTaskProgress(async_load_id, static_cast<quint64>(++async_progress));
+
+    // Always check for errors, even on success (e.g., playlist parsed but some songs failed to load)
+    const QStringList errors = loader->errors();
+    for (const QString &error : errors) {
+      Q_EMIT Error(error);
     }
+
     if (result == SongLoader::Result::Error) {
       continue;
     }
-    if (SongLoaderInserterPlan::ShouldLoadFirstMetadata(first_loaded, true)) {
+
+    if (!first_loaded) {
+      // Load everything from the first song.
+      // It'll start playing as soon as we emit PreloadFinished, so it needs to have the duration set to show properly in the UI.
       loader->LoadMetadataBlocking();
       first_loaded = true;
-      first_loaded_index = static_cast<int>(i);
+      first_loaded_index = i;
     }
-    songs_.insert(songs_.end(), loader->songs().begin(), loader->songs().end());
-    if (!loader->playlist_name().empty()) {
-      playlist_name_ = loader->playlist_name();
-    }
-  }
-  if (task_manager_ && task_id > 0) {
-    task_manager_->SetTaskFinished(task_id);
-  }
-  g_idle_add(SongLoaderInserter::PreloadIdle, this);
 
-  task_id = 0;
-  if (task_manager_) {
-    task_id = task_manager_->StartTask(SongLoaderInserterPlan::MetadataTaskName());
-    task_manager_->SetTaskProgress(task_id, 0, static_cast<int>(songs_.size()));
+    songs_ << loader->songs();
+    playlist_name_ = loader->playlist_name();
+
   }
+  task_manager_->SetTaskFinished(async_load_id);
+  Q_EMIT PreloadFinished();
+
+  // Songs are inserted in playlist, now load them completely.
+  async_progress = 0;
+  async_load_id = task_manager_->StartTask(tr("Loading tracks info"));
+  task_manager_->SetTaskProgress(async_load_id, static_cast<quint64>(async_progress), static_cast<quint64>(songs_.count()));
   SongList songs;
-  for (size_t i = 0; i < pending_.size(); ++i) {
-    SongLoader *loader = pending_[i].get();
-    if (static_cast<int>(i) != first_loaded_index) {
+  for (int i = 0; i < pending_.count(); ++i) {
+    SongLoader *loader = pending_.value(i);
+    if (i != first_loaded_index) {
+      // We already did this earlier for the first successfully-loaded song.
       loader->LoadMetadataBlocking();
     }
-    songs.insert(songs.end(), loader->songs().begin(), loader->songs().end());
-    if (task_manager_) {
-      task_manager_->SetTaskProgress(task_id, static_cast<int>(songs.size()), static_cast<int>(songs_.size()));
-    }
+    songs << loader->songs();
+    task_manager_->SetTaskProgress(async_load_id, static_cast<quint64>(songs.count()));
   }
-  if (task_manager_ && task_id > 0) {
-    task_manager_->SetTaskFinished(task_id);
-  }
-  effective_songs_ = songs;
-  g_idle_add(SongLoaderInserter::EffectiveIdle, this);
-}
+  task_manager_->SetTaskFinished(async_load_id);
 
-gboolean SongLoaderInserter::PreloadIdle(gpointer data) {
-  auto *self = static_cast<SongLoaderInserter *>(data);
-  self->InsertSongs();
-  self->NotifyFinished();
-  return G_SOURCE_REMOVE;
-}
+  // Replace the partially-loaded items by the new ones, fully loaded.
+  Q_EMIT EffectiveLoadFinished(songs);
 
-gboolean SongLoaderInserter::EffectiveIdle(gpointer data) {
-  auto *self = static_cast<SongLoaderInserter *>(data);
-  if (self->destination_) {
-    self->destination_->UpdateItems(self->effective_songs_);
-  }
-  self->NotifyFinished();
-  delete self;
-  return G_SOURCE_REMOVE;
+  deleteLater();
+
 }

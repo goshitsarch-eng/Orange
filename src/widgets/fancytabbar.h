@@ -1,49 +1,52 @@
-#ifndef STRAWBERRY_FANCYTABBAR_H
-#define STRAWBERRY_FANCYTABBAR_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2018, Vikram Ambrose <ambroseworks@gmail.com>
+ * Copyright 2018-2024, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "widgets/fancytabdata.h"
-#include "widgets/fancytabmode.h"
+#ifndef FANCYTABBAR_H
+#define FANCYTABBAR_H
 
-#include <functional>
-#include <gtk/gtk.h>
-#include <string>
-#include <vector>
+#include <QTabBar>
+#include <QString>
 
-class FancyTabBar {
+class QEvent;
+class QMouseEvent;
+class QPaintEvent;
+
+class FancyTabBar : public QTabBar {
+  Q_OBJECT
+
  public:
-  using ActivateCallback = std::function<void(const std::string &)>;
-  using ModeChangedCallback = std::function<void(FancyTabMode::Mode)>;
+  explicit FancyTabBar(QWidget *parent = nullptr);
 
-  FancyTabBar();
+  QString TabText(const int index) const;
+  QSize sizeHint() const override;
+  int width() const;
 
-  GtkWidget *widget() const { return widget_; }
-  FancyTabMode::Mode mode() const { return mode_; }
-  const std::string &active() const { return active_; }
-  int ActiveIndex() const;
-
-  void AddTab(const std::string &id, const std::string &title, const std::string &icon);
-  void SetActive(const std::string &id, bool notify = true);
-  void SetActiveIndex(int index, bool notify = true);
-  void SetMode(FancyTabMode::Mode mode);
-  void ReloadIconSizes();
-  void SetActivateCallback(ActivateCallback callback);
-  void SetModeChangedCallback(ModeChangedCallback callback);
-  gboolean OnKeyPressed(guint keyval, GdkModifierType state);
+ protected:
+  QSize tabSizeHint(const int index) const override;
+  void leaveEvent(QEvent *event) override;
+  void mouseMoveEvent(QMouseEvent *event) override;
+  void paintEvent(QPaintEvent *pe) override;
 
  private:
-  void Rebuild();
-  void ShowModeMenu();
-  void UpdateToggles() const;
-  int IconPixels() const;
-
-  GtkWidget *widget_ = nullptr;
-  FancyTabMode::Mode mode_ = FancyTabMode::kDefaultMode;
-  std::string active_;
-  std::vector<FancyTabData> tabs_;
-  ActivateCallback activate_;
-  ModeChangedCallback mode_changed_;
-  int icon_large_ = FancyTabMode::kLargeIcon;
-  int icon_small_ = FancyTabMode::kSmallIcon;
+  int mouseHoverTabIndex;
 };
 
-#endif
+#endif  // FANCYTABBAR_H

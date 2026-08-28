@@ -1,14 +1,40 @@
-#ifndef STRAWBERRY_XMLUTILS_H
-#define STRAWBERRY_XMLUTILS_H
+/*
+ * Strawberry Music Player
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include <string>
+#ifndef XMLUTILS_H
+#define XMLUTILS_H
 
-namespace XmlUtils {
+#include <QString>
+#include <QXmlStreamReader>
 
-std::string Escape(const std::string &value);
-std::string Unescape(const std::string &value);
-std::string Tag(const std::string &name, const std::string &value);
+namespace Utilities {
 
-}  // namespace XmlUtils
+// Reads all children of the current element,
+// and returns with the stream reader either on the EndElement for the current element, or the end of the file - whichever came first.
+void ConsumeCurrentElement(QXmlStreamReader *reader);
 
-#endif
+// Advances the stream reader until it finds an element with the given name.
+// Returns false if the end of the document was reached before finding a matching element.
+bool ParseUntilElement(QXmlStreamReader *reader, const QString &name);
+bool ParseUntilElementCI(QXmlStreamReader *reader, const QString &name);
+
+}  // namespace Utilities
+
+#endif  // XMLUTILS_H

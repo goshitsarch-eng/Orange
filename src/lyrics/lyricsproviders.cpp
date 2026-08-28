@@ -1,137 +1,143 @@
-#include "lyrics/lyricsproviders.h"
+/*
+ * Strawberry Music Player
+ * Copyright 2018-2026, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
 #include "config.h"
 
-#include "constants/lyricssettings.h"
+#include <utility>
+
+#include <QMutex>
+#include <QList>
+#include <QMap>
+#include <QString>
+#include <QStringList>
+#include <QSettings>
+
+#include "core/logging.h"
 #include "core/settings.h"
-#include "lyrics/lyricsproviderorder.h"
-#include "lyrics/lyricsprovidersettings.h"
-#include "lyrics/azlyricscomlyricsprovider.h"
-#include "lyrics/elyricsnetlyricsprovider.h"
-#include "lyrics/geniuslyricsprovider.h"
-#include "lyrics/letraslyricsprovider.h"
-#include "lyrics/lrcliblyricsprovider.h"
-#include "lyrics/musixmatchlyricsprovider.h"
-#include "lyrics/ovhlyricsprovider.h"
-#include "lyrics/songlyricscomlyricsprovider.h"
 
-#include <algorithm>
+#include "lyricsprovider.h"
+#include "lyricsproviders.h"
 
-LyricsProviders::LyricsProviders(NetworkAccessManager *network) : network_(network) {
-  providers_.push_back(std::make_unique<LrcLibLyricsProvider>());
-  providers_.push_back(std::make_unique<OVHLyricsProvider>());
-  providers_.push_back(std::make_unique<GeniusLyricsProvider>());
-  providers_.push_back(std::make_unique<MusixmatchLyricsProvider>());
-  providers_.push_back(std::make_unique<AzLyricsComLyricsProvider>());
-  providers_.push_back(std::make_unique<ElyricsNetLyricsProvider>());
-  providers_.push_back(std::make_unique<LetrasLyricsProvider>());
-  providers_.push_back(std::make_unique<SongLyricsComLyricsProvider>());
-  ReloadSettings();
+#include "constants/lyricssettings.h"
+
+int LyricsProviders::NextOrderId = 0;
+
+LyricsProviders::LyricsProviders(QObject *parent) : QObject(parent), next_id_(0) {
+
+  setObjectName(QLatin1String(QObject::metaObject()->className()));
+
+}
+
+LyricsProviders::~LyricsProviders() {
+
+  while (!lyrics_providers_.isEmpty()) {
+    delete lyrics_providers_.constBegin().key();
+  }
+
 }
 
 void LyricsProviders::ReloadSettings() {
-  Settings settings;
-  settings.BeginGroup(LyricsSettings::kSettingsGroup);
-  const std::vector<std::string> order = LyricsProviderOrder::Parse(settings.Value(LyricsSettings::kProviders, ""));
-  const bool has_providers = settings.Contains(LyricsSettings::kProviders);
-  for (size_t i = 0; i < providers_.size(); ++i) {
-    auto &provider = providers_[i];
-    const std::string legacy = [&]() {
-      if (provider->name() == "azlyrics.com") return std::string("AZLyrics");
-      if (provider->name() == "elyrics.net") return std::string("eLyrics");
-      if (provider->name() == "letras.mus.br") return std::string("Letras");
-      if (provider->name() == "songlyrics.com") return std::string("SongLyrics");
-      if (provider->name() == "Lyrics.ovh") return std::string("lyrics.ovh");
-      if (provider->name() == "LrcLib") return std::string("lrclib");
-      return std::string();
-    }();
-    const bool has_name_key = settings.Contains(provider->name()) || (!legacy.empty() && settings.Contains(legacy));
-    bool enabled = settings.BoolValue(provider->name(), true);
-    if (!legacy.empty() && settings.Contains(legacy)) {
-      enabled = settings.BoolValue(legacy, enabled);
+
+  QMap<int, QString> all_providers;
+  QList<LyricsProvider*> old_providers = lyrics_providers_.keys();
+  for (LyricsProvider *provider : std::as_const(old_providers)) {
+    if (!provider->is_enabled()) continue;
+    all_providers.insert(provider->order(), provider->name());
+  }
+
+  Settings s;
+  s.beginGroup(LyricsSettings::kSettingsGroup);
+  const QStringList providers_enabled = s.value(LyricsSettings::kProviders, QStringList() << all_providers.values()).toStringList();
+  s.endGroup();
+
+  int i = 0;
+  QList<LyricsProvider*> new_providers;
+  for (const QString &name : providers_enabled) {
+    LyricsProvider *provider = ProviderByName(name);
+    if (provider) {
+      provider->set_enabled(true);
+      provider->set_order(++i);
+      new_providers << provider;  // clazy:exclude=reserve-candidates
     }
-    enabled = LyricsProviderSettings::EnabledFromStored(has_name_key, enabled, has_providers,
-                                                        LyricsProviderSettings::InList(order, provider->name()) ||
-                                                            LyricsProviderSettings::InList(order, legacy));
-    provider->set_enabled(enabled);
-    provider->set_order(LyricsProviderOrder::Rank(order, provider->name(), static_cast<int>(1000 + i)));
   }
-  std::sort(providers_.begin(), providers_.end(), [](const std::unique_ptr<LyricsProvider> &a, const std::unique_ptr<LyricsProvider> &b) {
-    return a->order() < b->order();
-  });
-}
 
-void LyricsProviders::SaveOrder() {
-  const std::vector<std::string> names = LyricsProviderSettings::EnabledNames(All());
-  Settings settings;
-  settings.BeginGroup(LyricsSettings::kSettingsGroup);
-  settings.SetValue(LyricsSettings::kProviders, LyricsProviderOrder::Join(names));
-  settings.Sync();
-}
-
-void LyricsProviders::SetEnabled(LyricsProvider *provider, bool enabled) {
-  if (!provider) {
-    return;
-  }
-  provider->set_enabled(enabled);
-  Settings settings;
-  settings.BeginGroup(LyricsSettings::kSettingsGroup);
-  settings.SetBoolValue(provider->name(), enabled);
-  settings.Sync();
-  SaveOrder();
-}
-
-void LyricsProviders::Move(int index, int delta) {
-  const int dest = index + delta;
-  if (index < 0 || dest < 0 || dest >= static_cast<int>(providers_.size())) {
-    return;
-  }
-  std::swap(providers_[static_cast<size_t>(index)], providers_[static_cast<size_t>(dest)]);
-  for (size_t i = 0; i < providers_.size(); ++i) {
-    providers_[i]->set_order(static_cast<int>(i));
-  }
-  SaveOrder();
-}
-
-void LyricsProviders::Fetch(const Song &song, LyricsProvider::Callback callback) {
-  if (!song.lyrics().empty()) {
-    callback(song.lyrics(), {});
-    return;
-  }
-  FetchFromIndex(song, 0, std::move(callback));
-}
-
-void LyricsProviders::FetchFromIndex(const Song &song, size_t index, LyricsProvider::Callback callback) {
-  while (index < providers_.size() && !providers_[index]->enabled()) {
-    ++index;
-  }
-  if (index >= providers_.size()) {
-    callback({}, "No lyrics providers returned lyrics");
-    return;
-  }
-  providers_[index]->Fetch(song, network_, [this, song, index, callback](const std::string &lyrics, const std::string &error) {
-    if (!lyrics.empty()) {
-      callback(lyrics, {});
-      return;
+  old_providers = lyrics_providers_.keys();
+  for (LyricsProvider *provider : std::as_const(old_providers)) {
+    if (!new_providers.contains(provider)) {
+      provider->set_enabled(false);
+      provider->set_order(++i);
     }
-    (void)error;
-    FetchFromIndex(song, index + 1, callback);
-  });
+  }
+
 }
 
-LyricsProvider *LyricsProviders::ProviderByName(const std::string &name) const {
-  for (const auto &provider : providers_) {
-    if (provider->name() == name) {
-      return provider.get();
-    }
+LyricsProvider *LyricsProviders::ProviderByName(const QString &name) const {
+
+  const QList<LyricsProvider*> providers = lyrics_providers_.keys();
+  for (LyricsProvider *provider : providers) {
+    if (provider->name() == name) return provider;
   }
   return nullptr;
+
 }
 
-std::vector<LyricsProvider *> LyricsProviders::All() const {
-  std::vector<LyricsProvider *> result;
-  for (const auto &provider : providers_) {
-    result.push_back(provider.get());
+void LyricsProviders::AddProvider(LyricsProvider *provider) {
+
+  {
+    QMutexLocker locker(&mutex_);
+    lyrics_providers_.insert(provider, provider->name());
+    QObject::connect(provider, &LyricsProvider::destroyed, this, &LyricsProviders::ProviderDestroyed);
   }
-  return result;
+
+  provider->set_order(++NextOrderId);
+
+  qLog(Debug) << "Registered lyrics provider" << provider->name();
+
 }
+
+void LyricsProviders::RemoveProvider(LyricsProvider *provider) {
+
+  if (!provider) return;
+
+  // It's not safe to dereference provider at this point because it might have already been destroyed.
+
+  QString name;
+
+  {
+    QMutexLocker locker(&mutex_);
+    name = lyrics_providers_.take(provider);
+  }
+
+  if (name.isNull()) {
+    qLog(Debug) << "Tried to remove a lyrics provider that was not registered";
+  }
+  else {
+    qLog(Debug) << "Unregistered lyrics provider" << name;
+  }
+
+}
+
+void LyricsProviders::ProviderDestroyed() {
+
+  LyricsProvider *provider = static_cast<LyricsProvider*>(sender());
+  RemoveProvider(provider);
+
+}
+
+int LyricsProviders::NextId() { return next_id_.fetch_add(1, std::memory_order_relaxed); }

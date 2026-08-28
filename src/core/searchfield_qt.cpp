@@ -1,1 +1,0 @@
-// GTK build uses AdwEntryRow instead of QSearchField.\n

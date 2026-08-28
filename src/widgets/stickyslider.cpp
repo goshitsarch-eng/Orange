@@ -1,11 +1,63 @@
-#include "widgets/stickyslider.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include <cmath>
+#include <QWidget>
+#include <QSlider>
+#include <QMouseEvent>
 
-StickySlider::StickySlider(double min, double max, double sticky) : SliderSlider(min, max, 1), sticky_center_(sticky) {}
+#include "stickyslider.h"
 
-void StickySlider::SnapToSticky() {
-  if (std::abs(value() - sticky_center_) < 3.0) {
-    set_value(sticky_center_);
+StickySlider::StickySlider(QWidget *parent)
+    : QSlider(parent),
+      sticky_center_(-1),
+      sticky_threshold_(10) {}
+
+void StickySlider::set_sticky_center(const int center) {
+
+  if (sticky_center_ == center) return;
+
+  sticky_center_ = center;
+
+  Q_EMIT StickyCenterChanged(sticky_center_);
+
+}
+
+void StickySlider::set_sticky_threshold(const int threshold) {
+
+  if (sticky_threshold_ == threshold) return;
+
+  sticky_threshold_ = threshold;
+
+  Q_EMIT StickyThresholdChanged(sticky_threshold_);
+
+}
+
+void StickySlider::mouseMoveEvent(QMouseEvent *e) {
+
+  QSlider::mouseMoveEvent(e);
+
+  if (sticky_center_ == -1) return;
+
+  const int v = sliderPosition();
+  if (v <= sticky_center_ + sticky_threshold_ && v >= sticky_center_ - sticky_threshold_) {
+    setSliderPosition(sticky_center_);
   }
+
 }

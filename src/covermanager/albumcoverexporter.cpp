@@ -1,106 +1,102 @@
-#include "covermanager/albumcoverexporter.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "covermanager/coverexportjob.h"
-#include "covermanager/coverexportrunnable.h"
+#include "config.h"
 
-#include <glib.h>
+#include <QObject>
+#include <QThreadPool>
+
+#include "core/song.h"
+#include "albumcoverloaderoptions.h"
+#include "albumcoverexport.h"
+#include "albumcoverexporter.h"
+#include "coverexportrunnable.h"
 
 namespace {
-
-gboolean CoverExportProcessIdle(gpointer data) {
-  static_cast<AlbumCoverExporter *>(data)->IdleTick();
-  return G_SOURCE_REMOVE;
+constexpr int kMaxConcurrentRequests = 3;
 }
 
-}  // namespace
-
-AlbumCoverExporter::AlbumCoverExporter(TagReader *tagreader) : tagreader_(tagreader) {
-  cover_types_ = AlbumCoverLoaderOptions::LoadTypes();
+AlbumCoverExporter::AlbumCoverExporter(const SharedPtr<TagReaderClient> tagreader_client, QObject *parent)
+    : QObject(parent),
+      tagreader_client_(tagreader_client),
+      thread_pool_(new QThreadPool(this)),
+      exported_(0),
+      skipped_(0),
+      all_(0) {
+  thread_pool_->setMaxThreadCount(kMaxConcurrentRequests);
 }
 
-AlbumCoverExporter::~AlbumCoverExporter() {
-  if (idle_id_) {
-    g_source_remove(idle_id_);
-    idle_id_ = 0;
-  }
+void AlbumCoverExporter::SetDialogResult(const AlbumCoverExport::DialogResult &dialog_result) {
+  dialog_result_ = dialog_result;
 }
 
-void AlbumCoverExporter::SetDialogResult(const AlbumCoverExport::DialogResult &dialog_result) { dialog_result_ = dialog_result; }
+void AlbumCoverExporter::SetCoverTypes(const AlbumCoverLoaderOptions::Types &cover_types) {
+  cover_types_ = cover_types;
+}
 
-void AlbumCoverExporter::SetCoverTypes(const AlbumCoverLoaderOptions::Types &cover_types) { cover_types_ = cover_types; }
+void AlbumCoverExporter::AddExportRequest(const Song &song) {
 
-void AlbumCoverExporter::AddExportRequest(const Song &song) { requests_.push_back(song); }
+  requests_.append(new CoverExportRunnable(tagreader_client_, dialog_result_, cover_types_, song));
+  all_ = static_cast<int>(requests_.count());
 
-void AlbumCoverExporter::Cancel() { cancelled_ = true; }
+}
+
+void AlbumCoverExporter::Cancel() {
+  // The queued runnables haven't been handed to the thread pool yet, so delete them ourselves.
+  qDeleteAll(requests_);
+  requests_.clear();
+}
 
 void AlbumCoverExporter::StartExporting() {
+
   exported_ = 0;
   skipped_ = 0;
-  next_ = 0;
-  cancelled_ = false;
-  finished_ = false;
-  async_ = false;
-  while (!finished_) {
-    ProcessSome();
-  }
+  AddJobsToPool();
+
 }
 
-void AlbumCoverExporter::StartExportingAsync() {
-  exported_ = 0;
-  skipped_ = 0;
-  next_ = 0;
-  cancelled_ = false;
-  finished_ = false;
-  async_ = true;
-  ScheduleIdle();
+void AlbumCoverExporter::AddJobsToPool() {
+
+  while (!requests_.isEmpty() && thread_pool_->activeThreadCount() < thread_pool_->maxThreadCount()) {
+    CoverExportRunnable *runnable = requests_.dequeue();
+
+    QObject::connect(runnable, &CoverExportRunnable::CoverExported, this, &AlbumCoverExporter::CoverExported);
+    QObject::connect(runnable, &CoverExportRunnable::CoverSkipped, this, &AlbumCoverExporter::CoverSkipped);
+
+    thread_pool_->start(runnable);
+  }
+
 }
 
-void AlbumCoverExporter::IdleTick() {
-  idle_id_ = 0;
-  ProcessSome();
+void AlbumCoverExporter::CoverExported() {
+
+  ++exported_;
+  Q_EMIT AlbumCoversExportUpdate(exported_, skipped_, all_);
+  AddJobsToPool();
+
 }
 
-void AlbumCoverExporter::ScheduleIdle() {
-  if (idle_id_) {
-    return;
-  }
-  idle_id_ = g_idle_add(CoverExportProcessIdle, this);
-}
+void AlbumCoverExporter::CoverSkipped() {
 
-void AlbumCoverExporter::Complete() {
-  finished_ = true;
-  ExportUpdate.Emit();
-  Finished.Emit();
-}
+  ++skipped_;
+  Q_EMIT AlbumCoversExportUpdate(exported_, skipped_, all_);
+  AddJobsToPool();
 
-void AlbumCoverExporter::ProcessSome() {
-  if (finished_) {
-    return;
-  }
-  const int total = static_cast<int>(requests_.size());
-  if (!CoverExportJob::ShouldProcessBatch(cancelled_)) {
-    if (CoverExportJob::ShouldFinish(next_, total, cancelled_)) {
-      Complete();
-    }
-    return;
-  }
-  int processed = 0;
-  while (processed < CoverExportJob::kMaxConcurrent && next_ < total) {
-    CoverExportRunnable job(tagreader_, dialog_result_, cover_types_, requests_[static_cast<size_t>(next_)]);
-    if (job.Run()) {
-      ++exported_;
-    } else {
-      ++skipped_;
-    }
-    ++next_;
-    ++processed;
-  }
-  ExportUpdate.Emit();
-  if (CoverExportJob::ShouldFinish(next_, total, cancelled_)) {
-    Complete();
-    return;
-  }
-  if (CoverExportJob::ShouldScheduleNext(next_, total, cancelled_, async_)) {
-    ScheduleIdle();
-  }
 }

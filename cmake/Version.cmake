@@ -1,5 +1,5 @@
 set(STRAWBERRY_VERSION_MAJOR 2)
-set(STRAWBERRY_VERSION_MINOR 0)
+set(STRAWBERRY_VERSION_MINOR 1)
 set(STRAWBERRY_VERSION_PATCH 0)
 #set(STRAWBERRY_VERSION_PRERELEASE rc1)
 
@@ -49,14 +49,8 @@ if(GIT_REVISION)
     message(FATAL_ERROR "Failed to parse git revision string '${GIT_REVISION}'")
   endif()
 
-  # "git describe" only produces a "<tag>-<count>-g<sha>" string once a tag is reachable.
-  # In a checkout with no tags it returns a bare abbreviated sha, which is not a version number and must
-  # not be shown to the user on its own.
   list(LENGTH GIT_PARTS GIT_PARTS_LENGTH)
-  if(GIT_PARTS_LENGTH EQUAL 3)
-    set(GIT_DESCRIBE_HAS_TAG ON)
-  else()
-    set(GIT_DESCRIBE_HAS_TAG OFF)
+  if(NOT GIT_PARTS_LENGTH EQUAL 3)
     set(GIT_PARTS "${majorminorpatch};0;${GIT_REVISION}")
   endif()
 
@@ -66,11 +60,7 @@ if(GIT_REVISION)
 
   set(HAS_GIT_REVISION ON)
 
-  if(GIT_DESCRIBE_HAS_TAG)
-    set(STRAWBERRY_VERSION_DISPLAY "${GIT_REVISION}")
-  else()
-    set(STRAWBERRY_VERSION_DISPLAY "${majorminorpatch}-${GIT_SHA1}")
-  endif()
+  set(STRAWBERRY_VERSION_DISPLAY "${GIT_REVISION}")
   set(STRAWBERRY_VERSION_PACKAGE "${GIT_TAGNAME}.${GIT_COMMITCOUNT}.${GIT_SHA1}")
   string(REPLACE "-" "~" STRAWBERRY_VERSION_RPM_V "${GIT_TAGNAME}")
   set(STRAWBERRY_VERSION_RPM_R   "2.${GIT_COMMITCOUNT}.${GIT_SHA1}")

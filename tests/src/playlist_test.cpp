@@ -1,1497 +1,881 @@
-#include "core/playermetadatasync.h"
-#include "core/playernextmetadata.h"
-#include "core/playererrorloop.h"
-#include "core/playerloadresult.h"
-#include "core/playerprevious.h"
-#include "core/playerrestartorprevious.h"
-#include "core/playerpreload.h"
-#include "core/playerseeknotify.h"
-#include "core/playerstreamexpire.h"
-#include "core/playerintro.h"
-#include "core/playerrepeat.h"
-#include "core/playerstopafter.h"
-#include "core/songsegment.h"
-#include "playlist/playlistautosort.h"
-#include "playlist/playlistdynamicpersist.h"
-#include "playlist/playlistitemuuid.h"
-#include "playlist/playlistitembind.h"
-#include "playlist/playlistqueuescope.h"
-#include "playlist/playlistsaveschedule.h"
-#include "dialogs/saveplaylistsoptions.h"
-#include "playlist/playlist.h"
-#include "playlist/playlistmetadataupdate.h"
-#include "playlist/playlistplayrow.h"
-#include "playlist/playlistcollectionsync.h"
-#include "playlist/playlistqueuerefresh.h"
-#include "playlist/playlistremoveitemsnotinqueue.h"
-#include "playlist/playlistcoverpersist.h"
-#include "playlist/playlistdynamicadvance.h"
-#include "playlist/playlistlocalartdiscover.h"
-#include "playlist/playlistqueuedequeue.h"
-#include "playlist/playlistreloadrows.h"
-#include "playlist/playliststreamstate.h"
-#include "playlist/playlistfilterindex.h"
-#include "playlist/playlistfilterdelay.h"
-#include "playlist/playlistfilterempty.h"
-#include "playlist/playlistfiltersync.h"
-#include "playlist/playlisttoolbar.h"
-#include "playlist/playlistplayed.h"
-#include "playlist/playlistbehaviour.h"
-#include "playlist/playlistshuffle.h"
-#include "playlist/playlistsummary.h"
-#include "playlist/dynamicplaylistmaintenance.h"
-#include "playlist/playlistundolimits.h"
-#include "scrobbler/scrobblepoint.h"
-#include "collection/collectionbackend.h"
-#include "core/database.h"
-#include "smartplaylists/playlistgenerator.h"
-#include "smartplaylists/playlistgeneratorinserter.h"
-#include "smartplaylists/playlistquerygenerator.h"
-#include "playlist/playlistundostate.h"
-#include "playlist/playlistsaveitem.h"
-#include "tagreader/tagreaderclientpump.h"
-#include "utilities/fileutils.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2019-2026, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
 #include <memory>
-#include <gtest/gtest.h>
-#include <unistd.h>
 
-TEST(Playlist, AppendAndNavigate) {
-  Playlist playlist;
-  Song a;
-  a.set_title("A");
-  a.set_url("file:///a");
-  a.set_valid(true);
-  Song b;
-  b.set_title("B");
-  b.set_url("file:///b");
-  b.set_valid(true);
-  playlist.AppendSongs({a, b});
-  EXPECT_EQ(2, playlist.row_count());
-  playlist.set_current_row(0);
-  playlist.Next();
-  EXPECT_EQ("B", playlist.current_song().title());
-  playlist.Clear();
-  EXPECT_EQ(0, playlist.row_count());
-}
+#include "gtest_include.h"
 
-TEST(Playlist, DynamicRefill) {
-  Playlist playlist;
-  SmartPlaylistSearch search;
-  search.terms.push_back({SmartPlaylistField::Artist, SmartPlaylistOp::Contains, "A"});
-  playlist.SetDynamic(true, search);
-  EXPECT_TRUE(playlist.is_dynamic());
-  Song have;
-  have.set_title("Have");
-  have.set_artist("A");
-  have.set_url("file:///have");
-  have.set_valid(true);
-  playlist.AppendSongs({have});
-  Song extra;
-  extra.set_title("Extra");
-  extra.set_artist("A Band");
-  extra.set_url("file:///extra");
-  extra.set_valid(true);
-  Song skip;
-  skip.set_title("Skip");
-  skip.set_artist("Other");
-  skip.set_url("file:///skip");
-  skip.set_valid(true);
-  playlist.RefillDynamic({have, extra, skip});
-  EXPECT_EQ(2, playlist.row_count());
-  EXPECT_EQ("Extra", playlist.songs().back().title());
-  playlist.set_current_row(0);
-  Song more;
-  more.set_title("More");
-  more.set_artist("A Group");
-  more.set_url("file:///more");
-  more.set_valid(true);
-  playlist.ExpandDynamic({have, extra, skip, more});
-  EXPECT_EQ(3, playlist.row_count());
-  playlist.RepopulateDynamic({have, extra, skip, more});
-  EXPECT_GE(playlist.row_count(), 1);
-  playlist.SetDynamic(false);
-  EXPECT_FALSE(playlist.is_dynamic());
-  EXPECT_EQ(Playlist::SequenceMode::Sequential, playlist.sequence_mode());
-}
+#include "test_utils.h"
 
-TEST(Playlist, PeekNextDoesNotAdvance) {
-  Playlist playlist;
-  Song a;
-  a.set_title("A");
-  a.set_url("file:///a");
-  a.set_valid(true);
-  Song b;
-  b.set_title("B");
-  b.set_url("file:///b");
-  b.set_valid(true);
-  playlist.AppendSongs({a, b});
-  playlist.set_current_row(0);
-  EXPECT_EQ(1, playlist.PeekNextRow());
-  EXPECT_EQ("B", playlist.PeekNextSong().title());
-  EXPECT_EQ(0, playlist.current_row());
-  playlist.SetSequenceMode(Playlist::SequenceMode::RepeatAll);
-  playlist.set_current_row(1);
-  EXPECT_EQ(0, playlist.PeekNextRow());
-  EXPECT_EQ("A", playlist.PeekNextSong().title());
-}
+#include "collection/collectionplaylistitem.h"
+#include "playlist/playlist.h"
+#include "playlist/songplaylistitem.h"
+#include "tagreader/tagreaderclient.h"
+#include "tagreader/tagreaderreply.h"
+#include "tagreader/tagreaderresult.h"
+#include "mock_settingsprovider.h"
+#include "mock_playlistitem.h"
 
-TEST(Playlist, UndoRedo) {
-  Playlist playlist;
-  Song a;
-  a.set_title("A");
-  a.set_url("file:///a");
-  a.set_valid(true);
-  Song b;
-  b.set_title("B");
-  b.set_url("file:///b");
-  b.set_valid(true);
-  playlist.AppendSongs({a});
-  playlist.AppendSongs({b});
-  EXPECT_EQ(2, playlist.row_count());
-  EXPECT_TRUE(playlist.CanUndo());
-  playlist.Undo();
-  EXPECT_EQ(1, playlist.row_count());
-  EXPECT_EQ("A", playlist.songs().front().title());
-  EXPECT_TRUE(playlist.CanRedo());
-  playlist.Redo();
-  EXPECT_EQ(2, playlist.row_count());
-  playlist.Clear();
-  EXPECT_EQ(0, playlist.row_count());
-  playlist.Undo();
-  EXPECT_EQ(2, playlist.row_count());
-}
+#include <QtDebug>
+#include <QUndoStack>
+#include <QThread>
+#include <QEventLoop>
+#include <QTimer>
 
-TEST(Playlist, RemoveDuplicatesKeepsFirstUrl) {
-  Playlist playlist;
-  Song a;
-  a.set_title("A");
-  a.set_url("file:///same");
-  a.set_valid(true);
-  Song b;
-  b.set_title("B");
-  b.set_url("file:///same");
-  b.set_valid(true);
-  Song c;
-  c.set_title("C");
-  c.set_url("file:///other");
-  c.set_valid(true);
-  playlist.AppendSongs({a, b, c});
-  playlist.RemoveDuplicates();
-  EXPECT_EQ(2, playlist.row_count());
-  EXPECT_EQ("A", playlist.songs().front().title());
-  EXPECT_EQ("C", playlist.songs().back().title());
-}
+using ::testing::Return;
 
-TEST(Playlist, RemoveUnavailableDropsMissingLocalFiles) {
-  Playlist playlist;
-  const std::string existing = "/tmp/strawberry-playlist-exists.txt";
-  FileUtils::WriteFile(existing, "ok");
-  Song keep;
-  keep.set_title("Keep");
-  keep.set_url(FileUtils::UriFromPath(existing));
-  keep.set_valid(true);
-  Song gone;
-  gone.set_title("Gone");
-  gone.set_url("file:///tmp/strawberry-playlist-missing-file.mp3");
-  gone.set_valid(true);
-  Song stream;
-  stream.set_title("Stream");
-  stream.set_url("http://example.invalid/live");
-  stream.set_valid(true);
-  playlist.AppendSongs({keep, gone, stream});
-  playlist.RemoveUnavailable();
-  EXPECT_EQ(2, playlist.row_count());
-  EXPECT_EQ("Keep", playlist.songs().front().title());
-  EXPECT_EQ("Stream", playlist.songs().back().title());
-  FileUtils::Remove(existing);
-}
+using namespace Qt::Literals::StringLiterals;
 
-TEST(Playlist, SkipTracksAreBypassedOnNext) {
-  Playlist playlist;
-  Song a;
-  a.set_title("A");
-  a.set_url("file:///a");
-  a.set_valid(true);
-  Song b;
-  b.set_title("B");
-  b.set_url("file:///b");
-  b.set_valid(true);
-  Song c;
-  c.set_title("C");
-  c.set_url("file:///c");
-  c.set_valid(true);
-  playlist.AppendSongs({a, b, c});
-  playlist.set_current_row(0);
-  playlist.SkipTracks({1});
-  EXPECT_TRUE(playlist.songs()[1].skipped());
-  EXPECT_EQ(2, playlist.PeekNextRow());
-  playlist.Next();
-  EXPECT_EQ("C", playlist.current_song().title());
-  playlist.SkipTracks({1});
-  EXPECT_FALSE(playlist.songs()[1].skipped());
-}
+// clazy:excludeall=non-pod-global-static,returning-void-expression
 
-TEST(Playlist, RenumberAndRateCurrent) {
-  Playlist playlist;
-  Song a;
-  a.set_title("A");
-  a.set_url("file:///a");
-  a.set_track(9);
-  a.set_valid(true);
-  Song b;
-  b.set_title("B");
-  b.set_url("file:///b");
-  b.set_track(3);
-  b.set_valid(true);
-  playlist.AppendSongs({a, b});
-  playlist.RenumberTracks();
-  EXPECT_EQ(1, playlist.songs()[0].track());
-  EXPECT_EQ(2, playlist.songs()[1].track());
-  playlist.set_current_row(0);
-  playlist.RateCurrentSong(0.8f);
-  EXPECT_NEAR(0.8f, playlist.current_song().rating(), 0.001f);
-}
-
-TEST(Playlist, MoveRowsKeepsPlayingTrack) {
-  Playlist playlist;
-  Song a;
-  a.set_title("A");
-  a.set_url("file:///a");
-  a.set_valid(true);
-  Song b;
-  b.set_title("B");
-  b.set_url("file:///b");
-  b.set_valid(true);
-  Song c;
-  c.set_title("C");
-  c.set_url("file:///c");
-  c.set_valid(true);
-  playlist.AppendSongs({a, b, c});
-  playlist.set_current_row(0);
-  playlist.MoveRows({0}, 2);
-  ASSERT_EQ(3, playlist.row_count());
-  EXPECT_EQ("B", playlist.songs()[0].title());
-  EXPECT_EQ("A", playlist.songs()[1].title());
-  EXPECT_EQ("C", playlist.songs()[2].title());
-  EXPECT_EQ(1, playlist.current_row());
-  playlist.MoveRows({2, 1}, 0);
-  EXPECT_EQ("A", playlist.songs()[0].title());
-  EXPECT_EQ("C", playlist.songs()[1].title());
-  EXPECT_EQ("B", playlist.songs()[2].title());
-  EXPECT_EQ(0, playlist.current_row());
-  playlist.MoveRows({99}, 0);
-  EXPECT_EQ("A", playlist.songs()[0].title());
-}
-
-TEST(Playlist, InvalidateDeletedSongsGreysMissingLocalFiles) {
-  Playlist playlist;
-  const std::string existing = "/tmp/strawberry-playlist-greyout-exists.txt";
-  FileUtils::WriteFile(existing, "ok");
-  Song keep;
-  keep.set_title("Keep");
-  keep.set_url(FileUtils::UriFromPath(existing));
-  keep.set_valid(true);
-  Song gone;
-  gone.set_title("Gone");
-  gone.set_url("file:///tmp/strawberry-playlist-greyout-missing.mp3");
-  gone.set_valid(true);
-  Song stream;
-  stream.set_title("Stream");
-  stream.set_url("http://example.invalid/live");
-  stream.set_source(Song::Source::Stream);
-  stream.set_valid(true);
-  playlist.AppendSongs({keep, gone, stream});
-  playlist.InvalidateDeletedSongs();
-  ASSERT_EQ(3, playlist.row_count());
-  EXPECT_FALSE(playlist.songs()[0].unavailable());
-  EXPECT_TRUE(playlist.songs()[1].unavailable());
-  EXPECT_FALSE(playlist.songs()[2].unavailable());
-  FileUtils::Remove(existing);
-}
-
-TEST(Playlist, ApplyValidityOnCurrentSong) {
-  Playlist playlist;
-  Song song;
-  song.set_title("A");
-  song.set_url("file:///a");
-  song.set_valid(true);
-  playlist.AppendSongs({song});
-  playlist.set_current_row(0);
-  EXPECT_TRUE(playlist.ApplyValidityOnCurrentSong("file:///a", false));
-  EXPECT_TRUE(playlist.current_song().unavailable());
-  EXPECT_TRUE(playlist.ApplyValidityOnCurrentSong("file:///a", true));
-  EXPECT_FALSE(playlist.current_song().unavailable());
-  Song stream;
-  stream.set_title("B");
-  stream.set_url("tidal://track/1");
-  stream.set_stream_url("https://cdn.example/b.flac");
-  stream.set_valid(true);
-  playlist.Clear();
-  playlist.AppendSongs({stream});
-  playlist.set_current_row(0);
-  EXPECT_TRUE(playlist.ApplyValidityOnCurrentSong("https://cdn.example/b.flac", false));
-  EXPECT_TRUE(playlist.current_song().unavailable());
-  EXPECT_FALSE(playlist.ApplyValidityOnCurrentSong("https://other.example/c.flac", true));
-  EXPECT_TRUE(playlist.current_song().unavailable());
-}
-
-TEST(Playlist, AutoSortAfterInsert) {
-  Playlist playlist;
-  playlist.set_auto_sort(true);
-  playlist.SetSort(PlaylistColumn::Title, false);
-  Song b;
-  b.set_title("B");
-  b.set_url("file:///b");
-  b.set_valid(true);
-  Song a;
-  a.set_title("A");
-  a.set_url("file:///a");
-  a.set_valid(true);
-  playlist.AppendSongs({b});
-  playlist.AppendSongs({a});
-  ASSERT_EQ(2, playlist.row_count());
-  EXPECT_EQ("A", playlist.songs()[0].title());
-  EXPECT_EQ("B", playlist.songs()[1].title());
-}
-
-TEST(Playlist, AutoSortSkipsWhileLoading) {
-  EXPECT_TRUE(PlaylistAutoSort::ShouldSort(true, false, PlaylistColumn::Title));
-  EXPECT_FALSE(PlaylistAutoSort::ShouldSort(true, true, PlaylistColumn::Title));
-  EXPECT_FALSE(PlaylistAutoSort::ShouldSort(false, false, PlaylistColumn::Title));
-  EXPECT_FALSE(PlaylistAutoSort::ShouldSort(true, false, PlaylistColumn::Count));
-  Playlist playlist;
-  playlist.set_auto_sort(true);
-  playlist.SetSort(PlaylistColumn::Title, false);
-  playlist.BeginLoad();
-  EXPECT_TRUE(playlist.loading());
-  Song b;
-  b.set_title("B");
-  b.set_url("file:///b");
-  b.set_valid(true);
-  Song a;
-  a.set_title("A");
-  a.set_url("file:///a");
-  a.set_valid(true);
-  playlist.AppendSongs({b, a});
-  ASSERT_EQ(2, playlist.row_count());
-  EXPECT_EQ("B", playlist.songs()[0].title());
-  EXPECT_EQ("A", playlist.songs()[1].title());
-  playlist.EndLoad();
-  EXPECT_FALSE(playlist.loading());
-  playlist.AppendSongs({});
-  Song c;
-  c.set_title("C");
-  c.set_url("file:///c");
-  c.set_valid(true);
-  playlist.AppendSongs({c});
-  EXPECT_EQ("A", playlist.songs()[0].title());
-  EXPECT_EQ("B", playlist.songs()[1].title());
-  EXPECT_EQ("C", playlist.songs()[2].title());
-}
-
-TEST(Playlist, OwnsDedicatedQueue) {
-  Playlist first;
-  Playlist second;
-  Song a;
-  a.set_title("A");
-  a.set_url("file:///a");
-  a.set_valid(true);
-  Song b;
-  b.set_title("B");
-  b.set_url("file:///b");
-  b.set_valid(true);
-  first.queue()->Append(a);
-  second.queue()->Append(b);
-  EXPECT_EQ(1, first.queue()->size());
-  EXPECT_EQ("A", first.queue()->songs().front().title());
-  EXPECT_EQ("B", second.queue()->songs().front().title());
-  EXPECT_EQ(first.queue(), PlaylistQueueScope::For(&first));
-  EXPECT_EQ(nullptr, PlaylistQueueScope::For(static_cast<Playlist *>(nullptr)));
-}
-
-TEST(PlaylistSaveItem, GenerationGuardAndWriteError) {
-  EXPECT_EQ(1u, PlaylistSaveItem::Begin(0));
-  EXPECT_EQ(4u, PlaylistSaveItem::Begin(3));
-  EXPECT_TRUE(PlaylistSaveItem::ShouldApply(2, 2));
-  EXPECT_FALSE(PlaylistSaveItem::ShouldApply(2, 3));
-  Song editable(Song::Source::LocalFile);
-  editable.set_valid(true);
-  editable.set_url("file:///tmp/a.flac");
-  editable.set_filetype(Song::FileType::FLAC);
-  EXPECT_TRUE(PlaylistSaveItem::ShouldWriteFile(editable));
-  Song stream(Song::Source::Tidal);
-  stream.set_valid(true);
-  stream.set_url("tidal://1");
-  EXPECT_FALSE(PlaylistSaveItem::ShouldWriteFile(stream));
-  Song from_file;
-  from_file.set_valid(true);
-  from_file.set_title("On disk");
-  Song fallback;
-  fallback.set_valid(true);
-  fallback.set_title("Previous");
-  EXPECT_EQ("On disk", PlaylistSaveItem::ChooseMetadata(true, from_file, fallback).title());
-  EXPECT_EQ("Previous", PlaylistSaveItem::ChooseMetadata(false, from_file, fallback).title());
-  EXPECT_EQ("Could not write metadata to /tmp/a.flac", PlaylistSaveItem::WriteError("/tmp/a.flac", {}));
-  EXPECT_EQ("Could not write metadata to /tmp/a.flac: denied", PlaylistSaveItem::WriteError("/tmp/a.flac", "denied"));
-  EXPECT_TRUE(TagReaderClientPump::ShouldArm(true, false));
-  EXPECT_FALSE(TagReaderClientPump::ShouldArm(true, true));
-  EXPECT_TRUE(TagReaderClientPump::ShouldContinue(true));
-}
-
-TEST(Playlist, SetColumnValuesUpdatesSongsAndUndo) {
-  Playlist playlist;
-  Song a;
-  a.set_title("A");
-  a.set_artist("One");
-  a.set_url("file:///a");
-  a.set_valid(true);
-  Song b;
-  b.set_title("B");
-  b.set_artist("Two");
-  b.set_url("file:///b");
-  b.set_valid(true);
-  playlist.AppendSongs({a, b});
-  EXPECT_EQ(2, playlist.SetColumnValues({0, 1}, PlaylistColumn::Artist, "Shared"));
-  EXPECT_EQ("Shared", playlist.songs()[0].artist());
-  EXPECT_EQ("Shared", playlist.songs()[1].artist());
-  EXPECT_TRUE(playlist.SetColumnValue(0, PlaylistColumn::Title, "Renamed"));
-  EXPECT_EQ("Renamed", playlist.songs()[0].title());
-  EXPECT_FALSE(playlist.SetColumnValue(0, PlaylistColumn::Bitrate, "128"));
-  playlist.Undo();
-  EXPECT_EQ("A", playlist.songs()[0].title());
-  EXPECT_EQ("Shared", playlist.songs()[0].artist());
-  playlist.Undo();
-  EXPECT_EQ("One", playlist.songs()[0].artist());
-  EXPECT_EQ("Two", playlist.songs()[1].artist());
-}
-
-TEST(PlaylistShuffle, AlbumAndGroupingKeys) {
-  Song song;
-  song.set_albumartist("Portishead");
-  song.set_album("Dummy");
-  EXPECT_EQ("Portishead\nDummy", PlaylistShuffle::AlbumKey(song));
-  EXPECT_EQ("Portishead\nDummy", PlaylistShuffle::GroupingKey(song));
-  song.set_grouping("Trip hop");
-  EXPECT_EQ("Trip hop", PlaylistShuffle::GroupingKey(song));
-}
-
-TEST(PlaylistShuffle, AllUsesVirtualOrder) {
-  Playlist playlist;
-  for (const char *title : {"A", "B", "C", "D", "E"}) {
-    Song song;
-    song.set_title(title);
-    song.set_url(std::string("file:///") + title);
-    song.set_valid(true);
-    playlist.AppendSongs({song});
+// Declared at file scope (rather than inside the anonymous namespace below, where the TEST_F-generated fixture subclasses live) so that Playlist's "friend class PlaylistTest;" resolves to this exact class.
+// C++ friendship isn't inherited, so tests that need access to Playlist's private members go through the CallXxx() helpers below rather than calling them directly from a TEST_F body.
+class PlaylistTest : public ::testing::Test {
+ protected:
+  // tagreader_client_/tagreader_client_thread_ are declared (and so, per C++ member initialization order, constructed) before playlist_ below: Playlist::tagreader_client_ is a const member set once at construction time, from the SharedPtr this fixture passes in here - so the real TagReaderClient must already exist by then.
+  // ReloadItem()'s background task takes that same SharedPtr through Playlist rather than reaching for a process-wide singleton, so constructing and tearing this down per test (like tagreader_test.cpp does) is safe - there is no shared global state left for one test's teardown to leave dangling for another.
+  PlaylistTest()
+      : tagreader_client_(new TagReaderClient()),
+        tagreader_client_thread_(new QThread()),
+        playlist_(nullptr, nullptr, nullptr, nullptr, tagreader_client_, 1),
+        sequence_(nullptr, new DummySettingsProvider) {
+    tagreader_client_->moveToThread(tagreader_client_thread_);
+    tagreader_client_thread_->start();
   }
-  playlist.set_current_row(0);
-  playlist.SetShuffleMode(PlaylistSequence::ShuffleMode::All);
-  playlist.Reshuffle(7);
-  ASSERT_EQ(5u, playlist.virtual_items().size());
-  EXPECT_EQ(0, playlist.virtual_items().front());
-  EXPECT_NE((std::vector<int>{0, 1, 2, 3, 4}), playlist.virtual_items());
-  playlist.Next();
-  EXPECT_EQ(playlist.virtual_items()[1], playlist.current_row());
-}
 
-TEST(PlaylistShuffle, AlbumsKeepsTracksTogether) {
-  Playlist playlist;
-  auto add = [&](const char *title, const char *album) {
-    Song song;
-    song.set_title(title);
-    song.set_album(album);
-    song.set_albumartist("Artist");
-    song.set_url(std::string("file:///") + title);
-    song.set_valid(true);
-    playlist.AppendSongs({song});
-  };
-  add("A1", "Alpha");
-  add("A2", "Alpha");
-  add("B1", "Beta");
-  add("B2", "Beta");
-  playlist.set_current_row(0);
-  playlist.SetShuffleMode(PlaylistSequence::ShuffleMode::Albums);
-  playlist.Reshuffle(3);
-  const auto &order = playlist.virtual_items();
-  ASSERT_EQ(4u, order.size());
-  const std::string first = PlaylistShuffle::AlbumKey(playlist.song(order[0]));
-  EXPECT_EQ(first, PlaylistShuffle::AlbumKey(playlist.song(order[1])));
-  EXPECT_NE(first, PlaylistShuffle::AlbumKey(playlist.song(order[2])));
-  EXPECT_EQ(PlaylistShuffle::AlbumKey(playlist.song(order[2])), PlaylistShuffle::AlbumKey(playlist.song(order[3])));
-}
-
-TEST(Playlist, FilterIsHonoredByNextAndPrevious) {
-  Playlist playlist;
-  auto add = [&](const char *title, const char *artist) {
-    Song song;
-    song.set_title(title);
-    song.set_artist(artist);
-    song.set_url(std::string("file:///") + title);
-    song.set_valid(true);
-    playlist.AppendSongs({song});
-  };
-  add("Keep", "Portishead");
-  add("Skip", "Fleet Foxes");
-  add("Also", "Portishead");
-  playlist.set_current_row(0);
-  playlist.SetFilterString("artist:Portishead");
-  EXPECT_EQ(2, playlist.PeekNextRow());
-  playlist.Next();
-  EXPECT_EQ("Also", playlist.current_song().title());
-  EXPECT_EQ(-1, playlist.PeekNextRow());
-  playlist.SetRepeatMode(PlaylistSequence::RepeatMode::Playlist);
-  EXPECT_EQ(0, playlist.PeekNextRow());
-  playlist.SetRepeatMode(PlaylistSequence::RepeatMode::Off);
-  playlist.set_current_row(2);
-  EXPECT_EQ(-1, playlist.PeekNextRow());
-  playlist.Previous();
-  EXPECT_EQ("Keep", playlist.current_song().title());
-}
-
-TEST(Playlist, UpdateSongsByUrlReplacesMatchingRows) {
-  Playlist playlist;
-  Song a;
-  a.set_title("Old");
-  a.set_url("file:///a");
-  a.set_valid(true);
-  Song b;
-  b.set_title("Other");
-  b.set_url("file:///b");
-  b.set_valid(true);
-  playlist.AppendSongs({a, b});
-  Song updated;
-  updated.set_title("New");
-  updated.set_artist("Portishead");
-  updated.set_url("file:///a");
-  updated.set_musicbrainz_recording_id("mbid-a");
-  updated.set_valid(true);
-  playlist.UpdateSongsByUrl(updated);
-  EXPECT_EQ("New", playlist.song(0).title());
-  EXPECT_EQ("mbid-a", playlist.song(0).musicbrainz_recording_id());
-  EXPECT_EQ("Other", playlist.song(1).title());
-}
-
-TEST(PlayerPreload, AdvancesOnlyForAutoCrossfadeAcrossAlbums) {
-  EXPECT_FALSE(PlayerPreload::ShouldPreload(true, true));
-  EXPECT_FALSE(PlayerPreload::ShouldPreload(false, false));
-  EXPECT_TRUE(PlayerPreload::ShouldPreload(false, true));
-  EXPECT_FALSE(PlayerPreload::CanPreload(false, true, true));
-  EXPECT_TRUE(PlayerPreload::CanPreload(false, true, false));
-  EXPECT_FALSE(PlayerPreload::ShouldAdvanceOnAboutToEnd(false, false, true));
-  EXPECT_TRUE(PlayerPreload::ShouldAdvanceOnAboutToEnd(true, false, true));
-  EXPECT_FALSE(PlayerPreload::ShouldAdvanceOnAboutToEnd(true, true, true));
-  EXPECT_TRUE(PlayerPreload::ShouldAdvanceOnAboutToEnd(true, true, false));
-}
-
-TEST(PlayerStopAfter, PreparesNextRowBeforeStop) {
-  EXPECT_TRUE(PlayerStopAfter::ShouldPrepareResume(true));
-  EXPECT_FALSE(PlayerStopAfter::ShouldPrepareResume(false));
-  EXPECT_EQ(3, PlayerStopAfter::ResumeRow(3));
-  EXPECT_EQ(-1, PlayerStopAfter::ResumeRow(-1));
-}
-
-TEST(PlayerMetadataSync, MergesEngineTagsAndDetectsRefresh) {
-  Song current;
-  current.set_url("http://radio.example/live");
-  Song engine;
-  engine.set_title("Roads");
-  engine.set_artist("Portishead");
-  engine.set_length_nanosec(180000000000LL);
-  engine.set_bitrate(320);
-  engine.set_samplerate(44100);
-  engine.set_bitdepth(16);
-  engine.set_filetype(Song::FileType::MPEG);
-  PlayerMetadataSync::Merge(&current, engine);
-  EXPECT_EQ("Roads", current.title());
-  EXPECT_EQ("Portishead", current.artist());
-  EXPECT_EQ(180000000000LL, current.length_nanosec());
-  EXPECT_EQ(320, current.bitrate());
-  EXPECT_EQ(44100, current.samplerate());
-  EXPECT_EQ(16, current.bitdepth());
-  EXPECT_EQ(Song::FileType::MPEG, current.filetype());
-  Song same = current;
-  EXPECT_FALSE(PlayerMetadataSync::ShouldRefreshPlaylist(current, same));
-  same.set_title("Glory Box");
-  EXPECT_TRUE(PlayerMetadataSync::ShouldRefreshPlaylist(current, same));
-  same = current;
-  same.set_bitrate(256);
-  EXPECT_TRUE(PlayerMetadataSync::ShouldRefreshPlaylist(current, same));
-}
-
-TEST(SongSegment, UsesStoredEndOrBeginningPlusLength) {
-  Song song;
-  song.set_beginning_nanosec(2000000000LL);
-  song.set_length_nanosec(4000000000LL);
-  EXPECT_EQ(6000000000LL, SongSegment::EffectiveEndNanosec(song));
-  song.set_end_nanosec(5000000000LL);
-  EXPECT_EQ(5000000000LL, SongSegment::EffectiveEndNanosec(song));
-  EXPECT_TRUE(SongSegment::HasForcedEnd(song));
-}
-
-TEST(PlayerRepeat, OneByOneStopsAfterCurrent) {
-  EXPECT_TRUE(PlayerRepeat::ShouldStopAfterTrack(PlaylistSequence::RepeatMode::OneByOne, false));
-  EXPECT_TRUE(PlayerRepeat::ShouldStopAfterTrack(PlaylistSequence::RepeatMode::Off, true));
-  EXPECT_FALSE(PlayerRepeat::ShouldStopAfterTrack(PlaylistSequence::RepeatMode::Off, false));
-  EXPECT_FALSE(PlayerRepeat::ShouldStopAfterTrack(PlaylistSequence::RepeatMode::Playlist, false));
-  EXPECT_TRUE(PlayerRepeat::ShouldStopAfterRow(4, 4));
-  EXPECT_FALSE(PlayerRepeat::ShouldStopAfterRow(4, 3));
-  EXPECT_FALSE(PlayerRepeat::ShouldStopAfterRow(-1, 4));
-  EXPECT_TRUE(PlayerRepeat::ShouldStopAfterTrack(PlaylistSequence::RepeatMode::Off, false, 4, 4));
-  EXPECT_FALSE(PlayerRepeat::ShouldStopAfterTrack(PlaylistSequence::RepeatMode::Off, false, 4, 3));
-  EXPECT_TRUE(PlayerRepeat::ShouldStopAfterTrack(PlaylistSequence::RepeatMode::Off, true, 4, 3));
-  EXPECT_TRUE(PlayerStopAfter::SyncCurrentFlag(2, 2));
-  EXPECT_FALSE(PlayerStopAfter::SyncCurrentFlag(2, 1));
-}
-
-TEST(PlayerRepeat, IntroUsesTenSecondWindow) {
-  EXPECT_TRUE(PlayerRepeat::IsIntro(PlaylistSequence::RepeatMode::Intro));
-  EXPECT_FALSE(PlayerRepeat::IsIntro(PlaylistSequence::RepeatMode::Playlist));
-  EXPECT_FALSE(PlayerRepeat::IntroElapsed(9 * 1000000000LL));
-  EXPECT_TRUE(PlayerRepeat::IntroElapsed(10 * 1000000000LL));
-  EXPECT_EQ(10000u, PlayerRepeat::IntroTimeoutMs());
-}
-
-TEST(PlayerIntro, ClampsEngineEndToTenSeconds) {
-  Song song;
-  song.set_beginning_nanosec(1000000000LL);
-  song.set_length_nanosec(180000000000LL);
-  EXPECT_EQ(SongSegment::EffectiveEndNanosec(song), PlayerIntro::EffectiveEndNanosec(song, false));
-  EXPECT_EQ(11000000000LL, PlayerIntro::EffectiveEndNanosec(song, true));
-  EXPECT_TRUE(PlayerIntro::HasForcedEnd(song, true));
-  EXPECT_FALSE(PlayerIntro::HasForcedEnd(song, false));
-  song.set_end_nanosec(4000000000LL);
-  EXPECT_EQ(4000000000LL, PlayerIntro::EffectiveEndNanosec(song, true));
-  EXPECT_EQ(EngineBase::Intro, PlayerIntro::AdvanceFlags());
-  Playlist playlist;
-  EXPECT_FALSE(PlayerIntro::Active(&playlist));
-  playlist.SetRepeatMode(PlaylistSequence::RepeatMode::Intro);
-  EXPECT_TRUE(PlayerIntro::Active(&playlist));
-}
-
-TEST(Playlist, PreviousUsesPlayedHistory) {
-  Playlist playlist;
-  auto add = [&](const char *title) {
-    Song song;
-    song.set_title(title);
-    song.set_url(std::string("file:///") + title);
-    song.set_valid(true);
-    playlist.AppendSongs({song});
-  };
-  add("A");
-  add("B");
-  add("C");
-  playlist.set_current_row(0);
-  playlist.Next();
-  playlist.Next();
-  EXPECT_EQ("C", playlist.current_song().title());
-  ASSERT_EQ(2u, playlist.played_indexes().size());
-  playlist.Previous();
-  EXPECT_EQ("B", playlist.current_song().title());
-  playlist.Previous();
-  EXPECT_EQ("A", playlist.current_song().title());
-}
-
-TEST(PlaylistSummary, UsesSelectionWhenMoreThanOneRow) {
-  EXPECT_EQ("0 tracks", PlaylistSummary::Format({}));
-  EXPECT_EQ("1 track", PlaylistSummary::Format({1, 0, 0, 0}));
-  EXPECT_EQ("10 tracks - [ 10 minutes ]", PlaylistSummary::Format({10, 0, 600000000000LL, 0}));
-  EXPECT_EQ("10 tracks - [ 10 minutes ]", PlaylistSummary::Format({10, 1, 600000000000LL, 180000000000LL}));
-  EXPECT_EQ("3 selected of 10 tracks - [ 3 minutes ]", PlaylistSummary::Format({10, 3, 600000000000LL, 180000000000LL}));
-  EXPECT_EQ(600000000000LL, PlaylistSummary::DurationNs({10, 1, 600000000000LL, 180000000000LL}));
-  EXPECT_EQ(180000000000LL, PlaylistSummary::DurationNs({10, 3, 600000000000LL, 180000000000LL}));
-
-  Song short_song;
-  short_song.set_length_nanosec(60000000000LL);
-  Song long_song;
-  long_song.set_length_nanosec(180000000000LL);
-  Song skipped;
-  skipped.set_length_nanosec(-1);
-  const SongList songs = {short_song, long_song, skipped};
-  EXPECT_EQ(240000000000LL, PlaylistSummary::SelectedLengthNs(songs, {0, 1, 2, 99}));
-  const PlaylistSummary::Input input = PlaylistSummary::FromPlaylist(3, 240000000000LL, songs, {0, 1});
-  EXPECT_EQ(2, input.selected_tracks);
-  EXPECT_EQ(240000000000LL, input.selected_length_ns);
-  EXPECT_EQ("2 selected of 3 tracks - [ 4 minutes ]", PlaylistSummary::Format(input));
-}
-
-TEST(PlaylistFilterDelay, MatchesQtLargePlaylistDebounce) {
-  EXPECT_EQ(100, PlaylistFilterDelay::kFilterDelayMs);
-  EXPECT_EQ(5000, PlaylistFilterDelay::kFilterDelayPlaylistSizeThreshold);
-  EXPECT_FALSE(PlaylistFilterDelay::ShouldDelay(0, false));
-  EXPECT_FALSE(PlaylistFilterDelay::ShouldDelay(4999, false));
-  EXPECT_FALSE(PlaylistFilterDelay::ShouldDelay(5000, true));
-  EXPECT_TRUE(PlaylistFilterDelay::ShouldDelay(5000, false));
-  EXPECT_TRUE(PlaylistFilterDelay::ShouldDelay(8000, false));
-  EXPECT_FALSE(PlaylistFilterDelay::ShouldJumpToPlaying(-1));
-  EXPECT_TRUE(PlaylistFilterDelay::ShouldJumpToPlaying(0));
-}
-
-TEST(PlaylistFilterEmpty, ShowsOnlyWhenPlaylistHasRowsButNoneVisible) {
-  EXPECT_FALSE(PlaylistFilterEmpty::ShouldShow(0, 0));
-  EXPECT_FALSE(PlaylistFilterEmpty::ShouldShow(5, 5));
-  EXPECT_FALSE(PlaylistFilterEmpty::ShouldShow(5, 1));
-  EXPECT_TRUE(PlaylistFilterEmpty::ShouldShow(5, 0));
-  EXPECT_STREQ("No matches found. Clear the search box to show the whole playlist again.", PlaylistFilterEmpty::Message());
-}
-
-TEST(PlaylistFilterSync, RestoresStoredFilterWhenEntryDiffers) {
-  Playlist playlist;
-  playlist.SetFilterString("artist:Queen");
-  EXPECT_EQ("artist:Queen", PlaylistFilterSync::FilterForPlaylist(&playlist));
-  EXPECT_EQ("", PlaylistFilterSync::FilterForPlaylist(nullptr));
-  EXPECT_TRUE(PlaylistFilterSync::ShouldSyncEntry("foo", "artist:Queen"));
-  EXPECT_FALSE(PlaylistFilterSync::ShouldSyncEntry("artist:Queen", "artist:Queen"));
-  EXPECT_EQ("artist:Queen", PlaylistFilterSync::EntryFromPlaylist(playlist.filter_string()));
-}
-
-TEST(PlaylistToolbar, HideClearsFilterLikeQt) {
-  EXPECT_TRUE(PlaylistToolbar::Visible(true));
-  EXPECT_FALSE(PlaylistToolbar::Visible(false));
-  EXPECT_FALSE(PlaylistToolbar::ShouldClearFilter(true));
-  EXPECT_TRUE(PlaylistToolbar::ShouldClearFilter(false));
-  EXPECT_TRUE(PlaylistToolbar::FilterApplies(true));
-  EXPECT_FALSE(PlaylistToolbar::FilterApplies(false));
-  EXPECT_TRUE(PlaylistToolbar::FocusEnabled(true));
-  EXPECT_FALSE(PlaylistToolbar::FocusEnabled(false));
-  EXPECT_STREQ("strawberry-playlist-buttons", PlaylistToolbar::CssClass());
-  EXPECT_TRUE(PlaylistToolbar::ShouldApplyIconSizes(true));
-  EXPECT_FALSE(PlaylistToolbar::ShouldApplyIconSizes(false));
-  EXPECT_EQ(AppearanceSettings::kDefaultIconSizePlaylistButtons, PlaylistToolbar::IconSize(0));
-  EXPECT_EQ(32, PlaylistToolbar::IconSize(32));
-  EXPECT_EQ(128, PlaylistToolbar::IconSize(256));
-}
-
-TEST(PlaylistUndoLimits, ConfirmsClearWhenOverUndoLimit) {
-  EXPECT_EQ(500, PlaylistUndoLimits::kUndoItemLimit);
-  EXPECT_EQ(20, PlaylistUndoLimits::kUndoStackLimit);
-  EXPECT_FALSE(PlaylistUndoLimits::ShouldBypassUndo(500));
-  EXPECT_TRUE(PlaylistUndoLimits::ShouldBypassUndo(501));
-  EXPECT_FALSE(PlaylistUndoLimits::NeedsClearConfirmation(0));
-  EXPECT_FALSE(PlaylistUndoLimits::NeedsClearConfirmation(500));
-  EXPECT_TRUE(PlaylistUndoLimits::NeedsClearConfirmation(501));
-  EXPECT_STREQ("Clear playlist", PlaylistUndoLimits::ClearConfirmTitle());
-  EXPECT_EQ("Playlist has 501 songs, too large to undo, are you sure you want to clear the playlist?",
-            PlaylistUndoLimits::ClearConfirmBody(501));
-}
-
-TEST(PlaylistUndoState, EnablesButtonsFromStack) {
-  EXPECT_TRUE(PlaylistUndoState::UndoEnabled(true));
-  EXPECT_FALSE(PlaylistUndoState::UndoEnabled(false));
-  EXPECT_TRUE(PlaylistUndoState::RedoEnabled(true));
-  EXPECT_FALSE(PlaylistUndoState::RedoEnabled(false));
-  EXPECT_STREQ("Undo", PlaylistUndoState::UndoTooltip(true));
-  EXPECT_STREQ("Redo", PlaylistUndoState::RedoTooltip(false));
-}
-
-TEST(SavePlaylistsOptions, BuildsDestinationAndValidates) {
-  EXPECT_STREQ("Select directory for saving playlists", SavePlaylistsOptions::Title());
-  EXPECT_STREQ("Select directory for the playlists", SavePlaylistsOptions::BrowseTitle());
-  EXPECT_STREQ("Type", SavePlaylistsOptions::TypeLabel());
-  EXPECT_STREQ("Directory does not exist.", SavePlaylistsOptions::DirectoryMissingTitle());
-  EXPECT_STREQ("Directory does not exist.", SavePlaylistsOptions::DirectoryMissingBody());
-  EXPECT_EQ("Mix.m3u8", SavePlaylistsOptions::DestFilename("Mix", "m3u8"));
-  EXPECT_EQ("Mix.pls", SavePlaylistsOptions::DestFilename("Mix", ".pls"));
-  const auto choices = SavePlaylistsOptions::ExtensionChoices();
-  ASSERT_EQ(5u, choices.size());
-  EXPECT_EQ("m3u", choices.front());
-  EXPECT_EQ("asx", choices.back());
-  EXPECT_EQ(0, SavePlaylistsOptions::ExtensionIndex(choices, "m3u"));
-  EXPECT_EQ(2, SavePlaylistsOptions::ExtensionIndex(choices, "pls"));
-  EXPECT_EQ(0, SavePlaylistsOptions::ExtensionIndex(choices, "unknown"));
-  EXPECT_EQ("/home/user", SavePlaylistsOptions::FallbackPath("", "/home/user"));
-  EXPECT_EQ("/tmp/playlists", SavePlaylistsOptions::FallbackPath("/tmp/playlists", "/home/user"));
-  EXPECT_EQ("m3u", SavePlaylistsOptions::DefaultExtension(""));
-  EXPECT_EQ("xspf", SavePlaylistsOptions::DefaultExtension("xspf"));
-  EXPECT_FALSE(SavePlaylistsOptions::ValidateDirectory(""));
-  EXPECT_TRUE(SavePlaylistsOptions::ValidateDirectory("/tmp"));
-}
-
-TEST(PlaylistPlayed, RemapsStackAfterRemoveAndMove) {
-  const std::vector<int> stack = {0, 3, 1};
-  const auto removed = PlaylistPlayed::AfterRemove(stack, {1});
-  ASSERT_EQ(2u, removed.size());
-  EXPECT_EQ(0, removed[0]);
-  EXPECT_EQ(2, removed[1]);
-  const auto moved = PlaylistPlayed::AfterMove({1}, 4, {1}, 4);
-  ASSERT_EQ(1u, moved.size());
-  EXPECT_EQ(3, moved.front());
-}
-
-TEST(Playlist, UpdatesScrobblePointOnCurrentRowAndSeek) {
-  Playlist playlist;
-  Song song;
-  song.set_title("Roads");
-  song.set_artist("Portishead");
-  song.set_url("file:///roads.flac");
-  song.set_valid(true);
-  song.set_length_nanosec(180LL * ScrobblePoint::kNsecPerSec);
-  playlist.AppendSongs({song});
-  playlist.set_current_row(0);
-  EXPECT_EQ(90LL * ScrobblePoint::kNsecPerSec, playlist.scrobble_point_nanosec());
-  EXPECT_FALSE(playlist.scrobbled());
-  playlist.set_scrobbled(true);
-  playlist.UpdateScrobblePoint(100LL * ScrobblePoint::kNsecPerSec);
-  EXPECT_FALSE(playlist.scrobbled());
-  EXPECT_EQ(190LL * ScrobblePoint::kNsecPerSec, playlist.scrobble_point_nanosec());
-}
-
-TEST(Playlist, BypassesUndoForBulkInsertAndCapsStack) {
-  Playlist playlist;
-  SongList bulk;
-  for (int i = 0; i < 501; ++i) {
-    Song song;
-    song.set_title("T" + std::to_string(i));
-    song.set_url("file:///t" + std::to_string(i));
-    song.set_valid(true);
-    bulk.push_back(song);
+  ~PlaylistTest() override {
+    tagreader_client_thread_->exit();
+    tagreader_client_thread_->wait(5000);
+    delete tagreader_client_thread_;
   }
-  playlist.AppendSongs(bulk);
-  EXPECT_EQ(501, playlist.row_count());
-  EXPECT_FALSE(playlist.CanUndo());
 
-  Playlist stacked;
-  for (int i = 0; i < 25; ++i) {
-    Song song;
-    song.set_title("S" + std::to_string(i));
-    song.set_url("file:///s" + std::to_string(i));
-    song.set_valid(true);
-    stacked.AppendSongs({song});
+  void SetUp() override {
+    playlist_.set_sequence(&sequence_);
   }
-  int undos = 0;
-  while (stacked.CanUndo()) {
-    stacked.Undo();
-    ++undos;
+
+  MockPlaylistItem *MakeMockItem(const QString &title, const QString &artist = QString(), const QString &album = QString(), int length = 123) const {
+    Song metadata;
+    metadata.Init(title, artist, album, length);
+
+    MockPlaylistItem *ret = new MockPlaylistItem;
+    EXPECT_CALL(*ret, OriginalMetadata()).WillRepeatedly(Return(metadata));
+
+    return ret;
   }
-  EXPECT_EQ(PlaylistUndoLimits::kUndoStackLimit, undos);
-}
 
-TEST(DynamicPlaylistMaintenance, HistoryFutureAndTrimCounts) {
-  EXPECT_EQ(0, DynamicPlaylistMaintenance::HistoryLength(-1));
-  EXPECT_EQ(4, DynamicPlaylistMaintenance::HistoryLength(4));
-  EXPECT_EQ(3, DynamicPlaylistMaintenance::FutureCount(8, 4));
-  EXPECT_EQ(2, DynamicPlaylistMaintenance::HistoryTrimCount(12, 10));
-  EXPECT_EQ(0, DynamicPlaylistMaintenance::HistoryTrimCount(10, 10));
-  EXPECT_EQ(3, DynamicPlaylistMaintenance::FutureInsertCount(10, PlaylistGenerator::kDefaultDynamicFuture, 18));
-  EXPECT_TRUE(DynamicPlaylistMaintenance::ShouldClearUndo(true, true));
-  EXPECT_FALSE(DynamicPlaylistMaintenance::ShouldClearUndo(false, true));
-}
-
-TEST(PlaylistStreamState, ClearsResolvedStreamUrl) {
-  Song song;
-  song.set_url("tidal://1");
-  song.set_stream_url("https://cdn.example/a.flac");
-  song.set_valid(true);
-  PlaylistStreamState::ClearResolved(&song);
-  EXPECT_EQ("tidal://1", song.url());
-  EXPECT_EQ("tidal://1", song.stream_url());
-  Song next;
-  next.set_url("tidal://2");
-  next.set_stream_url("https://cdn.example/b.flac");
-  PlaylistStreamState::ClearForRowChange(&song, &next);
-  EXPECT_EQ("tidal://2", next.stream_url());
-}
-
-TEST(Playlist, ClearingStreamUrlOnRowChange) {
-  Playlist playlist;
-  Song current;
-  current.set_title("Now");
-  current.set_url("tidal://1");
-  current.set_stream_url("https://cdn.example/a.flac");
-  current.set_valid(true);
-  Song upcoming;
-  upcoming.set_title("Next");
-  upcoming.set_url("tidal://2");
-  upcoming.set_stream_url("https://cdn.example/b.flac");
-  upcoming.set_valid(true);
-  playlist.AppendSongs({current, upcoming});
-  playlist.set_current_row(0);
-  playlist.ReplaceRow(0, current);
-  playlist.ReplaceRow(1, upcoming);
-  EXPECT_EQ("https://cdn.example/a.flac", playlist.song(0).stream_url());
-  playlist.set_current_row(1);
-  EXPECT_EQ("tidal://1", playlist.song(0).stream_url());
-  EXPECT_EQ("tidal://2", playlist.song(1).url());
-}
-
-TEST(PlaylistQueueDequeue, FrontQueuedRow) {
-  Queue queue;
-  Song song;
-  song.set_url("file:///a");
-  song.set_valid(true);
-  queue.Append(song, 7, 3);
-  EXPECT_TRUE(PlaylistQueueDequeue::ShouldDequeue(7, 3, queue));
-  EXPECT_FALSE(PlaylistQueueDequeue::ShouldDequeue(7, 4, queue));
-  EXPECT_FALSE(PlaylistQueueDequeue::ShouldDequeue(8, 3, queue));
-  Playlist playlist;
-  playlist.set_id(7);
-  Song a;
-  a.set_title("A");
-  a.set_url("file:///a");
-  a.set_valid(true);
-  Song b;
-  b.set_title("B");
-  b.set_url("file:///b");
-  b.set_valid(true);
-  playlist.AppendSongs({a, b});
-  playlist.set_current_row(1);
-  playlist.queue()->Append(a, 7, 0);
-  EXPECT_EQ(1, playlist.queue()->size());
-  playlist.set_current_row(0);
-  EXPECT_EQ(0, playlist.queue()->size());
-}
-
-TEST(PlaylistReloadRows, ReloadsUnavailableLocalFiles) {
-  Song local(Song::Source::Collection);
-  local.set_url("file:///tmp/music/a.flac");
-  local.set_unavailable(true);
-  EXPECT_TRUE(PlaylistReloadRows::ShouldReload(local, true));
-  EXPECT_FALSE(PlaylistReloadRows::ShouldReload(local, false));
-  Song stream(Song::Source::Tidal);
-  stream.set_url("tidal://1");
-  stream.set_unavailable(true);
-  EXPECT_FALSE(PlaylistReloadRows::ShouldReload(stream, true));
-}
-
-TEST(PlaylistCoverPersist, LocalFileWithoutCollectionId) {
-  Song row(Song::Source::LocalFile);
-  row.set_url("file:///tmp/a.flac");
-  row.set_id(-1);
-  Song playing = row;
-  EXPECT_TRUE(PlaylistCoverPersist::ShouldPersistLocalArt(row, playing, "file:///cover.jpg"));
-  row.set_id(4);
-  EXPECT_FALSE(PlaylistCoverPersist::ShouldPersistLocalArt(row, playing, "file:///cover.jpg"));
-}
-
-TEST(PlayerLoadResult, MatchesNextRowAndAppliesStreamUrl) {
-  EXPECT_EQ(PlayerLoadResult::Target::Current, PlayerLoadResult::MatchMediaUrl("", "tidal://1", "tidal://2"));
-  EXPECT_EQ(PlayerLoadResult::Target::Current, PlayerLoadResult::MatchMediaUrl("tidal://1", "tidal://1", "tidal://2"));
-  EXPECT_EQ(PlayerLoadResult::Target::Next, PlayerLoadResult::MatchMediaUrl("tidal://2", "tidal://1", "tidal://2"));
-  EXPECT_EQ(PlayerLoadResult::Target::None, PlayerLoadResult::MatchMediaUrl("tidal://3", "tidal://1", "tidal://2"));
-  EXPECT_TRUE(PlayerLoadResult::ShouldDeferEngineStart(UrlHandler::LoadResult::Type::WillLoadAsynchronously));
-  EXPECT_TRUE(PlayerLoadResult::ShouldDeferEngineStart(UrlHandler::LoadResult::Type::Async));
-  EXPECT_FALSE(PlayerLoadResult::ShouldDeferEngineStart(UrlHandler::LoadResult::Type::TrackAvailable));
-  EXPECT_TRUE(PlayerLoadResult::ShouldAdvanceOnNoMoreTracks(UrlHandler::LoadResult::Type::NoMoreTracks));
-  EXPECT_TRUE(PlayerLoadResult::ShouldTreatAsError(UrlHandler::LoadResult::Type::Error));
-  EXPECT_TRUE(PlayerLoadResult::ShouldPreloadResolved(PlayerLoadResult::Target::Next, false));
-  EXPECT_FALSE(PlayerLoadResult::ShouldPreloadResolved(PlayerLoadResult::Target::Next, true));
-  std::vector<std::string> loading;
-  PlayerLoadResult::LoadingAsyncInsert(&loading, "tidal://1");
-  EXPECT_TRUE(PlayerLoadResult::LoadingAsyncContains(loading, "tidal://1"));
-  PlayerLoadResult::LoadingAsyncInsert(&loading, "tidal://1");
-  EXPECT_EQ(1u, loading.size());
-  PlayerLoadResult::LoadingAsyncErase(&loading, "tidal://1");
-  EXPECT_FALSE(PlayerLoadResult::LoadingAsyncContains(loading, "tidal://1"));
-  Song song;
-  song.set_url("tidal://1");
-  UrlHandler::LoadResult result;
-  result.type = UrlHandler::LoadResult::Type::TrackAvailable;
-  result.stream_url = "https://cdn.example/a.flac";
-  result.filetype = Song::FileType::FLAC;
-  result.samplerate = 44100;
-  result.bit_depth = 16;
-  result.duration = 180000000000;
-  Song meta;
-  meta.set_valid(true);
-  meta.set_title("Roads");
-  result.song = meta;
-  PlayerLoadResult::Apply(&song, result);
-  EXPECT_EQ("https://cdn.example/a.flac", song.stream_url());
-  EXPECT_EQ(Song::FileType::FLAC, song.filetype());
-  EXPECT_EQ(44100, song.samplerate());
-  EXPECT_EQ(16, song.bitdepth());
-  EXPECT_EQ(180000000000, song.length_nanosec());
-  EXPECT_EQ("Roads", song.title());
-}
-
-TEST(PlayerStreamExpire, RefreshesAfterThirtySeconds) {
-  Song tidal(Song::Source::Tidal);
-  EXPECT_TRUE(tidal.stream_url_can_expire());
-  EXPECT_FALSE(PlayerStreamExpire::NeedsRefresh(tidal, true, 100, 129));
-  EXPECT_TRUE(PlayerStreamExpire::NeedsRefresh(tidal, true, 100, 130));
-  EXPECT_FALSE(PlayerStreamExpire::NeedsRefresh(tidal, false, 100, 200));
-  Song flac;
-  flac.set_source(Song::Source::Collection);
-  EXPECT_FALSE(PlayerStreamExpire::NeedsRefresh(flac, true, 100, 200));
-}
-
-TEST(PlayerRestartOrPrevious, UsesEightSecondThreshold) {
-  EXPECT_EQ(8, PlayerRestartOrPrevious::kThresholdSec);
-  EXPECT_TRUE(PlayerRestartOrPrevious::ShouldGoToPrevious(0));
-  EXPECT_TRUE(PlayerRestartOrPrevious::ShouldGoToPrevious(1 * 1000000000LL));
-  EXPECT_TRUE(PlayerRestartOrPrevious::ShouldGoToPrevious(5 * 1000000000LL));
-  EXPECT_TRUE(PlayerRestartOrPrevious::ShouldGoToPrevious(7 * 1000000000LL));
-  EXPECT_TRUE(PlayerRestartOrPrevious::ShouldGoToPrevious(7999999999LL));
-  EXPECT_FALSE(PlayerRestartOrPrevious::ShouldGoToPrevious(8 * 1000000000LL));
-  EXPECT_FALSE(PlayerRestartOrPrevious::ShouldGoToPrevious(10 * 1000000000LL));
-}
-
-TEST(PlayerPrevious, RestartModeAndDontRestartSeek) {
-  EXPECT_TRUE(PlayerPrevious::ShouldRestartTrack(BehaviourSettings::PreviousBehaviour::Restart, 0, 10));
-  EXPECT_TRUE(PlayerPrevious::ShouldRestartTrack(BehaviourSettings::PreviousBehaviour::Restart, 1, 4));
-  EXPECT_FALSE(PlayerPrevious::ShouldRestartTrack(BehaviourSettings::PreviousBehaviour::Restart, 8, 9));
-  EXPECT_FALSE(PlayerPrevious::ShouldRestartTrack(BehaviourSettings::PreviousBehaviour::DontRestart, 0, 10));
-  EXPECT_TRUE(PlayerPrevious::ShouldSeekToStart(BehaviourSettings::PreviousBehaviour::DontRestart, 4 * 1000000000LL));
-  EXPECT_FALSE(PlayerPrevious::ShouldSeekToStart(BehaviourSettings::PreviousBehaviour::DontRestart, 2 * 1000000000LL));
-  EXPECT_FALSE(PlayerPrevious::ShouldSeekToStart(BehaviourSettings::PreviousBehaviour::Restart, 10 * 1000000000LL));
-}
-
-TEST(PlayerErrorLoop, StopsRepeatTrackAndGlobalCap) {
-  EXPECT_TRUE(PlayerErrorLoop::ShouldStopRepeatTrack(PlaylistSequence::RepeatMode::Track, 3));
-  EXPECT_FALSE(PlayerErrorLoop::ShouldStopRepeatTrack(PlaylistSequence::RepeatMode::Track, 2));
-  EXPECT_FALSE(PlayerErrorLoop::ShouldStopRepeatTrack(PlaylistSequence::RepeatMode::Off, 3));
-  EXPECT_TRUE(PlayerErrorLoop::ShouldStopAfterFilteredRows(10, 10));
-  EXPECT_FALSE(PlayerErrorLoop::ShouldStopAfterFilteredRows(9, 10));
-  EXPECT_TRUE(PlayerErrorLoop::ShouldStopGlobal(100));
-  EXPECT_TRUE(PlayerErrorLoop::ShouldStopAutoAdvance(PlaylistSequence::RepeatMode::Track, 3, 50));
-  EXPECT_TRUE(PlayerErrorLoop::ShouldStopAutoAdvance(PlaylistSequence::RepeatMode::Playlist, 8, 8));
-  EXPECT_FALSE(PlayerErrorLoop::ShouldStopAutoAdvance(PlaylistSequence::RepeatMode::Off, 8, 8));
-  EXPECT_TRUE(PlayerErrorLoop::ShouldStopAutoAdvance(PlaylistSequence::RepeatMode::Off, 100, 8));
-}
-
-TEST(PlayerNextMetadata, RoutesCurrentAndNextUrls) {
-  EXPECT_EQ(PlayerNextMetadata::Target::Current,
-            PlayerNextMetadata::TargetForUrl("", "file:///a", "", "file:///b", ""));
-  EXPECT_EQ(PlayerNextMetadata::Target::Current,
-            PlayerNextMetadata::TargetForUrl("file:///a", "file:///a", "", "file:///b", ""));
-  EXPECT_EQ(PlayerNextMetadata::Target::Next,
-            PlayerNextMetadata::TargetForUrl("file:///b", "file:///a", "", "file:///b", ""));
-  EXPECT_EQ(PlayerNextMetadata::Target::Next,
-            PlayerNextMetadata::TargetForUrl("http://stream/b", "file:///a", "", "file:///b", "http://stream/b"));
-  EXPECT_EQ(PlayerNextMetadata::Target::None,
-            PlayerNextMetadata::TargetForUrl("file:///c", "file:///a", "", "file:///b", ""));
-  EXPECT_TRUE(PlayerNextMetadata::ShouldApplyToNext(PlayerNextMetadata::Target::Next));
-  EXPECT_FALSE(PlayerNextMetadata::ShouldApplyToNext(PlayerNextMetadata::Target::Current));
-}
-
-TEST(PlayerSeekNotify, ClampsAndRefreshesNowPlaying) {
-  EXPECT_EQ(0, PlayerSeekNotify::Clamp(-5, 100));
-  EXPECT_EQ(100, PlayerSeekNotify::Clamp(200, 100));
-  EXPECT_EQ(40, PlayerSeekNotify::Clamp(40, 100));
-  EXPECT_EQ(40, PlayerSeekNotify::Clamp(40, 0));
-  EXPECT_TRUE(PlayerSeekNotify::ShouldRefreshNowPlaying(0, 100));
-  EXPECT_FALSE(PlayerSeekNotify::ShouldRefreshNowPlaying(1, 100));
-  EXPECT_FALSE(PlayerSeekNotify::ShouldRefreshNowPlaying(0, 0));
-}
-
-TEST(PlaylistMetadataUpdate, ReplacesPartialAndUnknown) {
-  Song partial;
-  partial.set_url("file:///tmp/track.flac");
-  partial.set_filetype(Song::FileType::FLAC);
-  partial.set_init_from_file(false);
-  Song tagged = partial;
-  tagged.set_init_from_file(true);
-  tagged.set_title("White Winter Hymnal");
-  EXPECT_TRUE(PlaylistMetadataUpdate::ShouldReplace(partial, tagged));
-  Song unknown;
-  unknown.set_url("file:///tmp/track.flac");
-  unknown.set_filetype(Song::FileType::Unknown);
-  unknown.set_init_from_file(true);
-  EXPECT_TRUE(PlaylistMetadataUpdate::ShouldReplace(unknown, tagged));
-  Song stream;
-  stream.set_url("file:///tmp/track.flac");
-  stream.set_filetype(Song::FileType::Stream);
-  stream.set_init_from_file(true);
-  EXPECT_TRUE(PlaylistMetadataUpdate::ShouldReplace(stream, tagged));
-  Song cdda;
-  cdda.set_url("file:///tmp/track.flac");
-  cdda.set_filetype(Song::FileType::CDDA);
-  cdda.set_init_from_file(true);
-  EXPECT_TRUE(PlaylistMetadataUpdate::ShouldReplace(cdda, tagged));
-  EXPECT_FALSE(PlaylistMetadataUpdate::ShouldReplace(tagged, partial));
-  Song other;
-  other.set_url("file:///tmp/other.flac");
-  EXPECT_FALSE(PlaylistMetadataUpdate::ShouldReplace(partial, other));
-}
-
-TEST(Playlist, UpdateItemsReplacesPartialKeepsTagged) {
-  Playlist playlist;
-  Song partial;
-  partial.set_url("file:///tmp/a.flac");
-  partial.set_title("a.flac");
-  partial.set_filetype(Song::FileType::FLAC);
-  partial.set_valid(true);
-  partial.set_skipped(true);
-  Song tagged;
-  tagged.set_url("file:///tmp/b.flac");
-  tagged.set_title("Already Tagged");
-  tagged.set_filetype(Song::FileType::FLAC);
-  tagged.set_init_from_file(true);
-  tagged.set_valid(true);
-  playlist.AppendSongs({partial, tagged});
-  Song loaded_a;
-  loaded_a.set_url("file:///tmp/a.flac");
-  loaded_a.set_title("White Winter Hymnal");
-  loaded_a.set_artist("Fleet Foxes");
-  loaded_a.set_filetype(Song::FileType::FLAC);
-  loaded_a.set_init_from_file(true);
-  loaded_a.set_valid(true);
-  Song loaded_b = tagged;
-  loaded_b.set_title("Should Not Replace");
-  playlist.UpdateItems({loaded_a, loaded_b});
-  EXPECT_EQ("White Winter Hymnal", playlist.song(0).title());
-  EXPECT_EQ("Fleet Foxes", playlist.song(0).artist());
-  EXPECT_TRUE(playlist.song(0).init_from_file());
-  EXPECT_TRUE(playlist.song(0).skipped());
-  EXPECT_EQ("Already Tagged", playlist.song(1).title());
-}
-
-TEST(Playlist, UpdateRowMetadataLeavesOtherRows) {
-  Playlist playlist;
-  Song current;
-  current.set_title("Now");
-  current.set_url("file:///now.flac");
-  current.set_valid(true);
-  Song next;
-  next.set_title("Next");
-  next.set_url("file:///next.flac");
-  next.set_valid(true);
-  playlist.AppendSongs({current, next});
-  playlist.set_current_row(0);
-  Song engine;
-  engine.set_title("Preloaded");
-  engine.set_length_nanosec(180000000000);
-  EXPECT_TRUE(playlist.UpdateRowMetadata(1, engine));
-  EXPECT_EQ("Now", playlist.song(0).title());
-  EXPECT_EQ("Preloaded", playlist.song(1).title());
-  EXPECT_EQ(180000000000, playlist.song(1).length_nanosec());
-  EXPECT_FALSE(playlist.UpdateRowMetadata(-1, engine));
-}
-
-TEST(Playlist, RepeatTrackHiddenByFilter) {
-  Playlist playlist;
-  Song keep;
-  keep.set_title("Keep");
-  keep.set_artist("Portishead");
-  keep.set_url("file:///keep");
-  keep.set_valid(true);
-  Song skip;
-  skip.set_title("Skip");
-  skip.set_artist("Fleet Foxes");
-  skip.set_url("file:///skip");
-  skip.set_valid(true);
-  playlist.AppendSongs({keep, skip});
-  playlist.set_current_row(1);
-  playlist.SetRepeatMode(PlaylistSequence::RepeatMode::Track);
-  EXPECT_EQ(1, playlist.PeekNextRow());
-  playlist.SetFilterString("artist:Portishead");
-  EXPECT_EQ(-1, playlist.PeekNextRow());
-  playlist.set_current_row(0);
-  EXPECT_EQ(0, playlist.PeekNextRow());
-  EXPECT_EQ(0, PlaylistFilterIndex::RepeatTrackRow(0, PlaylistFilter{}, keep));
-}
-
-TEST(Playlist, MergeFromEngineUpdatesMatchingUrl) {
-  Playlist playlist;
-  Song song;
-  song.set_url("http://radio.example/live");
-  song.set_valid(true);
-  playlist.AppendSongs({song});
-  Song engine;
-  engine.set_url("http://radio.example/live");
-  engine.set_title("Roads");
-  engine.set_artist("Portishead");
-  EXPECT_TRUE(playlist.MergeFromEngine(engine));
-  EXPECT_EQ("Roads", playlist.song(0).title());
-  EXPECT_EQ("Portishead", playlist.song(0).artist());
-}
-
-TEST(Playlist, PatchSongByIdUpdatesWithoutUndo) {
-  Playlist playlist;
-  Song song;
-  song.set_id(7);
-  song.set_title("Roads");
-  song.set_url("file:///roads.flac");
-  song.set_playcount(1);
-  song.set_valid(true);
-  playlist.AppendSongs({song});
-  EXPECT_TRUE(playlist.CanUndo());
-  Song updated = song;
-  updated.set_playcount(4);
-  EXPECT_TRUE(playlist.PatchSongById(updated));
-  EXPECT_EQ(4u, playlist.song(0).playcount());
-  playlist.Undo();
-  EXPECT_EQ(0, playlist.row_count());
-}
-
-TEST(Playlist, TrimsDynamicHistoryOnForwardAdvance) {
-  Playlist playlist;
-  SmartPlaylistSearch search;
-  playlist.SetDynamic(true, search);
-  SongList songs;
-  for (int i = 0; i < 16; ++i) {
-    Song song;
-    song.set_title("D" + std::to_string(i));
-    song.set_url("file:///d" + std::to_string(i));
-    song.set_valid(true);
-    songs.push_back(song);
+  PlaylistItemPtr MakeMockItemP(const QString &title, const QString &artist = QString(), const QString &album = QString(), int length = 123) const {
+    return PlaylistItemPtr(MakeMockItem(title, artist, album, length));
   }
-  playlist.AppendSongs(songs);
-  playlist.set_current_row(10);
-  playlist.Next();
-  EXPECT_EQ(PlaylistGenerator::kDefaultDynamicHistory, playlist.current_row());
-  EXPECT_EQ(15, playlist.row_count());
-  EXPECT_EQ("D1", playlist.songs().front().title());
-  EXPECT_FALSE(playlist.CanUndo());
-}
 
-TEST(Playlist, AssignsStableUuidsAcrossReorder) {
-  Playlist playlist;
-  Song a;
-  a.set_title("A");
-  a.set_url("file:///a");
-  a.set_valid(true);
-  Song b;
-  b.set_title("B");
-  b.set_url("file:///b");
-  b.set_valid(true);
-  playlist.AppendSongs({a, b});
-  playlist.EnsureUuids();
-  const std::string first = playlist.UuidAt(0);
-  const std::string second = playlist.UuidAt(1);
-  EXPECT_TRUE(PlaylistItemUuid::Valid(first));
-  EXPECT_TRUE(PlaylistItemUuid::Valid(second));
-  EXPECT_NE(first, second);
-  playlist.Move(0, 2);
-  EXPECT_EQ(second, playlist.UuidAt(0));
-  EXPECT_EQ(first, playlist.UuidAt(1));
-}
-
-TEST(PlaylistSaveSchedule, CoalescesIntentsAndSkipsLoad) {
-  EXPECT_EQ(900u, PlaylistSaveSchedule::kDelayMs);
-  EXPECT_TRUE(PlaylistSaveSchedule::ShouldSchedule(false, true));
-  EXPECT_FALSE(PlaylistSaveSchedule::ShouldSchedule(true, true));
-  EXPECT_FALSE(PlaylistSaveSchedule::ShouldSchedule(false, false));
-  EXPECT_EQ(PlaylistSaveSchedule::Intent::Full,
-            PlaylistSaveSchedule::Merge(PlaylistSaveSchedule::Intent::LastPlayed, PlaylistSaveSchedule::Intent::Full));
-  EXPECT_EQ(PlaylistSaveSchedule::Intent::Items,
-            PlaylistSaveSchedule::Merge(PlaylistSaveSchedule::Intent::LastPlayed, PlaylistSaveSchedule::Intent::Items));
-  EXPECT_EQ(PlaylistSaveSchedule::Intent::LastPlayed,
-            PlaylistSaveSchedule::Merge(PlaylistSaveSchedule::Intent::None, PlaylistSaveSchedule::Intent::LastPlayed));
-}
-
-TEST(PlaylistDynamicAdvance, ReplenishesAfterHistoryTrim) {
-  EXPECT_TRUE(PlaylistDynamicAdvance::ShouldReplenish(true, true));
-  EXPECT_FALSE(PlaylistDynamicAdvance::ShouldReplenish(true, false));
-  EXPECT_EQ(1, PlaylistDynamicAdvance::ReplenishCount(10, 10, 20));
-  EXPECT_EQ(0, PlaylistDynamicAdvance::ReplenishCount(10, 10, 21));
-  Song first;
-  first.set_id(1);
-  first.set_url("file:///a.flac");
-  Song second;
-  second.set_id(2);
-  second.set_url("file:///b.flac");
-  Song again = first;
-  EXPECT_EQ(std::vector<int>({1, 2}), PlaylistDynamicAdvance::ExistingIds({first, second}));
-  EXPECT_EQ(1u, PlaylistDynamicAdvance::DedupByIdThenUrl({first, again, second}, {first}).size());
-  EXPECT_EQ(PlaylistGenerator::kDefaultDynamicHistory, PlaylistDynamicAdvance::MaxHistory(nullptr));
-  EXPECT_EQ(PlaylistGenerator::kDefaultDynamicFuture, PlaylistDynamicAdvance::MaxFuture(nullptr));
-}
-
-TEST(PlaylistDynamicAdvance, NextInsertsFromGenerator) {
-  const std::string path = "/tmp/strawberry-dynamic-advance-" + std::to_string(getpid()) + ".db";
-  unlink(path.c_str());
-  Database db(path);
-  ASSERT_TRUE(db.Open());
-  CollectionBackend backend(&db);
-  const int directory = backend.AddDirectory("/tmp/music");
-  ASSERT_GE(directory, 0);
-  for (const char *title : {"Alpha", "Beta", "Charlie", "Delta"}) {
-    Song song;
-    song.set_title(title);
-    song.set_artist("Fleet Foxes");
-    song.set_url(std::string("file:///tmp/music/") + title + ".flac");
-    song.set_directory_id(directory);
-    song.set_valid(true);
-    ASSERT_GT(backend.AddOrUpdateSong(song), 0);
+  // Forwards to the private Playlist::ReloadItemComplete(), to let tests exercise the save-generation staleness check directly instead of via a real asynchronous write-then-reread round trip.
+  void CallReloadItemComplete(const QPersistentModelIndex &idx, const PlaylistItemPtr &item, const Song &new_metadata, const bool saved, const quint64 save_generation, const Song &fallback_metadata = Song()) {
+    playlist_.ReloadItemComplete(idx, item, new_metadata, saved, save_generation, fallback_metadata);
   }
-  SmartPlaylistSearch search;
-  search.type = SmartPlaylistSearch::SearchType::All;
-  search.limit = 1;
-  search.sort_field = SmartPlaylistField::Title;
-  auto query = std::make_shared<PlaylistQueryGenerator>("Advance", search, true);
-  query->set_collection_backend(&backend);
-  Playlist playlist;
-  playlist.SetDynamicGenerator(query);
-  PlaylistGeneratorInserter inserter;
-  ASSERT_EQ(1, inserter.Insert(&playlist, query));
-  EXPECT_EQ(1, playlist.row_count());
-  EXPECT_EQ("Alpha", playlist.song(0).title());
-  playlist.RefillDynamic({});
-  EXPECT_GE(playlist.row_count(), 2);
-  EXPECT_EQ("Beta", playlist.song(1).title());
-  playlist.Next();
-  EXPECT_EQ(1, playlist.current_row());
-  EXPECT_GE(playlist.row_count(), 3);
-  EXPECT_EQ("Charlie", playlist.song(2).title());
-  unlink(path.c_str());
-}
 
-TEST(PlaylistLocalArtDiscover, WritesSidecarOnPlaylistOnlyRow) {
-  Song row(Song::Source::LocalFile);
-  row.set_url("file:///tmp/music/a.flac");
-  row.set_id(-1);
-  Song playing = row;
-  EXPECT_TRUE(PlaylistLocalArtDiscover::ShouldWriteSidecar(row, playing, "file:///tmp/music/cover.jpg"));
-  PlaylistLocalArtDiscover::ApplySidecar(&row, "file:///tmp/music/cover.jpg");
-  EXPECT_EQ("file:///tmp/music/cover.jpg", row.art_manual());
-  row.set_id(4);
-  EXPECT_FALSE(PlaylistLocalArtDiscover::ShouldWriteSidecar(row, playing, "file:///tmp/music/cover.jpg"));
-  Playlist playlist;
-  Song local(Song::Source::LocalFile);
-  local.set_url("file:///tmp/music/a.flac");
-  local.set_valid(true);
-  playlist.AppendSongs({local});
-  playlist.ApplyDiscoveredArt(local, "file:///tmp/music/cover.jpg");
-  EXPECT_EQ("file:///tmp/music/cover.jpg", playlist.song(0).art_manual());
-}
-
-TEST(PlaylistPlayRow, ResolvesCurrentThenLastPlayedThenFirst) {
-  EXPECT_EQ(2, PlaylistPlayRow::Resolve(2, 5, 10));
-  EXPECT_EQ(5, PlaylistPlayRow::Resolve(-1, 5, 10));
-  EXPECT_EQ(0, PlaylistPlayRow::Resolve(-1, -1, 10));
-  EXPECT_EQ(-1, PlaylistPlayRow::Resolve(-1, -1, 0));
-  EXPECT_EQ(-1, PlaylistPlayRow::Resolve(3, 3, 0));
-  EXPECT_EQ(4, PlaylistPlayRow::Remember(4, 1));
-  EXPECT_EQ(1, PlaylistPlayRow::Remember(-1, 1));
-}
-
-TEST(PlaylistRemoveItemsNotInQueue, KeepsCurrentAndQueuedRows) {
-  EXPECT_TRUE(PlaylistRemoveItemsNotInQueue::KeepRow(1, 1, false));
-  EXPECT_TRUE(PlaylistRemoveItemsNotInQueue::KeepRow(2, 1, true));
-  EXPECT_FALSE(PlaylistRemoveItemsNotInQueue::KeepRow(3, 1, false));
-  const std::vector<int> rows = PlaylistRemoveItemsNotInQueue::RowsToRemove(5, 0, [](int row) { return row == 2 || row == 4; });
-  ASSERT_EQ(2u, rows.size());
-  EXPECT_EQ(1, rows[0]);
-  EXPECT_EQ(3, rows[1]);
-  const std::vector<int> all = PlaylistRemoveItemsNotInQueue::RowsToRemove(3, -1, [](int) { return false; });
-  EXPECT_EQ(3u, all.size());
-}
-
-TEST(Playlist, RepopulateDynamicKeepsQueuedRows) {
-  Playlist playlist;
-  playlist.set_id(4);
-  SmartPlaylistSearch search;
-  search.terms.push_back({SmartPlaylistField::Artist, SmartPlaylistOp::Contains, "A"});
-  playlist.SetDynamic(true, search);
-  SongList songs;
-  for (int i = 0; i < 5; ++i) {
-    Song song;
-    song.set_title(std::string(1, static_cast<char>('A' + i)));
-    song.set_artist("A");
-    song.set_url("file:///" + song.title());
-    song.set_valid(true);
-    songs.push_back(song);
+  // Forwards to the private Playlist::SaveItemComplete(), to let tests exercise the write-failure path directly instead of via a real asynchronous tag write. On failure this now triggers a real (asynchronous) ReloadItem(), so callers must pump the event loop (see WaitForEditingFinished()) for the result to apply.
+  void CallSaveItemComplete(TagReaderReplyPtr reply, const QPersistentModelIndex &idx, const PlaylistItemPtr &item, const quint64 save_generation, const Song &pre_edit_metadata) {
+    playlist_.SaveItemComplete(reply, idx, item, save_generation, pre_edit_metadata);
   }
-  playlist.AppendSongs(songs);
-  playlist.set_current_row(0);
-  playlist.queue()->Append(playlist.song(2), 4, 2);
-  playlist.queue()->Append(playlist.song(4), 4, 4);
-  playlist.RepopulateDynamic(songs);
-  EXPECT_GE(playlist.row_count(), 3);
-  bool kept_c = false;
-  bool kept_e = false;
-  for (const Song &song : playlist.songs()) {
-    kept_c = kept_c || song.title() == "C";
-    kept_e = kept_e || song.title() == "E";
+
+  // Expose the private sort-state fields, to let tests check that undo/redo of a sort restores them (not just the item order).
+  bool IsSorted() const { return playlist_.is_sorted_; }
+  Playlist::Column SortColumn() const { return playlist_.sort_column_; }
+  Qt::SortOrder SortOrder() const { return playlist_.sort_order_; }
+
+  // Blocks until Playlist::EditingFinished fires, i.e. until an in-flight ReloadItem()'s background reload has completed and ReloadItemComplete() has run.
+  // Bounded by timeout_ms so a regression that stops EditingFinished from firing (or a reload that never completes) fails the test instead of hanging the whole run indefinitely, which would otherwise take down CI.
+  void WaitForEditingFinished(const int timeout_ms = 5000) {
+    QEventLoop loop;
+    QObject::connect(&playlist_, &Playlist::EditingFinished, &loop, &QEventLoop::quit);
+    bool timed_out = false;
+    QTimer::singleShot(timeout_ms, &loop, [&loop, &timed_out]() {
+      timed_out = true;
+      loop.quit();
+    });
+    loop.exec();
+    if (timed_out) {
+      FAIL() << "Timed out after " << timeout_ms << " ms waiting for Playlist::EditingFinished";
+    }
   }
-  EXPECT_TRUE(kept_c);
-  EXPECT_TRUE(kept_e);
+
+  // Declaration order matters here: these must precede playlist_ so they are constructed first - see the comment above the constructor.
+  SharedPtr<TagReaderClient> tagreader_client_;
+  QThread *tagreader_client_thread_;
+
+  Playlist playlist_;
+  PlaylistSequence sequence_;
+
+};
+
+namespace {
+
+TEST_F(PlaylistTest, Basic) {
+  EXPECT_EQ(0, playlist_.rowCount(QModelIndex()));
 }
 
-TEST(PlaylistCollectionSync, PatchesEveryOpenPlaylist) {
-  Playlist first;
-  Playlist second;
+TEST_F(PlaylistTest, InsertItems) {
+
+  MockPlaylistItem *item = MakeMockItem(u"Title"_s, u"Artist"_s, u"Album"_s, 123);
+  PlaylistItemPtr item_ptr(item);
+
+  // Insert the item
+  EXPECT_EQ(0, playlist_.rowCount(QModelIndex()));
+  playlist_.InsertItems(PlaylistItemPtrList() << item_ptr, -1);
+  ASSERT_EQ(1, playlist_.rowCount(QModelIndex()));
+
+  // Get the metadata
+  EXPECT_EQ(u"Title"_s, playlist_.data(playlist_.index(0, static_cast<int>(Playlist::Column::Title))));
+  EXPECT_EQ(u"Artist"_s, playlist_.data(playlist_.index(0, static_cast<int>(static_cast<int>(Playlist::Column::Artist)))));
+  EXPECT_EQ(u"Album"_s, playlist_.data(playlist_.index(0, static_cast<int>(Playlist::Column::Album))));
+  EXPECT_EQ(123, playlist_.data(playlist_.index(0, static_cast<int>(Playlist::Column::Length))));
+
+}
+
+TEST_F(PlaylistTest, Indexes) {
+
+  playlist_.InsertItems(PlaylistItemPtrList() << MakeMockItemP(u"One"_s) << MakeMockItemP(u"Two"_s) << MakeMockItemP(u"Three"_s));
+  ASSERT_EQ(3, playlist_.rowCount(QModelIndex()));
+
+  // Start "playing" track 1
+  playlist_.set_current_row(0);
+  EXPECT_EQ(0, playlist_.current_row());
+  EXPECT_EQ(u"One"_s, playlist_.current_item()->EffectiveMetadata().title());
+  EXPECT_EQ(-1, playlist_.previous_row());
+  EXPECT_EQ(1, playlist_.next_row());
+
+  // Stop playing
+  EXPECT_EQ(0, playlist_.last_played_row());
+  playlist_.set_current_row(-1);
+  EXPECT_EQ(0, playlist_.last_played_row());
+  EXPECT_EQ(-1, playlist_.current_row());
+
+  // Play track 2
+  playlist_.set_current_row(1);
+  EXPECT_EQ(1, playlist_.current_row());
+  EXPECT_EQ(u"Two"_s, playlist_.current_item()->EffectiveMetadata().title());
+  EXPECT_EQ(0, playlist_.previous_row());
+  EXPECT_EQ(2, playlist_.next_row());
+
+  // Play track 3
+  playlist_.set_current_row(2);
+  EXPECT_EQ(2, playlist_.current_row());
+  EXPECT_EQ(u"Three"_s, playlist_.current_item()->EffectiveMetadata().title());
+  EXPECT_EQ(1, playlist_.previous_row());
+  EXPECT_EQ(-1, playlist_.next_row());
+
+}
+
+TEST_F(PlaylistTest, RepeatPlaylist) {
+
+  playlist_.InsertItems(PlaylistItemPtrList() << MakeMockItemP(u"One"_s) << MakeMockItemP(u"Two"_s) << MakeMockItemP(u"Three"_s));
+  ASSERT_EQ(3, playlist_.rowCount(QModelIndex()));
+
+  playlist_.sequence()->SetRepeatMode(PlaylistSequence::RepeatMode::Playlist);
+
+  playlist_.set_current_row(0);
+  EXPECT_EQ(1, playlist_.next_row());
+
+  playlist_.set_current_row(1);
+  EXPECT_EQ(2, playlist_.next_row());
+
+  playlist_.set_current_row(2);
+  EXPECT_EQ(0, playlist_.next_row());
+
+}
+
+TEST_F(PlaylistTest, RepeatTrack) {
+
+  playlist_.InsertItems(PlaylistItemPtrList() << MakeMockItemP(u"One"_s) << MakeMockItemP(u"Two"_s) << MakeMockItemP(u"Three"_s));
+  ASSERT_EQ(3, playlist_.rowCount(QModelIndex()));
+
+  playlist_.sequence()->SetRepeatMode(PlaylistSequence::RepeatMode::Track);
+
+  playlist_.set_current_row(0);
+  EXPECT_EQ(0, playlist_.next_row());
+
+}
+
+TEST_F(PlaylistTest, RepeatAlbum) {
+
+  playlist_.InsertItems(PlaylistItemPtrList()
+      << MakeMockItemP(u"One"_s, u"Album one"_s)
+      << MakeMockItemP(u"Two"_s, u"Album two"_s)
+      << MakeMockItemP(u"Three"_s, u"Album one"_s));
+  ASSERT_EQ(3, playlist_.rowCount(QModelIndex()));
+
+  playlist_.sequence()->SetRepeatMode(PlaylistSequence::RepeatMode::Album);
+
+  playlist_.set_current_row(0);
+  EXPECT_EQ(2, playlist_.next_row());
+
+  playlist_.set_current_row(2);
+  EXPECT_EQ(0, playlist_.next_row());
+
+}
+
+TEST_F(PlaylistTest, RemoveBeforeCurrent) {
+
+  playlist_.InsertItems(PlaylistItemPtrList()
+      << MakeMockItemP(u"One"_s) << MakeMockItemP(u"Two"_s) << MakeMockItemP(u"Three"_s));
+  ASSERT_EQ(3, playlist_.rowCount(QModelIndex()));
+
+  // Remove a row before the currently playing track
+  playlist_.set_current_row(2);
+  EXPECT_EQ(2, playlist_.current_row());
+  playlist_.removeRow(1, QModelIndex());
+  EXPECT_EQ(1, playlist_.current_row());
+  EXPECT_EQ(1, playlist_.last_played_row());
+  EXPECT_EQ(0, playlist_.previous_row());
+  EXPECT_EQ(-1, playlist_.next_row());
+
+}
+
+TEST_F(PlaylistTest, RemoveAfterCurrent) {
+
+  playlist_.InsertItems(PlaylistItemPtrList()
+      << MakeMockItemP(u"One"_s) << MakeMockItemP(u"Two"_s) << MakeMockItemP(u"Three"_s));
+  ASSERT_EQ(3, playlist_.rowCount(QModelIndex()));
+
+  // Remove a row after the currently playing track
+  playlist_.set_current_row(0);
+  EXPECT_EQ(0, playlist_.current_row());
+  playlist_.removeRow(1, QModelIndex());
+  EXPECT_EQ(0, playlist_.current_row());
+  EXPECT_EQ(0, playlist_.last_played_row());
+  EXPECT_EQ(-1, playlist_.previous_row());
+  EXPECT_EQ(1, playlist_.next_row());
+
+  playlist_.set_current_row(1);
+  EXPECT_EQ(-1, playlist_.next_row());
+
+}
+
+TEST_F(PlaylistTest, RemoveCurrent) {
+
+  playlist_.InsertItems(PlaylistItemPtrList() << MakeMockItemP(u"One"_s) << MakeMockItemP(u"Two"_s) << MakeMockItemP(u"Three"_s));
+  ASSERT_EQ(3, playlist_.rowCount(QModelIndex()));
+
+  // Remove the currently playing track's row
+  playlist_.set_current_row(1);
+  EXPECT_EQ(1, playlist_.current_row());
+  playlist_.removeRow(1, QModelIndex());
+  EXPECT_EQ(-1, playlist_.current_row());
+  EXPECT_EQ(-1, playlist_.last_played_row());
+  EXPECT_EQ(-1, playlist_.previous_row());
+  EXPECT_EQ(0, playlist_.next_row());
+
+}
+
+TEST_F(PlaylistTest, InsertBeforeCurrent) {
+
+  playlist_.InsertItems(PlaylistItemPtrList() << MakeMockItemP(u"One"_s) << MakeMockItemP(u"Two"_s) << MakeMockItemP(u"Three"_s));
+  ASSERT_EQ(3, playlist_.rowCount(QModelIndex()));
+
+  playlist_.set_current_row(1);
+  EXPECT_EQ(1, playlist_.current_row());
+  playlist_.InsertItems(PlaylistItemPtrList() << MakeMockItemP(u"Four"_s), 0);
+  ASSERT_EQ(4, playlist_.rowCount(QModelIndex()));
+
+  EXPECT_EQ(2, playlist_.current_row());
+  EXPECT_EQ(2, playlist_.last_played_row());
+  EXPECT_EQ(1, playlist_.previous_row());
+  EXPECT_EQ(3, playlist_.next_row());
+
+  EXPECT_EQ(u"Four"_s, playlist_.data(playlist_.index(0, static_cast<int>(Playlist::Column::Title))));
+  EXPECT_EQ(u"One"_s, playlist_.data(playlist_.index(1, static_cast<int>(Playlist::Column::Title))));
+
+}
+
+TEST_F(PlaylistTest, InsertAfterCurrent) {
+
+  playlist_.InsertItems(PlaylistItemPtrList() << MakeMockItemP(u"One"_s) << MakeMockItemP(u"Two"_s) << MakeMockItemP(u"Three"_s));
+  ASSERT_EQ(3, playlist_.rowCount(QModelIndex()));
+
+  playlist_.set_current_row(1);
+  EXPECT_EQ(1, playlist_.current_row());
+  playlist_.InsertItems(PlaylistItemPtrList() << MakeMockItemP(u"Four"_s), 2);
+  ASSERT_EQ(4, playlist_.rowCount(QModelIndex()));
+
+  EXPECT_EQ(1, playlist_.current_row());
+  EXPECT_EQ(1, playlist_.last_played_row());
+  EXPECT_EQ(0, playlist_.previous_row());
+  EXPECT_EQ(2, playlist_.next_row());
+
+  EXPECT_EQ(u"Two"_s, playlist_.data(playlist_.index(1, static_cast<int>(Playlist::Column::Title))));
+  EXPECT_EQ(u"Four"_s, playlist_.data(playlist_.index(2, static_cast<int>(Playlist::Column::Title))));
+  EXPECT_EQ(u"Three"_s, playlist_.data(playlist_.index(3, static_cast<int>(Playlist::Column::Title))));
+
+}
+
+TEST_F(PlaylistTest, Clear) {
+
+  playlist_.InsertItems(PlaylistItemPtrList() << MakeMockItemP(u"One"_s) << MakeMockItemP(u"Two"_s) << MakeMockItemP(u"Three"_s));
+  ASSERT_EQ(3, playlist_.rowCount(QModelIndex()));
+
+  playlist_.set_current_row(1);
+  EXPECT_EQ(1, playlist_.current_row());
+  playlist_.Clear();
+
+  EXPECT_EQ(0, playlist_.rowCount(QModelIndex()));
+  EXPECT_EQ(-1, playlist_.current_row());
+  EXPECT_EQ(-1, playlist_.last_played_row());
+  EXPECT_EQ(-1, playlist_.previous_row());
+  EXPECT_EQ(-1, playlist_.next_row());
+
+}
+
+TEST_F(PlaylistTest, UndoAdd) {
+
+  EXPECT_FALSE(playlist_.undo_stack()->canUndo());
+  EXPECT_FALSE(playlist_.undo_stack()->canRedo());
+
+  playlist_.InsertItems(PlaylistItemPtrList() << MakeMockItemP(u"Title"_s));
+  EXPECT_EQ(1, playlist_.rowCount(QModelIndex()));
+  EXPECT_FALSE(playlist_.undo_stack()->canRedo());
+  ASSERT_TRUE(playlist_.undo_stack()->canUndo());
+
+  playlist_.undo_stack()->undo();
+  EXPECT_EQ(0, playlist_.rowCount(QModelIndex()));
+  EXPECT_FALSE(playlist_.undo_stack()->canUndo());
+  ASSERT_TRUE(playlist_.undo_stack()->canRedo());
+
+  playlist_.undo_stack()->redo();
+  EXPECT_EQ(1, playlist_.rowCount(QModelIndex()));
+  EXPECT_FALSE(playlist_.undo_stack()->canRedo());
+  EXPECT_TRUE(playlist_.undo_stack()->canUndo());
+
+  EXPECT_EQ(u"Title"_s, playlist_.data(playlist_.index(0, static_cast<int>(Playlist::Column::Title))));
+
+}
+
+TEST_F(PlaylistTest, UndoMultiAdd) {
+
+  // Add 1 item
+  playlist_.InsertItems(PlaylistItemPtrList() << MakeMockItemP(u"One"_s));
+
+  // Add 2 items
+  playlist_.InsertItems(PlaylistItemPtrList() << MakeMockItemP(u"Two"_s) << MakeMockItemP(u"Three"_s));
+
+  // Undo adding 2 items
+  ASSERT_TRUE(playlist_.undo_stack()->canUndo());
+  EXPECT_EQ(u"add 2 songs"_s, playlist_.undo_stack()->undoText());
+  playlist_.undo_stack()->undo();
+
+  // Undo adding 1 item
+  ASSERT_TRUE(playlist_.undo_stack()->canUndo());
+  EXPECT_EQ(u"add 1 songs"_s, playlist_.undo_stack()->undoText());
+  playlist_.undo_stack()->undo();
+
+  EXPECT_FALSE(playlist_.undo_stack()->canUndo());
+
+}
+
+TEST_F(PlaylistTest, UndoRemove) {
+
+  EXPECT_FALSE(playlist_.undo_stack()->canUndo());
+  EXPECT_FALSE(playlist_.undo_stack()->canRedo());
+
+  playlist_.InsertItems(PlaylistItemPtrList() << MakeMockItemP(u"Title"_s));
+
+  EXPECT_TRUE(playlist_.undo_stack()->canUndo());
+  EXPECT_FALSE(playlist_.undo_stack()->canRedo());
+
+  playlist_.removeRow(0);
+
+  EXPECT_EQ(0, playlist_.rowCount(QModelIndex()));
+  EXPECT_FALSE(playlist_.undo_stack()->canRedo());
+  ASSERT_TRUE(playlist_.undo_stack()->canUndo());
+
+  playlist_.undo_stack()->undo();
+  EXPECT_EQ(1, playlist_.rowCount(QModelIndex()));
+  ASSERT_TRUE(playlist_.undo_stack()->canRedo());
+
+  EXPECT_EQ(u"Title"_s, playlist_.data(playlist_.index(0, static_cast<int>(Playlist::Column::Title))));
+
+  playlist_.undo_stack()->redo();
+  EXPECT_EQ(0, playlist_.rowCount(QModelIndex()));
+  EXPECT_FALSE(playlist_.undo_stack()->canRedo());
+  EXPECT_TRUE(playlist_.undo_stack()->canUndo());
+
+}
+
+TEST_F(PlaylistTest, UndoMultiRemove) {
+
+  // Add 3 items
+  playlist_.InsertItems(PlaylistItemPtrList() << MakeMockItemP(u"One"_s) << MakeMockItemP(u"Two"_s) << MakeMockItemP(u"Three"_s));
+  ASSERT_EQ(3, playlist_.rowCount(QModelIndex()));
+
+  // Remove 1 item
+  playlist_.removeRow(1); // Item "Two"
+
+  // Remove 2 items
+  playlist_.removeRows(0, 2); // "One" and "Three"
+
+  ASSERT_EQ(0, playlist_.rowCount(QModelIndex()));
+
+  // Undo removing all 3 items
+  ASSERT_TRUE(playlist_.undo_stack()->canUndo());
+  EXPECT_EQ(u"remove 3 songs"_s, playlist_.undo_stack()->undoText());
+
+  playlist_.undo_stack()->undo();
+  ASSERT_EQ(3, playlist_.rowCount(QModelIndex()));
+
+}
+
+TEST_F(PlaylistTest, UndoClear) {
+
+  playlist_.InsertItems(PlaylistItemPtrList() << MakeMockItemP(u"One"_s) << MakeMockItemP(u"Two"_s) << MakeMockItemP(u"Three"_s));
+  ASSERT_EQ(3, playlist_.rowCount(QModelIndex()));
+
+  playlist_.Clear();
+  ASSERT_EQ(0, playlist_.rowCount(QModelIndex()));
+  ASSERT_TRUE(playlist_.undo_stack()->canUndo());
+  EXPECT_EQ(u"remove 3 songs"_s, playlist_.undo_stack()->undoText());
+  playlist_.undo_stack()->undo();
+
+  ASSERT_EQ(3, playlist_.rowCount(QModelIndex()));
+
+}
+
+TEST_F(PlaylistTest, UndoRemoveCurrent) {
+
+  playlist_.InsertItems(PlaylistItemPtrList() << MakeMockItemP(u"Title"_s));
+  playlist_.set_current_row(0);
+  EXPECT_EQ(0, playlist_.current_row());
+  EXPECT_EQ(0, playlist_.last_played_row());
+
+  playlist_.removeRow(0);
+  EXPECT_EQ(-1, playlist_.current_row());
+  EXPECT_EQ(-1, playlist_.last_played_row());
+
+  playlist_.undo_stack()->undo();
+  EXPECT_EQ(-1, playlist_.current_row());
+  EXPECT_EQ(-1, playlist_.last_played_row());
+
+}
+
+TEST_F(PlaylistTest, UndoRemoveOldCurrent) {
+
+  playlist_.InsertItems(PlaylistItemPtrList() << MakeMockItemP(u"Title"_s));
+  playlist_.set_current_row(0);
+  EXPECT_EQ(0, playlist_.current_row());
+  EXPECT_EQ(0, playlist_.last_played_row());
+
+  playlist_.removeRow(0);
+  EXPECT_EQ(-1, playlist_.current_row());
+  EXPECT_EQ(-1, playlist_.last_played_row());
+
+  playlist_.set_current_row(-1);
+
+  playlist_.undo_stack()->undo();
+  EXPECT_EQ(-1, playlist_.current_row());
+  EXPECT_EQ(-1, playlist_.last_played_row());
+
+}
+
+TEST_F(PlaylistTest, ShuffleThenNext) {
+
+  // Add 100 items
+  PlaylistItemPtrList items;
+  items.reserve(100);
+  for (int i = 0; i < 100; ++i)
+    items << MakeMockItemP(u"Item "_s + QString::number(i));
+  playlist_.InsertItems(items);
+
+  playlist_.set_current_row(0);
+
+  // Shuffle until the current index is not at the end
+  Q_FOREVER {
+    playlist_.Shuffle();
+    if (playlist_.current_row() != items.count() - 1)
+      break;
+  }
+
+  int index = playlist_.current_row();
+  EXPECT_EQ(u"Item 0"_s, playlist_.current_item()->EffectiveMetadata().title());
+  EXPECT_EQ(u"Item 0"_s, playlist_.data(playlist_.index(index, static_cast<int>(Playlist::Column::Title))));
+  EXPECT_EQ(index, playlist_.last_played_row());
+  // EXPECT_EQ(index + 1, playlist_.next_row());
+
+  // Shuffle until the current index *is* at the end
+  // forever {
+  // playlist_.Shuffle();
+  // if (playlist_.current_row() == items.count()-1)
+  // break;
+  // }
+
+  index = playlist_.current_row();
+  EXPECT_EQ(u"Item 0"_s, playlist_.current_item()->EffectiveMetadata().title());
+  EXPECT_EQ(u"Item 0"_s, playlist_.data(playlist_.index(index, static_cast<int>(Playlist::Column::Title))));
+  EXPECT_EQ(index, playlist_.last_played_row());
+  // EXPECT_EQ(-1, playlist_.next_row());
+  // EXPECT_EQ(index-1, playlist_.previous_row());
+
+}
+
+TEST_F(PlaylistTest, CollectionIdMapSingle) {
+
+  Song song(Song::Source::Collection);
+  song.Init(u"title"_s, u"artist"_s, u"album"_s, 123);
+  song.set_id(1);
+
+  PlaylistItemPtr item(std::make_shared<CollectionPlaylistItem>(song));
+  playlist_.InsertItems(PlaylistItemPtrList() << item);
+
+  EXPECT_EQ(0, playlist_.collection_items(Song::Source::Collection, -1).count());
+  EXPECT_EQ(0, playlist_.collection_items(Song::Source::Collection, 0).count());
+  EXPECT_EQ(0, playlist_.collection_items(Song::Source::Collection, 2).count());
+  ASSERT_EQ(1, playlist_.collection_items(Song::Source::Collection, 1).count());
+  EXPECT_EQ(song.title(), playlist_.collection_items(Song::Source::Collection, 1)[0]->EffectiveMetadata().title());  // clazy:exclude=detaching-temporary
+
+  playlist_.Clear();
+
+  EXPECT_EQ(0, playlist_.collection_items(Song::Source::Collection, 1).count());
+
+}
+
+TEST_F(PlaylistTest, CollectionIdMapInvalid) {
+
+  Song invalid;
+  invalid.Init(u"title"_s, u"artist"_s, u"album"_s, 123);
+  ASSERT_EQ(-1, invalid.id());
+
+  PlaylistItemPtr item(std::make_shared<CollectionPlaylistItem>(invalid));
+  playlist_.InsertItems(PlaylistItemPtrList() << item);
+
+  EXPECT_EQ(0, playlist_.collection_items(Song::Source::Collection, -1).count());
+  EXPECT_EQ(0, playlist_.collection_items(Song::Source::Collection, 0).count());
+  EXPECT_EQ(0, playlist_.collection_items(Song::Source::Collection, 1).count());
+  EXPECT_EQ(0, playlist_.collection_items(Song::Source::Collection, 2).count());
+
+}
+
+TEST_F(PlaylistTest, CollectionIdMapMulti) {
+
+  Song one(Song::Source::Collection);
+  one.Init(u"title"_s, u"artist"_s, u"album"_s, 123);
+  one.set_id(1);
+
+  Song two(Song::Source::Collection);
+  two.Init(u"title 2"_s, u"artist 2"_s, u"album 2"_s, 123);
+  two.set_id(2);
+
+  PlaylistItemPtr item_one(std::make_shared<CollectionPlaylistItem>(one));
+  PlaylistItemPtr item_two(std::make_shared<CollectionPlaylistItem>(two));
+  PlaylistItemPtr item_three(std::make_shared<CollectionPlaylistItem>(one));
+  playlist_.InsertItems(PlaylistItemPtrList() << item_one << item_two << item_three);
+
+  EXPECT_EQ(2, playlist_.collection_items(Song::Source::Collection, 1).count());
+  EXPECT_EQ(1, playlist_.collection_items(Song::Source::Collection, 2).count());
+
+  playlist_.removeRow(1); // item_two
+  EXPECT_EQ(2, playlist_.collection_items(Song::Source::Collection, 1).count());
+  EXPECT_EQ(0, playlist_.collection_items(Song::Source::Collection, 2).count());
+
+  playlist_.removeRow(1); // item_three
+  EXPECT_EQ(1, playlist_.collection_items(Song::Source::Collection, 1).count());
+  EXPECT_EQ(0, playlist_.collection_items(Song::Source::Collection, 2).count());
+
+  playlist_.removeRow(0); // item_one
+  EXPECT_EQ(0, playlist_.collection_items(Song::Source::Collection, 1).count());
+  EXPECT_EQ(0, playlist_.collection_items(Song::Source::Collection, 2).count());
+
+}
+
+
+TEST_F(PlaylistTest, PreviousRowIsNonMutating) {
+
+  playlist_.InsertItems(PlaylistItemPtrList() << MakeMockItemP(u"One"_s) << MakeMockItemP(u"Two"_s) << MakeMockItemP(u"Three"_s));
+  ASSERT_EQ(3, playlist_.rowCount(QModelIndex()));
+
+  playlist_.set_current_row(0);
+  playlist_.set_current_row(1);
+  playlist_.set_current_row(2);
+
+  // previous_row() should return the same row each time without consuming history
+  EXPECT_EQ(1, playlist_.previous_row());
+  EXPECT_EQ(1, playlist_.previous_row());
+  EXPECT_EQ(1, playlist_.previous_row());
+
+}
+
+TEST_F(PlaylistTest, TakePreviousRowConsumesHistory) {
+
+  playlist_.InsertItems(PlaylistItemPtrList() << MakeMockItemP(u"One"_s) << MakeMockItemP(u"Two"_s) << MakeMockItemP(u"Three"_s));
+  ASSERT_EQ(3, playlist_.rowCount(QModelIndex()));
+
+  playlist_.set_current_row(0);
+  playlist_.set_current_row(1);
+  playlist_.set_current_row(2);
+
+  // take_previous_row() should return the same row as previous_row() before consuming
+  const int previous_row = playlist_.previous_row();
+  const int take_previous_row = playlist_.take_previous_row(false);
+  EXPECT_EQ(previous_row, take_previous_row);
+
+  // After consuming row 1, previous_row() and take_previous_row() should now see row 0 as the previous
+  EXPECT_EQ(0, playlist_.previous_row());
+  EXPECT_EQ(0, playlist_.take_previous_row(false));
+
+  // History is now empty; should fall back to sequence-based previous (row 1, the item before row 2)
+  EXPECT_EQ(1, playlist_.take_previous_row(false));
+
+  // Verify fallback is stable: repeated calls without new history still return the sequence-based previous
+  EXPECT_EQ(1, playlist_.take_previous_row(false));
+
+}
+
+// Regression test for a race between two consecutive inline edits to the same playlist item: if the first edit's write-then-reread round trip completes after the second edit's, it must not clobber the second (newer) edit with its own stale result.
+TEST_F(PlaylistTest, StaleReloadCompletionDoesNotClobberNewerEdit) {
+
   Song song;
-  song.set_id(12);
-  song.set_title("Roads");
-  song.set_url("file:///roads.flac");
-  song.set_valid(true);
-  first.AppendSongs({song});
-  second.AppendSongs({song});
-  Song updated = song;
-  updated.set_title("Roads (live)");
-  EXPECT_EQ(2, PlaylistCollectionSync::PatchAll({&first, &second}, {updated}));
-  EXPECT_EQ("Roads (live)", first.song(0).title());
-  EXPECT_EQ("Roads (live)", second.song(0).title());
-  Song other = song;
-  other.set_id(12);
-  other.set_directory_id(2);
-  Song existing = first.songs().front();
-  existing.set_directory_id(1);
-  EXPECT_FALSE(PlaylistCollectionSync::SameCollectionRow(existing, other));
-  EXPECT_TRUE(PlaylistQueueRefresh::ShouldRefreshPlaylistView());
+  song.Init(u"Title"_s, u"OriginalArtist"_s, u"Album"_s, 123);
+  song.set_url(QUrl::fromLocalFile(u"/tmp/does-not-need-to-exist.mp3"_s));
+
+  PlaylistItemPtr item = std::make_shared<SongPlaylistItem>(song, false);
+  playlist_.InsertItems(PlaylistItemPtrList() << item, -1);
+  const QPersistentModelIndex idx(playlist_.index(0, static_cast<int>(Playlist::Column::Artist)));
+
+  ASSERT_EQ(u"OriginalArtist"_s, item->OriginalMetadata().artist());
+
+  // Simulate the user making two consecutive edits to the same cell before the first edit's async write-then-reread round trip (see Playlist::setData()) has completed: each edit bumps the item's save generation, exactly as setData() does.
+  const quint64 generation_edit_one = item->BumpSaveGeneration();
+  const quint64 generation_edit_two = item->BumpSaveGeneration();
+  ASSERT_NE(generation_edit_one, generation_edit_two);
+
+  Song metadata_edit_one = item->OriginalMetadata();
+  metadata_edit_one.set_artist(u"EditOneArtist"_s);
+
+  Song metadata_edit_two = item->OriginalMetadata();
+  metadata_edit_two.set_artist(u"EditTwoArtist"_s);
+
+  // The second (newer) edit's reload completes first.
+  CallReloadItemComplete(idx, item, metadata_edit_two, true, generation_edit_two);
+  EXPECT_EQ(u"EditTwoArtist"_s, item->OriginalMetadata().artist());
+
+  // The first edit's reload, started earlier but slower, completes afterwards. Its captured generation no longer matches the item's current generation, so this stale completion must be discarded rather than clobbering the newer edit.
+  CallReloadItemComplete(idx, item, metadata_edit_one, true, generation_edit_one);
+  EXPECT_EQ(u"EditTwoArtist"_s, item->OriginalMetadata().artist());
+
 }
 
-TEST(Playlist, RemembersLastPlayedRow) {
-  Playlist playlist;
-  Song a;
-  a.set_title("A");
-  a.set_url("file:///a");
-  a.set_valid(true);
-  Song b;
-  b.set_title("B");
-  b.set_url("file:///b");
-  b.set_valid(true);
-  playlist.AppendSongs({a, b});
-  EXPECT_EQ(-1, playlist.last_played_row());
-  playlist.set_current_row(1);
-  EXPECT_EQ(1, playlist.last_played_row());
-  playlist.set_current_row(0);
-  EXPECT_EQ(0, playlist.last_played_row());
-  playlist.Clear();
-  EXPECT_EQ(-1, playlist.current_row());
-  EXPECT_EQ(0, playlist.last_played_row());
-  EXPECT_EQ(-1, PlaylistPlayRow::Resolve(playlist.current_row(), playlist.last_played_row(), playlist.row_count()));
+TEST_F(PlaylistTest, StalePlainReloadCompletionDoesNotClobberInFlightEdit) {
+
+  Song song;
+  song.Init(u"Title"_s, u"OriginalArtist"_s, u"Album"_s, 123);
+  song.set_url(QUrl::fromLocalFile(u"/tmp/does-not-need-to-exist.mp3"_s));
+
+  PlaylistItemPtr item = std::make_shared<SongPlaylistItem>(song, false);
+  playlist_.InsertItems(PlaylistItemPtrList() << item, -1);
+  const QPersistentModelIndex idx(playlist_.index(0, static_cast<int>(Playlist::Column::Artist)));
+
+  ASSERT_EQ(u"OriginalArtist"_s, item->OriginalMetadata().artist());
+
+  // Simulate a plain reload (e.g. ReloadItems()/RescanSongs()) starting - it snapshots the item's generation at kick-off, exactly as Playlist::ReloadItem() does for a non-save-triggered reload.
+  const quint64 generation_at_reload_start = item->save_generation();
+
+  // Before that reload completes, the user edits the same cell, which bumps the item's save generation, exactly as setData() does.
+  item->BumpSaveGeneration();
+  Song edited_metadata = item->OriginalMetadata();
+  edited_metadata.set_artist(u"EditedArtist"_s);
+  playlist_.UpdateItemMetadata(0, item, edited_metadata, false);
+  ASSERT_EQ(u"EditedArtist"_s, item->OriginalMetadata().artist());
+
+  // The plain reload, started before the edit, now completes with saved=false and its stale, pre-edit generation. It must not clobber the newer edit just because it wasn't itself a save-triggered reload.
+  Song stale_reloaded_metadata = song;
+  stale_reloaded_metadata.set_artist(u"ReloadedOriginalArtist"_s);
+  CallReloadItemComplete(idx, item, stale_reloaded_metadata, false, generation_at_reload_start);
+  EXPECT_EQ(u"EditedArtist"_s, item->OriginalMetadata().artist());
+
 }
 
-TEST(PlaylistPlayRow, RestoreLeavesCurrentUnsetLikeQt) {
-  EXPECT_EQ(3, PlaylistPlayRow::RestoreIndex(3, 10));
-  EXPECT_EQ(-1, PlaylistPlayRow::RestoreIndex(-1, 10));
-  EXPECT_EQ(-1, PlaylistPlayRow::RestoreIndex(10, 10));
-  EXPECT_TRUE(PlaylistPlayRow::ShouldAssignFirstRowOnInsert(false, -1));
-  EXPECT_FALSE(PlaylistPlayRow::ShouldAssignFirstRowOnInsert(true, -1));
-  EXPECT_FALSE(PlaylistPlayRow::ShouldAssignFirstRowOnInsert(false, 2));
-  EXPECT_EQ(4, PlaylistPlayRow::ShuffleReference(4, 1));
-  EXPECT_EQ(1, PlaylistPlayRow::ShuffleReference(-1, 1));
-  EXPECT_EQ(-1, PlaylistPlayRow::ShuffleReference(-1, -1));
+// Regression test: if the tag write itself fails and the subsequent reload also can't read the file (here because it doesn't exist), the optimistic value shown by setData() must fall back to the pre-edit value instead of being left displayed (and later persisted) despite never having been written.
+TEST_F(PlaylistTest, FailedSaveAndFailedReloadFallsBackToPreEditMetadata) {
 
-  Playlist playlist;
-  Song a;
-  a.set_title("A");
-  a.set_url("file:///a");
-  a.set_valid(true);
-  Song b;
-  b.set_title("B");
-  b.set_url("file:///b");
-  b.set_valid(true);
-  Song c;
-  c.set_title("C");
-  c.set_url("file:///c");
-  c.set_valid(true);
-  playlist.BeginLoad();
-  playlist.AppendSongs({a, b, c});
-  playlist.EndLoad();
-  EXPECT_EQ(-1, playlist.current_row());
-  playlist.set_last_played_row(2);
-  EXPECT_EQ(-1, playlist.current_row());
-  EXPECT_EQ(2, playlist.last_played_row());
-  playlist.set_last_played_row(99);
-  EXPECT_EQ(-1, playlist.last_played_row());
-  playlist.set_last_played_row(1);
-  EXPECT_EQ(1, PlaylistPlayRow::Resolve(playlist.current_row(), playlist.last_played_row(), playlist.row_count()));
+  Song song;
+  song.Init(u"Title"_s, u"OriginalArtist"_s, u"Album"_s, 123);
+  QTemporaryFile missing_file;
+  ASSERT_TRUE(missing_file.open());
+  const QString missing_path = missing_file.fileName();
+  missing_file.close();
+  ASSERT_TRUE(missing_file.remove());
+  song.set_url(QUrl::fromLocalFile(missing_path));
+  PlaylistItemPtr item = std::make_shared<SongPlaylistItem>(song, false);
+  playlist_.InsertItems(PlaylistItemPtrList() << item, -1);
+  const QPersistentModelIndex idx(playlist_.index(0, static_cast<int>(Playlist::Column::Artist)));
+
+  const Song pre_edit_metadata = item->OriginalMetadata();
+
+  // Simulate setData()'s optimistic update: bump the save generation and apply the edited value immediately, exactly as setData() does before the async write starts.
+  const quint64 save_generation = item->BumpSaveGeneration();
+  Song edited_metadata = pre_edit_metadata;
+  edited_metadata.set_artist(u"EditedArtist"_s);
+  playlist_.UpdateItemMetadata(0, item, edited_metadata, false);
+  ASSERT_EQ(u"EditedArtist"_s, item->OriginalMetadata().artist());
+
+  // The write fails, and since the file doesn't exist, the reload SaveItemComplete() triggers to resync with disk will fail too.
+  TagReaderReplyPtr reply(new TagReaderReply(song.url().toLocalFile()));
+  reply->set_result(TagReaderResult(TagReaderResult::ErrorCode::FileSaveError));
+
+  CallSaveItemComplete(reply, idx, item, save_generation, pre_edit_metadata);
+  WaitForEditingFinished();
+
+  // With no genuine disk state to fall back on, the pre-edit value is the best available: the optimistic edit must not be left displayed (and persisted) despite never having been written to disk.
+  EXPECT_EQ(u"OriginalArtist"_s, item->OriginalMetadata().artist());
+
 }
 
-TEST(DynamicPlaylistPersist, EncodesQueryTypeAndRoundTripsSearch) {
-  EXPECT_EQ(1, DynamicPlaylistPersist::TypeFor(true));
-  EXPECT_EQ(0, DynamicPlaylistPersist::TypeFor(false));
-  EXPECT_TRUE(DynamicPlaylistPersist::IsDynamic(1));
-  EXPECT_FALSE(DynamicPlaylistPersist::IsDynamic(0));
-  SmartPlaylistSearch search;
-  search.terms.push_back({SmartPlaylistField::Artist, SmartPlaylistOp::Contains, "Portishead"});
-  const std::string blob = DynamicPlaylistPersist::Encode(search);
-  const SmartPlaylistSearch loaded = DynamicPlaylistPersist::Decode(blob);
-  ASSERT_FALSE(loaded.terms.empty());
-  EXPECT_EQ("Portishead", loaded.terms.front().value);
-  EXPECT_STREQ("songs", DynamicPlaylistPersist::DefaultBackend());
+// Regression test: for consecutive edits to the same item, the metadata restored after a failed write must reflect the actual on-disk state, not just whatever the previous (possibly also-unwritten) optimistic edit happened to leave in place.
+TEST_F(PlaylistTest, FailedSaveReloadsActualDiskStateRatherThanStalePreEditChain) {
+
+  TemporaryResource resource(u":/audio/strawberry.mp3"_s);
+
+  // Establish a known baseline actually on disk.
+  Song baseline;
+  baseline.Init(u"Title"_s, u"RealDiskArtist"_s, u"Album"_s, 123);
+  baseline.set_url(QUrl::fromLocalFile(resource.fileName()));
+  {
+    TagReaderReplyPtr write_reply = tagreader_client_->WriteFileAsync(resource.fileName(), baseline);
+    QEventLoop loop;
+    QObject::connect(&*write_reply, &TagReaderReply::Finished, &loop, &QEventLoop::quit);
+    loop.exec();
+    ASSERT_TRUE(write_reply->success());
+  }
+
+  PlaylistItemPtr item = std::make_shared<SongPlaylistItem>(baseline, false);
+  playlist_.InsertItems(PlaylistItemPtrList() << item, -1);
+  const QPersistentModelIndex idx(playlist_.index(0, static_cast<int>(Playlist::Column::Artist)));
+
+  // Edit 1: optimistically applied, its write is still (conceptually) in flight. Its generation isn't needed here since edit 1's own (still in-flight) completion is never delivered in this test.
+  item->BumpSaveGeneration();
+  Song metadata_edit_one = item->OriginalMetadata();
+  metadata_edit_one.set_artist(u"EditOneArtist"_s);
+  playlist_.UpdateItemMetadata(0, item, metadata_edit_one, false);
+
+  // Edit 2 follows before edit 1's write completes: its pre-edit value is edit 1's optimistic (unconfirmed) artist, not what is genuinely on disk.
+  const Song pre_edit_metadata_two = item->OriginalMetadata();
+  ASSERT_EQ(u"EditOneArtist"_s, pre_edit_metadata_two.artist());
+  const quint64 generation_edit_two = item->BumpSaveGeneration();
+  Song metadata_edit_two = pre_edit_metadata_two;
+  metadata_edit_two.set_artist(u"EditTwoArtist"_s);
+  playlist_.UpdateItemMetadata(0, item, metadata_edit_two, false);
+
+  // Edit 2's write fails.
+  TagReaderReplyPtr reply(new TagReaderReply(resource.fileName()));
+  reply->set_result(TagReaderResult(TagReaderResult::ErrorCode::FileSaveError));
+
+  CallSaveItemComplete(reply, idx, item, generation_edit_two, pre_edit_metadata_two);
+  WaitForEditingFinished();
+
+  // The item must reflect what is genuinely on disk ("RealDiskArtist"), not edit 1's stale, never-confirmed optimistic value ("EditOneArtist") that pre_edit_metadata_two happened to carry.
+  EXPECT_EQ(u"RealDiskArtist"_s, item->OriginalMetadata().artist());
+
 }
+
+// Regression test: clearing the sort indicator (column -1, e.g. from resetting columns to their defaults) stops the playlist from tracking itself as sorted, but must not reorder it - there's no "restore the pre-sort order" behavior.
+TEST_F(PlaylistTest, ClearingSortIndicatorStopsTrackingAsSortedWithoutReordering) {
+
+  playlist_.InsertItems(PlaylistItemPtrList() << MakeMockItemP(u"B"_s) << MakeMockItemP(u"A"_s), -1);
+  playlist_.sort(static_cast<int>(Playlist::Column::Title), Qt::AscendingOrder);
+  ASSERT_TRUE(IsSorted());
+  ASSERT_EQ(u"A"_s, playlist_.data(playlist_.index(0, static_cast<int>(Playlist::Column::Title))));
+  ASSERT_EQ(u"B"_s, playlist_.data(playlist_.index(1, static_cast<int>(Playlist::Column::Title))));
+
+  playlist_.sort(-1, Qt::AscendingOrder);
+  EXPECT_FALSE(IsSorted());
+  // Order is left exactly as it was (A, B), not reverted to the pre-sort B, A order.
+  EXPECT_EQ(u"A"_s, playlist_.data(playlist_.index(0, static_cast<int>(Playlist::Column::Title))));
+  EXPECT_EQ(u"B"_s, playlist_.data(playlist_.index(1, static_cast<int>(Playlist::Column::Title))));
+
+}
+
+// Regression test for #1690: "Automatically sort playlist when inserting songs" must not act as if the playlist were sorted by the (arbitrary) default column until the user has actually chosen a sort column by clicking a header.
+TEST_F(PlaylistTest, AutoSortDoesNothingUntilAColumnHasBeenSorted) {
+
+  playlist_.set_auto_sort(true);
+
+  playlist_.InsertItems(PlaylistItemPtrList() << MakeMockItemP(u"B"_s) << MakeMockItemP(u"A"_s), -1);
+  // No column has been sorted yet, so auto-sort must leave the insertion order alone.
+  EXPECT_EQ(u"B"_s, playlist_.data(playlist_.index(0, static_cast<int>(Playlist::Column::Title))));
+  EXPECT_EQ(u"A"_s, playlist_.data(playlist_.index(1, static_cast<int>(Playlist::Column::Title))));
+
+  playlist_.sort(static_cast<int>(Playlist::Column::Title), Qt::AscendingOrder);
+  ASSERT_EQ(u"A"_s, playlist_.data(playlist_.index(0, static_cast<int>(Playlist::Column::Title))));
+  ASSERT_EQ(u"B"_s, playlist_.data(playlist_.index(1, static_cast<int>(Playlist::Column::Title))));
+
+  // Now that the playlist has an active sort column, auto-sort should kick in and place new insertions in order.
+  playlist_.InsertItems(PlaylistItemPtrList() << MakeMockItemP(u"AB"_s), -1);
+  ASSERT_EQ(3, playlist_.rowCount(QModelIndex()));
+  EXPECT_EQ(u"A"_s, playlist_.data(playlist_.index(0, static_cast<int>(Playlist::Column::Title))));
+  EXPECT_EQ(u"AB"_s, playlist_.data(playlist_.index(1, static_cast<int>(Playlist::Column::Title))));
+  EXPECT_EQ(u"B"_s, playlist_.data(playlist_.index(2, static_cast<int>(Playlist::Column::Title))));
+
+}
+
+// Regression test: undoing a column sort must also revert the playlist's own idea of what's sorted (is_sorted_/sort_column_/sort_order_), and announce it via SortStateChanged, so the header's sort indicator can be kept in sync rather than being left showing a sort that's since been undone.
+TEST_F(PlaylistTest, UndoingASortAlsoRevertsSortState) {
+
+  playlist_.InsertItems(PlaylistItemPtrList() << MakeMockItemP(u"B"_s) << MakeMockItemP(u"A"_s), -1);
+
+  bool signal_emitted = false;
+  bool signal_is_sorted = true;
+  Playlist::Column signal_column = Playlist::Column::Artist;
+  Qt::SortOrder signal_sort_order = Qt::DescendingOrder;
+  QObject::connect(&playlist_, &Playlist::SortStateChanged, [&](const bool is_sorted, const Playlist::Column column, const Qt::SortOrder sort_order) {
+    signal_emitted = true;
+    signal_is_sorted = is_sorted;
+    signal_column = column;
+    signal_sort_order = sort_order;
+  });
+
+  playlist_.sort(static_cast<int>(Playlist::Column::Title), Qt::AscendingOrder);
+  ASSERT_TRUE(IsSorted());
+  ASSERT_EQ(Playlist::Column::Title, SortColumn());
+  ASSERT_EQ(Qt::AscendingOrder, SortOrder());
+  ASSERT_EQ(u"A"_s, playlist_.data(playlist_.index(0, static_cast<int>(Playlist::Column::Title))));
+  ASSERT_EQ(u"B"_s, playlist_.data(playlist_.index(1, static_cast<int>(Playlist::Column::Title))));
+
+  // Undo: back to unsorted, with the pre-sort B, A order restored.
+  playlist_.undo_stack()->undo();
+
+  EXPECT_TRUE(signal_emitted);
+  EXPECT_FALSE(signal_is_sorted);
+  EXPECT_FALSE(IsSorted());
+  EXPECT_EQ(u"B"_s, playlist_.data(playlist_.index(0, static_cast<int>(Playlist::Column::Title))));
+  EXPECT_EQ(u"A"_s, playlist_.data(playlist_.index(1, static_cast<int>(Playlist::Column::Title))));
+
+  // Redo: sorted state (and order) comes back too, not just the item order.
+  signal_emitted = false;
+  playlist_.undo_stack()->redo();
+
+  EXPECT_TRUE(signal_emitted);
+  EXPECT_TRUE(signal_is_sorted);
+  EXPECT_EQ(Playlist::Column::Title, signal_column);
+  EXPECT_EQ(Qt::AscendingOrder, signal_sort_order);
+  EXPECT_TRUE(IsSorted());
+  EXPECT_EQ(Playlist::Column::Title, SortColumn());
+  EXPECT_EQ(Qt::AscendingOrder, SortOrder());
+  EXPECT_EQ(u"A"_s, playlist_.data(playlist_.index(0, static_cast<int>(Playlist::Column::Title))));
+  EXPECT_EQ(u"B"_s, playlist_.data(playlist_.index(1, static_cast<int>(Playlist::Column::Title))));
+
+}
+
+}  // namespace

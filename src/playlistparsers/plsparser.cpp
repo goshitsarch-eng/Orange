@@ -1,77 +1,108 @@
-#include "playlistparsers/plsparser.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "utilities/fileutils.h"
-#include "utilities/strutils.h"
+#include <QtGlobal>
+#include <QObject>
+#include <QIODevice>
+#include <QDir>
+#include <QMap>
+#include <QByteArray>
+#include <QString>
+#include <QRegularExpression>
+#include <QTextStream>
 
-#include <map>
-#include <sstream>
+#include "includes/shared_ptr.h"
+#include "constants/timeconstants.h"
+#include "constants/playlistsettings.h"
+#include "parserbase.h"
+#include "plsparser.h"
 
-bool PLSParser::TryMagic(const std::string &data) const { return StrUtils::ContainsInsensitive(data, "[playlist]"); }
+using namespace Qt::Literals::StringLiterals;
 
-SongList PLSParser::Load(const std::string &data, const std::string &playlist_path) const {
-  std::map<int, Song> songs;
-  const std::string dir = FileUtils::DirName(playlist_path);
-  std::istringstream stream(data);
-  std::string line;
-  while (std::getline(stream, line)) {
-    if (!line.empty() && line.back() == '\r') {
-      line.pop_back();
-    }
-    const std::string trimmed = StrUtils::Trim(line);
-    const auto eq = trimmed.find('=');
-    if (eq == std::string::npos) {
-      continue;
-    }
-    const std::string key = StrUtils::ToLower(trimmed.substr(0, eq));
-    const std::string value = trimmed.substr(eq + 1);
-    int n = 0;
-    size_t digit = key.find_first_of("0123456789");
-    if (digit != std::string::npos) {
-      try {
-        n = std::stoi(key.substr(digit));
-      } catch (...) {
-        n = 0;
-      }
-    }
-    if (StrUtils::StartsWith(key, "file")) {
-      Song song = LoadSong(dir, value);
-      if (!songs[n].title().empty()) {
-        song.set_title(songs[n].title());
-      }
-      if (songs[n].length_nanosec() > 0) {
+class CollectionBackendInterface;
+
+PLSParser::PLSParser(const SharedPtr<TagReaderClient> tagreader_client, const SharedPtr<CollectionBackendInterface> collection_backend, QObject *parent)
+    : ParserBase(tagreader_client, collection_backend, parent) {}
+
+ParserBase::LoadResult PLSParser::Load(QIODevice *device, const QString &playlist_path, const QDir &dir, const bool collection_lookup) const {
+
+  Q_UNUSED(playlist_path);
+
+  QMap<int, Song> songs;
+  static const QRegularExpression n_re(u"\\d+$"_s);
+
+  while (!device->atEnd()) {
+    QString line = QString::fromUtf8(device->readLine()).trimmed();
+    qint64 equals = line.indexOf(u'=');
+    if (equals < 0) continue;
+    QString key = line.left(equals).toLower();
+    QString value = line.mid(equals + 1);
+
+    QRegularExpressionMatch re_match = n_re.match(key);
+    int n = re_match.captured(0).toInt();
+
+    if (key.startsWith("file"_L1)) {
+      Song song = LoadSong(value, 0, 0, dir, collection_lookup);
+
+      // Use the title and length we've already loaded if any
+      if (!songs[n].title().isEmpty()) song.set_title(songs[n].title());
+      if (songs[n].length_nanosec() != -1) {
         song.set_length_nanosec(songs[n].length_nanosec());
       }
+
       songs[n] = song;
-    } else if (StrUtils::StartsWith(key, "title")) {
+    }
+    else if (key.startsWith("title"_L1)) {
       songs[n].set_title(value);
-    } else if (StrUtils::StartsWith(key, "length")) {
-      try {
-        const long seconds = std::stol(value);
-        if (seconds > 0) {
-          songs[n].set_length_nanosec(seconds * 1000000000LL);
-        }
-      } catch (...) {
+    }
+    else if (key.startsWith("length"_L1)) {
+      qint64 seconds = value.toLongLong();
+      if (seconds > 0) {
+        songs[n].set_length_nanosec(seconds * kNsecPerSec);
       }
     }
   }
-  SongList result;
-  for (auto &entry : songs) {
-    if (entry.second.is_valid()) {
-      result.push_back(entry.second);
-    }
-  }
-  return result;
+
+  return songs.values();
+
 }
 
-bool PLSParser::Save(const std::string &path, const SongList &songs) const {
-  const std::string dir = FileUtils::DirName(path);
-  std::string data = "[playlist]\nVersion=2\nNumberOfEntries=" + std::to_string(songs.size()) + "\n";
+void PLSParser::Save(const QString &playlist_name, const SongList &songs, QIODevice *device, const QDir &dir, const PlaylistSettings::PathType path_type) const {
+
+  Q_UNUSED(playlist_name)
+
+  QTextStream s(device);
+  s << "[playlist]" << Qt::endl;
+  s << "Version=2" << Qt::endl;
+  s << "NumberOfEntries=" << songs.count() << Qt::endl;
+
   int n = 1;
   for (const Song &song : songs) {
-    data += "File" + std::to_string(n) + "=" + URLOrFilename(song.url(), dir) + "\n";
-    data += "Title" + std::to_string(n) + "=" + song.title() + "\n";
-    data += "Length" + std::to_string(n) + "=" + std::to_string(song.length_nanosec() / 1000000000LL) + "\n";
+    s << "File" << n << "=" << URLOrFilename(song.url(), dir, path_type) << Qt::endl;
+    s << "Title" << n << "=" << song.title() << Qt::endl;
+    s << "Length" << n << "=" << song.length_nanosec() / kNsecPerSec << Qt::endl;
     ++n;
   }
-  return FileUtils::WriteFile(path, data);
+
+}
+
+bool PLSParser::TryMagic(const QByteArray &data) const {
+  return data.toLower().contains("[playlist]");
 }

@@ -1,22 +1,46 @@
-#ifndef STRAWBERRY_TRANSCODEROPTIONSVORBIS_H
-#define STRAWBERRY_TRANSCODEROPTIONSVORBIS_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "transcoder/transcoderoptionsfields.h"
-#include "transcoder/transcoderoptionsinterface.h"
+#ifndef TRANSCODEROPTIONSVORBIS_H
+#define TRANSCODEROPTIONSVORBIS_H
+
+#include "config.h"
+
+#include <QWidget>
+
+#include "transcoderoptionsinterface.h"
+
+class Ui_TranscoderOptionsVorbis;
 
 class TranscoderOptionsVorbis : public TranscoderOptionsInterface {
+  Q_OBJECT
+
  public:
-  Transcoder::Format format() const override { return Transcoder::Format::OggVorbis; }
-  std::string EncoderElement() const override { return "vorbisenc"; }
-  std::string MuxerElement() const override { return "oggmux"; }
-  void ApplyQuality(int quality) override { options_.ApplyQuality(quality); }
-  void Load() override { options_.Load(); }
-  std::string PipelineFragment() const override { return options_.Pipeline(); }
-  int quality() const { return options_.quality; }
-  TranscoderOptionsFields::Vorbis *options() { return &options_; }
+  explicit TranscoderOptionsVorbis(QWidget *parent = nullptr);
+  ~TranscoderOptionsVorbis() override;
+
+  void Load() override;
+  void Save() override;
 
  private:
-  TranscoderOptionsFields::Vorbis options_;
+  Ui_TranscoderOptionsVorbis *ui_;
 };
 
-#endif
+#endif  // TRANSCODEROPTIONSVORBIS_H

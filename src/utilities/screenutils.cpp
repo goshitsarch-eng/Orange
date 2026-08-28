@@ -1,43 +1,46 @@
-#include "utilities/screenutils.h"
+/*
+ * Strawberry Music Player
+ * Copyright 2023, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include <gdk/gdk.h>
+#include <QGuiApplication>
+#include <QWidget>
+#include <QScreen>
+#include <QWindow>
 
-namespace ScreenUtils {
+#include "screenutils.h"
 
-int Width() {
-  GdkDisplay *display = gdk_display_get_default();
-  if (!display) {
-    return 0;
-  }
-  GdkMonitor *monitor = GDK_IS_DISPLAY(display) ? gdk_display_get_monitor_at_surface(display, nullptr) : nullptr;
-  if (!monitor) {
-    GListModel *monitors = gdk_display_get_monitors(display);
-    if (monitors && g_list_model_get_n_items(monitors) > 0) {
-      monitor = GDK_MONITOR(g_list_model_get_item(monitors, 0));
-    }
-  }
-  if (!monitor) {
-    return 0;
-  }
-  GdkRectangle geo;
-  gdk_monitor_get_geometry(monitor, &geo);
-  return geo.width;
+namespace Utilities {
+
+QScreen *GetScreen(QWidget *widget) {
+
+  return widget->screen();
+
 }
 
-int Height() {
-  GdkDisplay *display = gdk_display_get_default();
-  if (!display) {
-    return 0;
+void CenterWidgetOnScreen(QScreen *screen, QWidget *widget) {
+
+  if (screen) {
+    const QRect sr = screen->availableGeometry();
+    const QRect wr({}, widget->size().boundedTo(sr.size()));
+    widget->resize(wr.size());
+    widget->move(sr.center() - wr.center());
   }
-  GListModel *monitors = gdk_display_get_monitors(display);
-  if (!monitors || g_list_model_get_n_items(monitors) == 0) {
-    return 0;
-  }
-  auto *monitor = GDK_MONITOR(g_list_model_get_item(monitors, 0));
-  GdkRectangle geo;
-  gdk_monitor_get_geometry(monitor, &geo);
-  g_object_unref(monitor);
-  return geo.height;
+
 }
 
-}  // namespace ScreenUtils
+}  // namespace Utilities

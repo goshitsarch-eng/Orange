@@ -1,170 +1,157 @@
+/*
+ * Strawberry Music Player
+ * Copyright 2026, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
 #include "config.h"
 
-#include "core/winsystemmediatransportcontrols.h"
-
-#include "core/logging.h"
-#include "core/player.h"
-
-#include <glib.h>
-#include <string>
-
-#ifdef _WIN32
 #include <windows.h>
-#if defined(_MSC_VER)
-#include <eventtoken.h>
-#include <inspectable.h>
-#include <roapi.h>
 #include <winstring.h>
+#include <roapi.h>
+#include <inspectable.h>
+#include <eventtoken.h>
 #include <windows.foundation.h>
 #include <windows.media.h>
 #include <windows.storage.streams.h>
 #if __has_include(<wrl.h>)
-#include <wrl.h>
+#  include <wrl.h>
 #else
-#include <wrl/client.h>
-#include <wrl/event.h>
-#endif
-#include <systemmediatransportcontrolsinterop.h>
-#include <gdk-pixbuf/gdk-pixbuf.h>
-#endif
+#  include <wrl/client.h>
+#  include <wrl/event.h>
 #endif
 
-#if defined(_WIN32) && defined(_MSC_VER)
+#include <systemmediatransportcontrolsinterop.h>
+
+#include <QObject>
+#include <QMetaObject>
+#include <QString>
+#include <QImage>
+#include <QBuffer>
+#include <QUrl>
+#include <QTimer>
+
+#include "core/logging.h"
+#include "core/song.h"
+#include "core/player.h"
+#include "engine/enginebase.h"
+#include "covermanager/albumcoverloaderresult.h"
+#include "winsystemmediatransportcontrols.h"
+
 using namespace ABI::Windows::Media;
 using namespace ABI::Windows::Foundation;
 using namespace ABI::Windows::Storage::Streams;
 
 namespace {
 
-HRESULT CreateHString(const std::string &str, HSTRING *out) {
-  if (str.empty()) {
-    return WindowsCreateString(L"", 0, out);
-  }
-  const int n = MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, nullptr, 0);
-  if (n <= 0) {
-    return E_FAIL;
-  }
-  std::wstring wide(static_cast<size_t>(n - 1), L'\0');
-  MultiByteToWideChar(CP_UTF8, 0, str.c_str(), -1, wide.data(), n);
-  return WindowsCreateString(wide.c_str(), static_cast<UINT32>(wide.size()), out);
+// Helper: create an HSTRING from a QString, caller must WindowsDeleteString() it.
+HRESULT CreateHString(const QString &str, HSTRING *out) {
+  const std::wstring w = str.toStdWString();
+  return WindowsCreateString(w.c_str(), static_cast<UINT32>(w.size()), out);
 }
 
-std::vector<unsigned char> EncodeJpeg(const std::vector<unsigned char> &image) {
-  if (WinSmtcStatus::LooksLikeJpeg(image)) {
-    return image;
-  }
-  GError *error = nullptr;
-  GdkPixbufLoader *loader = gdk_pixbuf_loader_new();
-  if (!gdk_pixbuf_loader_write(loader, image.data(), image.size(), &error)) {
-    if (error) {
-      g_error_free(error);
-    }
-    g_object_unref(loader);
-    return {};
-  }
-  gdk_pixbuf_loader_close(loader, nullptr);
-  GdkPixbuf *pixbuf = gdk_pixbuf_loader_get_pixbuf(loader);
-  if (!pixbuf) {
-    g_object_unref(loader);
-    return {};
-  }
-  gchar *out = nullptr;
-  gsize out_len = 0;
-  if (!gdk_pixbuf_save_to_buffer(pixbuf, &out, &out_len, "jpeg", nullptr, "quality", "90", nullptr)) {
-    g_object_unref(loader);
-    return {};
-  }
-  std::vector<unsigned char> jpeg(out, out + out_len);
-  g_free(out);
-  g_object_unref(loader);
-  return jpeg;
-}
-
-struct ButtonIdle {
-  WinSystemMediaTransportControls *self = nullptr;
-  int button = 0;
-  std::shared_ptr<bool> alive;
-};
-
-gboolean EmitButtonIdle(gpointer data) {
-  auto *idle = static_cast<ButtonIdle *>(data);
-  if (idle->alive && *idle->alive) {
-    idle->self->HandleButtonPressed(idle->button);
-  }
-  delete idle;
-  return G_SOURCE_REMOVE;
-}
-
-using SmtcBtnHandlerType = ITypedEventHandler<SystemMediaTransportControls *, SystemMediaTransportControlsButtonPressedEventArgs *>;
+using SmtcBtnHandlerType = ITypedEventHandler<SystemMediaTransportControls*, SystemMediaTransportControlsButtonPressedEventArgs*>;
 
 }  // namespace
-#endif
 
-WinSystemMediaTransportControls::WinSystemMediaTransportControls(Player *player) : player_(player) {}
+WinSystemMediaTransportControls::WinSystemMediaTransportControls(SharedPtr<Player> player, QObject *parent)
+    : QObject(parent),
+      player_(player),
+      ro_initialized_(false),
+      smtc_(nullptr),
+      smtc2_(nullptr),
+      updater_(nullptr),
+      button_handler_(nullptr),
+      button_pressed_token_(0),
+      state_(EngineBase::State::Empty),
+      current_duration_nanosec_(0),
+      timeline_timer_(new QTimer(this)) {
+
+  timeline_timer_->setInterval(1000);
+  QObject::connect(timeline_timer_, &QTimer::timeout, this, &WinSystemMediaTransportControls::UpdateTimeline);
+
+}
 
 WinSystemMediaTransportControls::~WinSystemMediaTransportControls() {
-  *alive_ = false;
-  StopTimelineTimer();
-#if defined(_WIN32) && defined(_MSC_VER)
-  ISystemMediaTransportControls *smtc = static_cast<ISystemMediaTransportControls *>(smtc_);
+
+  ISystemMediaTransportControls *smtc = static_cast<ISystemMediaTransportControls*>(smtc_);
+
   if (smtc && button_pressed_token_) {
     EventRegistrationToken token;
     token.value = button_pressed_token_;
     smtc->remove_ButtonPressed(token);
   }
+
   if (button_handler_) {
-    static_cast<IUnknown *>(button_handler_)->Release();
+    static_cast<IUnknown*>(button_handler_)->Release();
     button_handler_ = nullptr;
   }
+
   if (updater_) {
-    static_cast<ISystemMediaTransportControlsDisplayUpdater *>(updater_)->Release();
+    static_cast<ISystemMediaTransportControlsDisplayUpdater*>(updater_)->Release();
     updater_ = nullptr;
   }
+
   if (smtc2_) {
-    static_cast<ISystemMediaTransportControls2 *>(smtc2_)->Release();
+    static_cast<ABI::Windows::Media::ISystemMediaTransportControls2*>(smtc2_)->Release();
     smtc2_ = nullptr;
   }
+
   if (smtc) {
     smtc->put_IsEnabled(false);
     smtc->Release();
     smtc_ = nullptr;
   }
+
   if (ro_initialized_) {
     RoUninitialize();
-    ro_initialized_ = false;
   }
-#endif
+
 }
 
-bool WinSystemMediaTransportControls::Initialize(void *hwnd) {
-#if defined(_WIN32) && defined(_MSC_VER)
-  if (!hwnd) {
-    return false;
-  }
+bool WinSystemMediaTransportControls::Initialize(const HWND hwnd) {
+
   const HRESULT hr_init = RoInitialize(RO_INIT_SINGLETHREADED);
   if (hr_init != S_OK && hr_init != S_FALSE) {
-    LogError("WinSystemMediaTransportControls: RoInitialize failed 0x%08lx", static_cast<unsigned long>(hr_init));
+    qLog(Error) << "WinSystemMediaTransportControls: RoInitialize failed" << Qt::hex << static_cast<DWORD>(hr_init);
     return false;
   }
   ro_initialized_ = true;
 
+  // Obtain the Win32 interop factory for SystemMediaTransportControls
   HSTRING h_class = nullptr;
   static const wchar_t kSmtcClass[] = L"Windows.Media.SystemMediaTransportControls";
   WindowsCreateString(kSmtcClass, static_cast<UINT32>(wcslen(kSmtcClass)), &h_class);
 
   ISystemMediaTransportControlsInterop *interop = nullptr;
-  HRESULT hr = RoGetActivationFactory(h_class, __uuidof(ISystemMediaTransportControlsInterop), reinterpret_cast<void **>(&interop));
+  HRESULT hr = RoGetActivationFactory(h_class, __uuidof(ISystemMediaTransportControlsInterop), reinterpret_cast<void**>(&interop));
   WindowsDeleteString(h_class);
+
   if (FAILED(hr) || !interop) {
-    LogError("WinSystemMediaTransportControls: Failed to get SMTC interop factory 0x%08lx", static_cast<unsigned long>(hr));
+    qLog(Error) << "WinSystemMediaTransportControls: Failed to get SMTC interop factory" << Qt::hex << static_cast<DWORD>(hr);
     return false;
   }
 
+  // Get SMTC bound to our window handle
   ISystemMediaTransportControls *smtc = nullptr;
-  hr = interop->GetForWindow(static_cast<HWND>(hwnd), __uuidof(ISystemMediaTransportControls), reinterpret_cast<void **>(&smtc));
+  hr = interop->GetForWindow(hwnd, __uuidof(ISystemMediaTransportControls), reinterpret_cast<void**>(&smtc));
   interop->Release();
+
   if (FAILED(hr) || !smtc) {
-    LogError("WinSystemMediaTransportControls: GetForWindow failed 0x%08lx", static_cast<unsigned long>(hr));
+    qLog(Error) << "WinSystemMediaTransportControls: GetForWindow failed" << Qt::hex << static_cast<DWORD>(hr);
     return false;
   }
 
@@ -175,23 +162,19 @@ bool WinSystemMediaTransportControls::Initialize(void *hwnd) {
   smtc->put_IsNextEnabled(true);
   smtc->put_IsPreviousEnabled(true);
 
-  Microsoft::WRL::ComPtr<SmtcBtnHandlerType> handler = Microsoft::WRL::Callback<SmtcBtnHandlerType>(
-      [this](ISystemMediaTransportControls *, ISystemMediaTransportControlsButtonPressedEventArgs *args) -> HRESULT {
-        SystemMediaTransportControlsButton btn;
-        if (SUCCEEDED(args->get_Button(&btn))) {
-          auto *idle = new ButtonIdle;
-          idle->self = this;
-          idle->button = static_cast<int>(btn);
-          idle->alive = alive_;
-          g_idle_add(EmitButtonIdle, idle);
-        }
-        return S_OK;
-      });
+  // Register button-pressed handler using WRL Callback
+  Microsoft::WRL::ComPtr<SmtcBtnHandlerType> handler = Microsoft::WRL::Callback<SmtcBtnHandlerType>([this](ISystemMediaTransportControls*, ISystemMediaTransportControlsButtonPressedEventArgs *args) -> HRESULT {
+    SystemMediaTransportControlsButton btn;
+    if (SUCCEEDED(args->get_Button(&btn))) {
+      QMetaObject::invokeMethod(this, "HandleButtonPressed", Qt::QueuedConnection, Q_ARG(const int, static_cast<const int>(btn)));
+    }
+    return S_OK;
+  });
 
   EventRegistrationToken token{};
   hr = smtc->add_ButtonPressed(handler.Get(), &token);
   if (FAILED(hr)) {
-    LogError("WinSystemMediaTransportControls: Failed to register button handler 0x%08lx", static_cast<unsigned long>(hr));
+    qLog(Error) << "WinSystemMediaTransportControls: Failed to register button handler" << Qt::hex << static_cast<DWORD>(hr);
     smtc->put_IsEnabled(false);
     smtc->Release();
     return false;
@@ -200,7 +183,7 @@ bool WinSystemMediaTransportControls::Initialize(void *hwnd) {
   ISystemMediaTransportControlsDisplayUpdater *updater = nullptr;
   hr = smtc->get_DisplayUpdater(&updater);
   if (FAILED(hr) || !updater) {
-    LogError("WinSystemMediaTransportControls: Failed to get display updater 0x%08lx", static_cast<unsigned long>(hr));
+    qLog(Error) << "WinSystemMediaTransportControls: Failed to get display updater" << Qt::hex << static_cast<DWORD>(hr);
     smtc->remove_ButtonPressed(token);
     smtc->put_IsEnabled(false);
     smtc->Release();
@@ -213,239 +196,193 @@ bool WinSystemMediaTransportControls::Initialize(void *hwnd) {
   smtc_ = smtc;
   updater_ = updater;
 
-  ISystemMediaTransportControls2 *smtc2 = nullptr;
-  if (SUCCEEDED(smtc->QueryInterface(__uuidof(ISystemMediaTransportControls2), reinterpret_cast<void **>(&smtc2)))) {
+  ABI::Windows::Media::ISystemMediaTransportControls2 *smtc2 = nullptr;
+  if (SUCCEEDED(smtc->QueryInterface(__uuidof(ABI::Windows::Media::ISystemMediaTransportControls2), reinterpret_cast<void**>(&smtc2)))) {
     smtc2_ = smtc2;
-  } else {
-    LogWarning("WinSystemMediaTransportControls: ISystemMediaTransportControls2 unavailable, timeline disabled");
+  }
+  else {
+    qLog(Warning) << "WinSystemMediaTransportControls: ISystemMediaTransportControls2 unavailable, timeline disabled";
   }
 
-  initialized_ = true;
-  if (player_) {
-    UpdatePlaybackStatus(player_->GetState());
-    UpdateMetadata(player_->current_song());
-  }
-  LogInfo("WinSystemMediaTransportControls: Initialized");
+  qLog(Info) << "WinSystemMediaTransportControls: Initialized";
+
   return true;
-#elif defined(_WIN32)
-  initialized_ = hwnd != nullptr;
-  (void)hwnd;
-  if (initialized_ && player_) {
-    UpdatePlaybackStatus(player_->GetState());
-    UpdateMetadata(player_->current_song());
-  }
-  return initialized_;
-#else
-  (void)hwnd;
-  return false;
-#endif
+
 }
 
-void WinSystemMediaTransportControls::EngineStateChanged(EngineBase::State state) {
+void WinSystemMediaTransportControls::EngineStateChanged(const EngineBase::State state) {
+
   state_ = state;
   UpdatePlaybackStatus(state);
-  if (WinSmtcStatus::ShouldRunTimelineTimer(state)) {
-    StartTimelineTimer();
-  } else {
-    StopTimelineTimer();
+
+  if (state == EngineBase::State::Playing) {
+    timeline_timer_->start();
+  }
+  else {
+    timeline_timer_->stop();
     UpdateTimeline();
   }
+
 }
 
 void WinSystemMediaTransportControls::CurrentSongChanged(const Song &song) {
+
   current_song_url_ = song.url();
   current_duration_nanosec_ = song.length_nanosec();
   UpdateMetadata(song);
   UpdateTimeline();
+
 }
 
-void WinSystemMediaTransportControls::AlbumCoverLoaded(const Song &song, const std::vector<unsigned char> &image) {
-  const bool url_matches = WinSmtcStatus::ShouldApplyCover(song.url(), current_song_url_);
-  if (WinSmtcStatus::ShouldSetThumbnail(url_matches, !image.empty())) {
-    SetThumbnail(image);
-  } else if (WinSmtcStatus::ShouldClearThumbnail(url_matches, !image.empty())) {
+void WinSystemMediaTransportControls::AlbumCoverLoaded(const Song &song, const AlbumCoverLoaderResult &result) {
+
+  if (song.url() != current_song_url_) return;
+
+  if (result.success && !result.album_cover.image.isNull()) {
+    SetThumbnail(result.album_cover.image);
+  }
+  else {
     ClearThumbnail();
   }
-}
 
-void WinSystemMediaTransportControls::HandleButtonPressed(int button) {
-  const WinSmtcStatus::Button id = WinSmtcStatus::ButtonFromWinRt(button);
-  if (player_ && WinSmtcStatus::DispatchesToPlayer(id)) {
-    switch (id) {
-      case WinSmtcStatus::Button::Play:
-        player_->Play();
-        break;
-      case WinSmtcStatus::Button::Pause:
-        player_->Pause();
-        break;
-      case WinSmtcStatus::Button::Stop:
-        player_->Stop();
-        break;
-      case WinSmtcStatus::Button::Next:
-        player_->Next();
-        break;
-      case WinSmtcStatus::Button::Previous:
-        player_->Previous();
-        break;
-      default:
-        break;
-    }
-  }
-  if (button_) {
-    const char *action = WinSmtcStatus::ButtonAction(id);
-    if (action && *action) {
-      button_(action);
-    }
-  }
-}
-
-void WinSystemMediaTransportControls::StartTimelineTimer() {
-  if (timeline_timer_ != 0) {
-    return;
-  }
-  timeline_timer_ = g_timeout_add_seconds(1, +[](gpointer data) -> gboolean {
-    static_cast<WinSystemMediaTransportControls *>(data)->UpdateTimeline();
-    return G_SOURCE_CONTINUE;
-  }, this);
-}
-
-void WinSystemMediaTransportControls::StopTimelineTimer() {
-  if (timeline_timer_ == 0) {
-    return;
-  }
-  g_source_remove(timeline_timer_);
-  timeline_timer_ = 0;
 }
 
 void WinSystemMediaTransportControls::UpdateTimeline() {
-#if defined(_WIN32) && defined(_MSC_VER)
-  if (!smtc2_ || !player_ || !player_->engine()) {
-    return;
-  }
-  ISystemMediaTransportControls2 *smtc2 = static_cast<ISystemMediaTransportControls2 *>(smtc2_);
+
+  if (!smtc2_) return;
+
+  ABI::Windows::Media::ISystemMediaTransportControls2 *smtc2 = static_cast<ABI::Windows::Media::ISystemMediaTransportControls2*>(smtc2_);
 
   HSTRING h_class = nullptr;
   static const wchar_t kClass[] = L"Windows.Media.SystemMediaTransportControlsTimelineProperties";
   WindowsCreateString(kClass, static_cast<UINT32>(wcslen(kClass)), &h_class);
+
   IInspectable *insp = nullptr;
   const HRESULT hr = RoActivateInstance(h_class, &insp);
   WindowsDeleteString(h_class);
-  if (FAILED(hr) || !insp) {
-    return;
-  }
+  if (FAILED(hr) || !insp) return;
 
-  ISystemMediaTransportControlsTimelineProperties *props = nullptr;
-  if (FAILED(insp->QueryInterface(__uuidof(ISystemMediaTransportControlsTimelineProperties), reinterpret_cast<void **>(&props))) || !props) {
+  ABI::Windows::Media::ISystemMediaTransportControlsTimelineProperties *props = nullptr;
+  if (FAILED(insp->QueryInterface(__uuidof(ABI::Windows::Media::ISystemMediaTransportControlsTimelineProperties), reinterpret_cast<void**>(&props))) || !props) {
     insp->Release();
     return;
   }
   insp->Release();
 
-  const int64_t pos_ns = player_->engine()->position_nanosec();
-  const int64_t dur_ns = WinSmtcStatus::TimelineDurationNs(current_duration_nanosec_, player_->engine()->length_nanosec());
-  TimeSpan zero_ts = {};
-  TimeSpan pos_ts = {WinSmtcStatus::TimelineHundredNs(pos_ns)};
-  TimeSpan dur_ts = {WinSmtcStatus::TimelineHundredNs(dur_ns)};
+  const qint64 pos_ns = player_->engine()->position_nanosec();
+  const qint64 dur_ns = current_duration_nanosec_ > 0 ? current_duration_nanosec_ : player_->engine()->length_nanosec();
+
+  ABI::Windows::Foundation::TimeSpan zero_ts = {};
+  ABI::Windows::Foundation::TimeSpan pos_ts = { pos_ns / 100 };
+  ABI::Windows::Foundation::TimeSpan dur_ts = { dur_ns / 100 };
+
   props->put_StartTime(zero_ts);
   props->put_EndTime(dur_ts);
   props->put_MinSeekTime(zero_ts);
   props->put_MaxSeekTime(dur_ts);
   props->put_Position(pos_ts);
+
   smtc2->UpdateTimelineProperties(props);
   props->Release();
-#endif
+
 }
 
-void WinSystemMediaTransportControls::UpdatePlaybackStatus(EngineBase::State state) {
-#if defined(_WIN32) && defined(_MSC_VER)
-  if (!smtc_) {
-    return;
-  }
-  ISystemMediaTransportControls *smtc = static_cast<ISystemMediaTransportControls *>(smtc_);
-  MediaPlaybackStatus playback_status = MediaPlaybackStatus_Stopped;
-  switch (WinSmtcStatus::FromEngine(state)) {
-    case WinSmtcStatus::Playback::Playing:
-      playback_status = MediaPlaybackStatus_Playing;
+void WinSystemMediaTransportControls::UpdatePlaybackStatus(const EngineBase::State state) {
+
+  if (!smtc_) return;
+
+  ISystemMediaTransportControls *smtc = static_cast<ISystemMediaTransportControls*>(smtc_);
+
+  ABI::Windows::Media::MediaPlaybackStatus playback_status;
+  switch (state) {
+    case EngineBase::State::Playing:
+      playback_status = ABI::Windows::Media::MediaPlaybackStatus_Playing;
       break;
-    case WinSmtcStatus::Playback::Paused:
-      playback_status = MediaPlaybackStatus_Paused;
+    case EngineBase::State::Paused:
+      playback_status = ABI::Windows::Media::MediaPlaybackStatus_Paused;
       break;
     default:
-      playback_status = MediaPlaybackStatus_Stopped;
+      playback_status = ABI::Windows::Media::MediaPlaybackStatus_Stopped;
       break;
   }
+
   smtc->put_PlaybackStatus(playback_status);
-#else
-  (void)state;
-#ifdef _WIN32
-  LogDebug("SMTC playback status updated");
-#endif
-#endif
+
 }
 
 void WinSystemMediaTransportControls::UpdateMetadata(const Song &song) {
-#if defined(_WIN32) && defined(_MSC_VER)
-  if (!updater_) {
-    return;
-  }
-  ISystemMediaTransportControlsDisplayUpdater *updater = static_cast<ISystemMediaTransportControlsDisplayUpdater *>(updater_);
-  if (WinSmtcStatus::ShouldClearMetadata(song.is_valid())) {
+
+  if (!updater_) return;
+
+  ISystemMediaTransportControlsDisplayUpdater *updater = static_cast<ISystemMediaTransportControlsDisplayUpdater*>(updater_);
+
+  if (!song.is_valid()) {
     updater->ClearAll();
     updater->Update();
     return;
   }
 
-  updater->put_Type(MediaPlaybackType_Music);
-  IMusicDisplayProperties *music_props = nullptr;
+  updater->put_Type(ABI::Windows::Media::MediaPlaybackType_Music);
+
+  ABI::Windows::Media::IMusicDisplayProperties *music_props = nullptr;
   if (SUCCEEDED(updater->get_MusicProperties(&music_props)) && music_props) {
+
     HSTRING h = nullptr;
     if (SUCCEEDED(CreateHString(song.title(), &h))) {
       music_props->put_Title(h);
       WindowsDeleteString(h);
       h = nullptr;
     }
+
     if (SUCCEEDED(CreateHString(song.artist(), &h))) {
       music_props->put_Artist(h);
       WindowsDeleteString(h);
       h = nullptr;
     }
-    if (SUCCEEDED(CreateHString(song.EffectiveAlbumartist(), &h))) {
+
+    if (SUCCEEDED(CreateHString(song.effective_albumartist(), &h))) {
       music_props->put_AlbumArtist(h);
       WindowsDeleteString(h);
       h = nullptr;
     }
-    IMusicDisplayProperties2 *music_props2 = nullptr;
-    if (SUCCEEDED(music_props->QueryInterface(__uuidof(IMusicDisplayProperties2), reinterpret_cast<void **>(&music_props2)))) {
+
+    // AlbumTitle is exposed on IMusicDisplayProperties2 (not v1)
+    ABI::Windows::Media::IMusicDisplayProperties2 *music_props2 = nullptr;
+    if (SUCCEEDED(music_props->QueryInterface(__uuidof(ABI::Windows::Media::IMusicDisplayProperties2), reinterpret_cast<void**>(&music_props2)))) {
       if (SUCCEEDED(CreateHString(song.album(), &h))) {
         music_props2->put_AlbumTitle(h);
         WindowsDeleteString(h);
       }
       music_props2->Release();
     }
+
     music_props->Release();
   }
+
   updater->Update();
-#else
-#ifdef _WIN32
-  LogDebug("SMTC metadata %s", song.PrettyTitleWithArtist().c_str());
-#else
-  (void)song;
-#endif
-#endif
+
 }
 
-void WinSystemMediaTransportControls::SetThumbnail(const std::vector<unsigned char> &image) {
-#if defined(_WIN32) && defined(_MSC_VER)
-  if (!updater_) {
-    return;
-  }
-  const std::vector<unsigned char> jpeg = EncodeJpeg(image);
-  if (jpeg.empty()) {
-    ClearThumbnail();
-    return;
+void WinSystemMediaTransportControls::SetThumbnail(const QImage &image) {
+
+  if (!updater_) return;
+
+  ISystemMediaTransportControlsDisplayUpdater *updater = static_cast<ISystemMediaTransportControlsDisplayUpdater*>(updater_);
+
+  // Encode image to JPEG bytes in memory
+  QByteArray jpeg_data;
+  {
+    QBuffer buf(&jpeg_data);
+    buf.open(QIODevice::WriteOnly);
+    if (!image.save(&buf, "JPEG", 90)) {
+      qLog(Warning) << "WinSystemMediaTransportControls: Failed to encode thumbnail";
+      ClearThumbnail();
+      return;
+    }
   }
 
-  ISystemMediaTransportControlsDisplayUpdater *updater = static_cast<ISystemMediaTransportControlsDisplayUpdater *>(updater_);
+  // Create InMemoryRandomAccessStream — an agile (free-threaded) WinRT type.
+  // Unlike CreateRandomAccessStreamOverStream, it has no STA affinity, so the SMTC background MTA thread can call OpenReadAsync without marshaling back to the GUI STA.
   IRandomAccessStream *ra_stream = nullptr;
   {
     HSTRING h = nullptr;
@@ -458,7 +395,7 @@ void WinSystemMediaTransportControls::SetThumbnail(const std::vector<unsigned ch
       ClearThumbnail();
       return;
     }
-    insp->QueryInterface(__uuidof(IRandomAccessStream), reinterpret_cast<void **>(&ra_stream));
+    insp->QueryInterface(__uuidof(IRandomAccessStream), reinterpret_cast<void**>(&ra_stream));
     insp->Release();
   }
   if (!ra_stream) {
@@ -466,72 +403,78 @@ void WinSystemMediaTransportControls::SetThumbnail(const std::vector<unsigned ch
     return;
   }
 
-  IOutputStream *out = nullptr;
-  ra_stream->GetOutputStreamAt(0, &out);
-  if (!out) {
-    ra_stream->Release();
-    ClearThumbnail();
-    return;
-  }
-
-  IDataWriterFactory *dwf = nullptr;
+  // Write JPEG bytes into the stream via DataWriter
   {
-    HSTRING h = nullptr;
-    static const wchar_t kDwClass[] = L"Windows.Storage.Streams.DataWriter";
-    WindowsCreateString(kDwClass, static_cast<UINT32>(wcslen(kDwClass)), &h);
-    RoGetActivationFactory(h, __uuidof(IDataWriterFactory), reinterpret_cast<void **>(&dwf));
-    WindowsDeleteString(h);
-  }
-  if (!dwf) {
-    out->Release();
-    ra_stream->Release();
-    ClearThumbnail();
-    return;
-  }
-
-  IDataWriter *dw = nullptr;
-  dwf->CreateDataWriter(out, &dw);
-  dwf->Release();
-  out->Release();
-  if (!dw) {
-    ra_stream->Release();
-    ClearThumbnail();
-    return;
-  }
-
-  dw->WriteBytes(static_cast<UINT32>(jpeg.size()), const_cast<BYTE *>(jpeg.data()));
-  using StoreOp = __FIAsyncOperation_1_UINT32_t;
-  using StoreHandler = __FIAsyncOperationCompletedHandler_1_UINT32_t;
-  StoreOp *store_op = nullptr;
-  dw->StoreAsync(&store_op);
-  if (store_op) {
-    HANDLE ev = CreateEventW(nullptr, FALSE, FALSE, nullptr);
-    if (ev) {
-      auto cb = Microsoft::WRL::Callback<StoreHandler>([ev](StoreOp *, AsyncStatus) -> HRESULT {
-        SetEvent(ev);
-        return S_OK;
-      });
-      store_op->put_Completed(cb.Get());
-      WaitForSingleObject(ev, 5000);
-      CloseHandle(ev);
+    IOutputStream *out = nullptr;
+    ra_stream->GetOutputStreamAt(0, &out);
+    if (!out) {
+      ra_stream->Release();
+      ClearThumbnail();
+      return;
     }
-    store_op->Release();
+
+    IDataWriterFactory *dwf = nullptr;
+    {
+      HSTRING h = nullptr;
+      static const wchar_t kDwClass[] = L"Windows.Storage.Streams.DataWriter";
+      WindowsCreateString(kDwClass, static_cast<UINT32>(wcslen(kDwClass)), &h);
+      RoGetActivationFactory(h, __uuidof(IDataWriterFactory), reinterpret_cast<void**>(&dwf));
+      WindowsDeleteString(h);
+    }
+    if (!dwf) {
+      out->Release();
+      ra_stream->Release();
+      ClearThumbnail();
+      return;
+    }
+
+    IDataWriter *dw = nullptr;
+    dwf->CreateDataWriter(out, &dw);
+    dwf->Release();
+    out->Release();
+    if (!dw) {
+      ra_stream->Release();
+      ClearThumbnail();
+      return;
+    }
+
+    // WriteBytes buffers data synchronously into DataWriter's internal buffer
+    dw->WriteBytes(static_cast<UINT32>(jpeg_data.size()), reinterpret_cast<BYTE*>(const_cast<char*>(jpeg_data.constData())));
+
+    // StoreAsync flushes to the InMemoryRandomAccessStream.
+    // The completion callback runs on an MTA thread pool thread — no STA marshal, so WaitForSingleObject from the GUI STA thread cannot deadlock here.
+    using StoreOp = __FIAsyncOperation_1_UINT32_t;
+    using StoreHandler = __FIAsyncOperationCompletedHandler_1_UINT32_t;
+    StoreOp *store_op = nullptr;
+    dw->StoreAsync(&store_op);
+    if (store_op) {
+      HANDLE ev = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+      if (ev) {
+        auto cb = Microsoft::WRL::Callback<StoreHandler>([ev](StoreOp *, AsyncStatus) -> HRESULT {
+          SetEvent(ev);
+          return S_OK;
+        });
+        store_op->put_Completed(cb.Get());
+        WaitForSingleObject(ev, 5000);
+        CloseHandle(ev);
+      }
+      store_op->Release();
+    }
+
+    IOutputStream *detached = nullptr;
+    dw->DetachStream(&detached);
+    if (detached) detached->Release();
+    dw->Release();
   }
 
-  IOutputStream *detached = nullptr;
-  dw->DetachStream(&detached);
-  if (detached) {
-    detached->Release();
-  }
-  dw->Release();
-
+  // Create a RandomAccessStreamReference from the agile stream
   IRandomAccessStreamReference *stream_ref = nullptr;
   {
     HSTRING h = nullptr;
     static const wchar_t kSrClass[] = L"Windows.Storage.Streams.RandomAccessStreamReference";
     WindowsCreateString(kSrClass, static_cast<UINT32>(wcslen(kSrClass)), &h);
     IRandomAccessStreamReferenceStatics *statics = nullptr;
-    RoGetActivationFactory(h, __uuidof(IRandomAccessStreamReferenceStatics), reinterpret_cast<void **>(&statics));
+    RoGetActivationFactory(h, __uuidof(IRandomAccessStreamReferenceStatics), reinterpret_cast<void**>(&statics));
     WindowsDeleteString(h);
     if (statics) {
       statics->CreateFromStream(ra_stream, &stream_ref);
@@ -543,21 +486,42 @@ void WinSystemMediaTransportControls::SetThumbnail(const std::vector<unsigned ch
     ClearThumbnail();
     return;
   }
+
   updater->put_Thumbnail(stream_ref);
   stream_ref->Release();
   updater->Update();
-#else
-  (void)image;
-#endif
+
 }
 
 void WinSystemMediaTransportControls::ClearThumbnail() {
-#if defined(_WIN32) && defined(_MSC_VER)
-  if (!updater_) {
-    return;
-  }
-  ISystemMediaTransportControlsDisplayUpdater *updater = static_cast<ISystemMediaTransportControlsDisplayUpdater *>(updater_);
+
+  if (!updater_) return;
+  ISystemMediaTransportControlsDisplayUpdater *updater = static_cast<ISystemMediaTransportControlsDisplayUpdater*>(updater_);
   updater->put_Thumbnail(nullptr);
   updater->Update();
-#endif
+
+}
+
+void WinSystemMediaTransportControls::HandleButtonPressed(const int button) {
+
+  switch (static_cast<ABI::Windows::Media::SystemMediaTransportControlsButton>(button)) {
+    case ABI::Windows::Media::SystemMediaTransportControlsButton_Play:
+      player_->Play();
+      break;
+    case ABI::Windows::Media::SystemMediaTransportControlsButton_Pause:
+      player_->Pause();
+      break;
+    case ABI::Windows::Media::SystemMediaTransportControlsButton_Stop:
+      player_->Stop();
+      break;
+    case ABI::Windows::Media::SystemMediaTransportControlsButton_Next:
+      player_->Next();
+      break;
+    case ABI::Windows::Media::SystemMediaTransportControlsButton_Previous:
+      player_->Previous();
+      break;
+    default:
+      break;
+  }
+
 }

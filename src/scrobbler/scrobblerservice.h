@@ -1,33 +1,78 @@
-#ifndef STRAWBERRY_SCROBBLERSERVICE_H
-#define STRAWBERRY_SCROBBLERSERVICE_H
+/*
+ * Strawberry Music Player
+ * Copyright 2018-2025, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "core/signal.h"
+#ifndef SCROBBLERSERVICE_H
+#define SCROBBLERSERVICE_H
+
+#include "config.h"
+
+#include <QPair>
+#include <QByteArray>
+#include <QString>
+
+#include "includes/shared_ptr.h"
 #include "core/song.h"
+#include "core/jsonbaserequest.h"
 
-#include <string>
+#include "scrobblersettingsservice.h"
 
-class ScrobblerService {
+class ScrobblerService : public JsonBaseRequest {
+  Q_OBJECT
+
  public:
-  virtual ~ScrobblerService() = default;
-  virtual std::string name() const = 0;
-  virtual bool enabled() const { return enabled_; }
-  virtual void set_enabled(bool e) { enabled_ = e; }
-  virtual void NowPlaying(const Song &song) = 0;
-  virtual void ClearPlaying() {}
-  virtual void Scrobble(const Song &song) = 0;
-  virtual void Love(const Song &song) = 0;
-  virtual void Authenticate(const std::string &username, const std::string &password) = 0;
-  virtual void StartAuthentication() {}
-  virtual void Logout() {}
-  virtual bool authenticated() const { return false; }
-  virtual std::string username() const { return {}; }
-  virtual void WriteCache() {}
-  virtual void Submit() {}
+  explicit ScrobblerService(const QString &name, const SharedPtr<NetworkAccessManager> network, const SharedPtr<ScrobblerSettingsService> settings, QObject *parent);
 
-  Signal<std::string> Error;
+  QString name() const { return name_; }
+  QString service_name() const override { return name_; }
+
+  virtual void ReloadSettings() = 0;
+
+  virtual bool enabled() const { return false; }
+  virtual bool authenticated() const override { return false; }
+
+  virtual void UpdateNowPlaying(const Song &song) = 0;
+  virtual void ClearPlaying() = 0;
+  virtual void Scrobble(const Song &song) = 0;
+  virtual void Love() {}
+
+  virtual void StartSubmit(const bool initial = false) = 0;
+  virtual bool submitted() const { return false; }
 
  protected:
-  bool enabled_ = false;
+  using EncodedParam = QPair<QByteArray, QByteArray>;
+
+  QString StripAlbum(const QString &album) const;
+  QString StripTitle(const QString &title) const;
+
+ public Q_SLOTS:
+  virtual void Submit() = 0;
+  virtual void WriteCache() = 0;
+
+ Q_SIGNALS:
+  void ErrorMessage(const QString &error);
+  void OpenSettingsDialog();
+
+ protected:
+  const QString name_;
+  const SharedPtr<ScrobblerSettingsService> settings_;
 };
 
-#endif
+using ScrobblerServicePtr = SharedPtr<ScrobblerService>;
+
+#endif  // SCROBBLERSERVICE_H

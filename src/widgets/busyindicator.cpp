@@ -1,44 +1,96 @@
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+#include <QWidget>
+#include <QString>
+#include <QMovie>
+#include <QLabel>
+#include <QSizePolicy>
+#include <QBoxLayout>
+
 #include "busyindicator.h"
 
-#include "widgets/busyindicatoranim.h"
+using namespace Qt::Literals::StringLiterals;
 
-BusyIndicator::BusyIndicator() {
-  root_ = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-  g_object_ref_sink(root_);
-  spinner_ = gtk_spinner_new();
-  label_ = gtk_label_new("");
-  gtk_box_append(GTK_BOX(root_), spinner_);
-  gtk_box_append(GTK_BOX(root_), label_);
-  g_signal_connect(root_, "map", G_CALLBACK(+[](GtkWidget *, gpointer data) { static_cast<BusyIndicator *>(data)->OnMapped(); }), this);
-  g_signal_connect(root_, "unmap", G_CALLBACK(+[](GtkWidget *, gpointer data) { static_cast<BusyIndicator *>(data)->OnUnmapped(); }), this);
-  Hide();
+class QHideEvent;
+class QShowEvent;
+
+BusyIndicator::BusyIndicator(const QString &text, QWidget *parent)
+    : QWidget(parent),
+      movie_(nullptr),
+      label_(nullptr) {
+
+  Init(text);
+}
+
+BusyIndicator::BusyIndicator(QWidget *parent)
+    : QWidget(parent),
+      movie_(nullptr),
+      label_(nullptr) {
+
+  Init(QString());
+}
+
+void BusyIndicator::Init(const QString &text) {
+
+  movie_ = new QMovie(u":/pictures/spinner.gif"_s),
+  label_ = new QLabel;
+
+  QLabel *icon = new QLabel;
+  icon->setMovie(movie_);
+  icon->setMinimumSize(16, 16);
+
+  label_->setWordWrap(true);
+  label_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+
+  QHBoxLayout *layout = new QHBoxLayout(this);
+  layout->setContentsMargins(0, 0, 0, 0);
+  layout->addWidget(icon);
+  layout->addSpacing(6);
+  layout->addWidget(label_);
+
+  set_text(text);
+
 }
 
 BusyIndicator::~BusyIndicator() {
-  if (root_) g_object_unref(root_);
+  delete movie_;
 }
 
-void BusyIndicator::Show(const std::string &text) {
-  visible_ = true;
-  gtk_label_set_text(GTK_LABEL(label_), text.empty() ? "Working…" : text.c_str());
-  gtk_spinner_start(GTK_SPINNER(spinner_));
-  gtk_widget_set_visible(root_, TRUE);
+void BusyIndicator::showEvent(QShowEvent *e) {
+  Q_UNUSED(e)
+  movie_->start();
 }
 
-void BusyIndicator::Hide() {
-  visible_ = false;
-  gtk_spinner_stop(GTK_SPINNER(spinner_));
-  gtk_widget_set_visible(root_, FALSE);
+void BusyIndicator::hideEvent(QHideEvent *e) {
+  Q_UNUSED(e)
+  movie_->stop();
 }
 
-void BusyIndicator::OnMapped() {
-  if (visible_ && BusyIndicatorAnim::ShouldStartOnShow()) {
-    gtk_spinner_start(GTK_SPINNER(spinner_));
-  }
+void BusyIndicator::set_text(const QString &text) {
+  if (label_->text() == text) return;
+  label_->setText(text);
+  label_->setVisible(!text.isEmpty());
+  Q_EMIT TextChanged(text);
 }
 
-void BusyIndicator::OnUnmapped() {
-  if (BusyIndicatorAnim::ShouldStopOnHide()) {
-    gtk_spinner_stop(GTK_SPINNER(spinner_));
-  }
+QString BusyIndicator::text() const {
+  return label_->text();
 }

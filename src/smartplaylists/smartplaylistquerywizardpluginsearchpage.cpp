@@ -1,34 +1,45 @@
-#include "smartplaylists/smartplaylistquerywizardpluginsearchpage.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "smartplaylists/smartplaylistwizardlabels.h"
+#include <algorithm>
 
-SmartPlaylistQueryWizardPluginSearchPage::SmartPlaylistQueryWizardPluginSearchPage() {
-  widget_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
-  const char *type_names[] = {SmartPlaylistWizardLabels::And(), SmartPlaylistWizardLabels::Or(), SmartPlaylistWizardLabels::All(),
-                              nullptr};
-  type_drop_ = gtk_drop_down_new_from_strings(type_names);
-  terms_group_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
-  gtk_box_append(GTK_BOX(terms_group_), gtk_label_new(SmartPlaylistWizardLabels::SearchTerms()));
-  gtk_box_append(GTK_BOX(widget_), gtk_label_new(SmartPlaylistWizardLabels::SearchMode()));
-  gtk_box_append(GTK_BOX(widget_), type_drop_);
-  gtk_box_append(GTK_BOX(widget_), terms_group_);
-  g_signal_connect(type_drop_, "notify::selected", G_CALLBACK(+[](GtkDropDown *, GParamSpec *, gpointer data) {
-                     static_cast<SmartPlaylistQueryWizardPluginSearchPage *>(data)->ApplyTermsSensitive();
-                   }),
-                   this);
+#include "smartplaylistquerywizardpluginsearchpage.h"
+#include "smartplaylistsearchtermwidget.h"
+#include "ui_smartplaylistquerysearchpage.h"
+
+SmartPlaylistQueryWizardPluginSearchPage::SmartPlaylistQueryWizardPluginSearchPage(QWidget *parent)
+    : QWizardPage(parent),
+      layout_(nullptr),
+      new_term_(nullptr),
+      preview_(nullptr),
+      ui_(new Ui_SmartPlaylistQuerySearchPage) {
+
+  ui_->setupUi(this);
+
 }
 
-SmartPlaylistSearch SmartPlaylistQueryWizardPluginSearchPage::search() const {
-  SmartPlaylistSearch search;
-  search.type = SmartPlaylistWizardLabels::TypeFromIndex(static_cast<int>(gtk_drop_down_get_selected(GTK_DROP_DOWN(type_drop_))));
-  return search;
-}
+bool SmartPlaylistQueryWizardPluginSearchPage::isComplete() const {
 
-void SmartPlaylistQueryWizardPluginSearchPage::SetSearch(const SmartPlaylistSearch &search) {
-  gtk_drop_down_set_selected(GTK_DROP_DOWN(type_drop_), static_cast<guint>(SmartPlaylistWizardLabels::TypeIndex(search.type)));
-  ApplyTermsSensitive();
-}
+  if (ui_->type->currentIndex() == 2) {  // All songs
+    return true;
+  }
+  return !std::any_of(terms_.begin(), terms_.end(), [](SmartPlaylistSearchTermWidget *widget) { return !widget->Term().is_valid(); });
 
-void SmartPlaylistQueryWizardPluginSearchPage::ApplyTermsSensitive() {
-  gtk_widget_set_sensitive(terms_group_, SmartPlaylistWizardLabels::TermsSensitive(search().type));
 }

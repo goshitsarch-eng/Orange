@@ -1,30 +1,66 @@
-#ifndef STRAWBERRY_LYRICSPROVIDERS_H
-#define STRAWBERRY_LYRICSPROVIDERS_H
+/*
+ * Strawberry Music Player
+ * Copyright 2018-2026, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "core/network.h"
-#include "core/song.h"
-#include "lyrics/lyricsprovider.h"
+#ifndef LYRICSPROVIDERS_H
+#define LYRICSPROVIDERS_H
 
-#include <memory>
-#include <string>
-#include <vector>
+#include "config.h"
 
-class LyricsProviders {
+#include <atomic>
+
+#include <QtGlobal>
+#include <QObject>
+#include <QMutex>
+#include <QList>
+#include <QHash>
+#include <QString>
+
+class LyricsProvider;
+
+class LyricsProviders : public QObject {
+  Q_OBJECT
+
  public:
-  explicit LyricsProviders(NetworkAccessManager *network);
+  explicit LyricsProviders(QObject *parent = nullptr);
+  ~LyricsProviders() override;
+
   void ReloadSettings();
-  void Move(int index, int delta);
-  void SetEnabled(LyricsProvider *provider, bool enabled);
-  void SaveOrder();
-  void Fetch(const Song &song, LyricsProvider::Callback callback);
-  LyricsProvider *ProviderByName(const std::string &name) const;
-  std::vector<LyricsProvider *> All() const;
-  NetworkAccessManager *network() const { return network_; }
+  LyricsProvider *ProviderByName(const QString &name) const;
+
+  void AddProvider(LyricsProvider *provider);
+  void RemoveProvider(LyricsProvider *provider);
+  QList<LyricsProvider*> List() const { return lyrics_providers_.keys(); }
+  bool HasAnyProviders() const { return !lyrics_providers_.isEmpty(); }
+  int NextId();
+
+ private Q_SLOTS:
+  void ProviderDestroyed();
 
  private:
-  void FetchFromIndex(const Song &song, size_t index, LyricsProvider::Callback callback);
+  static int NextOrderId;
 
-  NetworkAccessManager *network_;
-  std::vector<std::unique_ptr<LyricsProvider>> providers_;
+  QHash<LyricsProvider*, QString> lyrics_providers_;
+  QMutex mutex_;
+
+  std::atomic<int> next_id_;
+
+  Q_DISABLE_COPY_MOVE(LyricsProviders)
 };
-#endif
+
+#endif  // LYRICSPROVIDERS_H

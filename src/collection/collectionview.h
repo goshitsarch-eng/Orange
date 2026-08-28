@@ -1,98 +1,199 @@
-#ifndef STRAWBERRY_COLLECTIONVIEW_H
-#define STRAWBERRY_COLLECTIONVIEW_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "collection/collectioncover.h"
-#include "collection/collectionfilter.h"
-#include "collection/collectionfocus.h"
-#include "collection/collectionkeyboard.h"
-#include "collection/collectionmodel.h"
+#ifndef COLLECTIONVIEW_H
+#define COLLECTIONVIEW_H
 
-#include <gtk/gtk.h>
+#include "config.h"
 
-#include <functional>
-#include <map>
-#include <set>
-#include <string>
-#include <vector>
+#include <QAbstractItemModel>
+#include <QAbstractItemView>
+#include <QString>
+#include <QPixmap>
+#include <QSet>
 
+#include "includes/scoped_ptr.h"
+#include "includes/shared_ptr.h"
+#include "core/song.h"
+#include "widgets/autoexpandingtreeview.h"
+
+class QSortFilterProxyModel;
+class QMenu;
+class QAction;
+class QContextMenuEvent;
+class QMouseEvent;
+class QPaintEvent;
+class QKeyEvent;
+
+class TaskManager;
+class TagReaderClient;
+class NetworkAccessManager;
+class CollectionLibrary;
+class CollectionBackend;
+class CollectionModel;
+class CollectionFilter;
+class CollectionFilterWidget;
+class DeviceManager;
+class StreamingServices;
 class AlbumCoverLoader;
+class CurrentAlbumCoverLoader;
+class CoverProviders;
+class LyricsProviders;
+class EditTagDialog;
+class OrganizeDialog;
 
-class CollectionView {
+class CollectionView : public AutoExpandingTreeView {
+  Q_OBJECT
+
  public:
-  using ActivateCallback = std::function<void(const SongList &)>;
-  using EnqueueCallback = std::function<void(const SongList &)>;
-  using EmptyCallback = std::function<void()>;
-  using FocusFilterCallback = std::function<void(unsigned keyval)>;
-  using MenuCallback = std::function<void(double x, double y)>;
+  explicit CollectionView(QWidget *parent = nullptr);
+  ~CollectionView() override;
 
-  CollectionView();
-  ~CollectionView();
+  // Returns Songs currently selected in the collection view.
+  // Please note that the selection is recursive meaning that if for example an album is selected this will return all of it's songs.
+  SongList GetSelectedSongs() const;
 
-  GtkWidget *widget() const { return widget_; }
-  GtkWidget *list() const { return list_; }
-  CollectionModel *model() { return &model_; }
-  CollectionFilter *filter() { return &filter_; }
+  void Init(const SharedPtr<TaskManager> task_manager,
+            const SharedPtr<TagReaderClient> tagreader_client,
+            const SharedPtr<NetworkAccessManager> network,
+            const SharedPtr<AlbumCoverLoader> albumcover_loader,
+            const SharedPtr<CurrentAlbumCoverLoader> current_albumcover_loader,
+            const SharedPtr<CoverProviders> cover_providers,
+            const SharedPtr<LyricsProviders> lyrics_providers,
+            const SharedPtr<CollectionLibrary> collection,
+            const SharedPtr<DeviceManager> device_manager,
+            const SharedPtr<StreamingServices> streaming_services);
 
-  void SetModelSongs(const SongList &songs, const CollectionGrouping::Grouping &grouping, bool separate_albums_by_grouping,
-                     bool skip_artist_articles, bool skip_album_articles);
-  void ApplyUpdate(const CollectionModelUpdate &update);
-  void SetFilterString(const std::string &filter);
-  void SetActivateCallback(ActivateCallback callback);
-  void SetEnqueueCallback(EnqueueCallback callback);
-  void SetEmptyCallback(EmptyCallback callback);
-  void SetFocusFilterCallback(FocusFilterCallback callback);
-  void SetMenuCallback(MenuCallback callback);
+  void SetFilterWidget(CollectionFilterWidget *filter_widget);
+
+  // QTreeView
+  void keyboardSearch(const QString &search) override;
+  void scrollTo(const QModelIndex &idx, ScrollHint hint = EnsureVisible) override;
+
+  int TotalSongs() const;
+  int TotalArtists() const;
+  int TotalAlbums() const;
+
+ public Q_SLOTS:
+  void TotalSongCountUpdated(const int count);
+  void TotalArtistCountUpdated(const int count);
+  void TotalAlbumCountUpdated(const int count);
+  void ReloadSettings();
+
   void FilterReturnPressed();
-  void FocusAndMove(CollectionKeyboard::Action action);
-  void SetCoverLoader(AlbumCoverLoader *loader) { cover_loader_ = loader; }
-  void ApplyLook();
-  void Rebuild();
+
   void SaveFocus();
   void RestoreFocus();
-  void ExpandAll();
-  void CollapseAll();
-  void ToggleExpanded(const CollectionItem *item);
-  bool IsExpanded(const CollectionItem *item) const;
 
-  SongList SelectedSongs() const;
-  const CollectionItem *SelectedItem() const;
-  std::vector<const CollectionItem *> SelectedItems() const;
+  void EditTagError(const QString &message);
+
+ Q_SIGNALS:
+  void ShowSettingsDialog();
+
+  void TotalSongCountUpdated_();
+  void TotalArtistCountUpdated_();
+  void TotalAlbumCountUpdated_();
+  void Error(const QString &error);
+
+ protected:
+  // QWidget
+  void paintEvent(QPaintEvent *event) override;
+  void keyPressEvent(QKeyEvent *e) override;
+  void mouseReleaseEvent(QMouseEvent *e) override;
+  void contextMenuEvent(QContextMenuEvent *e) override;
+
+ private Q_SLOTS:
+  void Load();
+  void AddToPlaylist();
+  void AddToPlaylistEnqueue();
+  void AddToPlaylistEnqueueNext();
+  void OpenInNewPlaylist();
+  void SearchForThis();
+  void Organize();
+  void CopyToDevice();
+  void EditTracks();
+  void RescanSongs();
+  void ShowInBrowser() const;
+  void ShowInVarious();
+  void NoShowInVarious();
+  void Delete();
+  void DeleteFilesFinished(const SongList &songs_with_errors);
 
  private:
-  void RebuildRows();
-  void SelectFocusItem();
-  void SelectItem(const CollectionItem *target);
-  void AppendItem(GtkWidget *parent, const CollectionItem *item, int depth);
-  void LoadCover(GtkWidget *image, const Song &song);
-  void SetupRowDrag(GtkWidget *row, const CollectionItem *item);
-  void TypeAhead(gunichar ch);
-  void ResetTypeAhead();
-  void ScrollRowToTop(GtkWidget *row);
-  gboolean OnKeyPressed(guint keyval, GdkModifierType state);
-  bool ApplyTreeLeft();
-  void ActivateRow(GtkListBoxRow *row);
-  void HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state);
-  GtkWidget *CreateEmptyPlaceholder(bool collection_empty) const;
-  void OpenEmptyIfNeeded(GtkListBoxRow *row, guint button);
+  void SetShowInVarious(const bool on);
+  bool RestoreLevelFocus(const QModelIndex &parent = QModelIndex());
+  void SaveContainerPath(const QModelIndex &child);
 
-  CollectionModel model_;
-  CollectionFilter filter_;
-  CollectionGrouping::Grouping grouping_;
-  ActivateCallback activate_;
-  EnqueueCallback enqueue_;
-  EmptyCallback empty_;
-  FocusFilterCallback focus_filter_;
-  MenuCallback menu_;
-  AlbumCoverLoader *cover_loader_ = nullptr;
-  GtkWidget *widget_ = nullptr;
-  GtkWidget *list_ = nullptr;
-  std::set<std::string> expanded_;
-  CollectionFocus::State focus_;
-  std::map<std::string, std::string> cover_cache_;
-  bool pretty_covers_ = CollectionSettings::kDefaultPrettyCovers;
-  bool auto_open_ = CollectionSettings::kDefaultAutoOpen;
-  std::string typeahead_;
-  guint typeahead_timeout_id_ = 0;
+ private:
+  SharedPtr<TaskManager> task_manager_;
+  SharedPtr<TagReaderClient> tagreader_client_;
+  SharedPtr<NetworkAccessManager> network_;
+  SharedPtr<DeviceManager> device_manager_;
+  SharedPtr<AlbumCoverLoader> albumcover_loader_;
+  SharedPtr<CurrentAlbumCoverLoader> current_albumcover_loader_;
+  SharedPtr<CollectionLibrary> collection_;
+  SharedPtr<CoverProviders> cover_providers_;
+  SharedPtr<LyricsProviders> lyrics_providers_;
+  SharedPtr<StreamingServices> streaming_services_;
+
+  SharedPtr<CollectionBackend> backend_;
+  CollectionModel *model_;
+  CollectionFilter *filter_;
+  CollectionFilterWidget *filter_widget_;
+
+  int total_song_count_;
+  int total_artist_count_;
+  int total_album_count_;
+
+  QPixmap nomusic_;
+
+  QMenu *context_menu_;
+  QPersistentModelIndex context_menu_index_;
+  QAction *action_load_;
+  QAction *action_add_to_playlist_;
+  QAction *action_add_to_playlist_enqueue_;
+  QAction *action_add_to_playlist_enqueue_next_;
+  QAction *action_open_in_new_playlist_;
+  QAction *action_organize_;
+  QAction *action_search_for_this_;
+
+  QAction *action_copy_to_device_;
+  QAction *action_edit_track_;
+  QAction *action_edit_tracks_;
+  QAction *action_rescan_songs_;
+  QAction *action_show_in_browser_;
+  QAction *action_show_in_various_;
+  QAction *action_no_show_in_various_;
+  QAction *action_delete_files_;
+
+  ScopedPtr<OrganizeDialog> organize_dialog_;
+  ScopedPtr<EditTagDialog> edit_tag_dialog_;
+
+  bool is_in_keyboard_search_;
+  bool delete_files_;
+
+  // Save focus
+  Song last_selected_song_;
+  QString last_selected_container_;
+  QSet<QString> last_selected_path_;
 };
 
-#endif
+#endif  // COLLECTIONVIEW_H

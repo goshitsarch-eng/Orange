@@ -1,503 +1,838 @@
-#include "covermanager/albumcoverchoicecontroller.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2019-2023, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "collection/collectionalbumart.h"
-#include "covermanager/coveractionenable.h"
-#include "covermanager/covererrormessage.h"
-#include "dialogs/uierror.h"
+#include "config.h"
 
-#include "constants/coverssettings.h"
-#include "context/contextcover.h"
-#include "core/application.h"
-#include "core/settings.h"
-#include "covermanager/albumcoversearcher.h"
-#include "covermanager/coverproviders.h"
-#include "covermanager/coversearchstatisticsdialog.h"
-#include "dialogs/dialoghelpers.h"
-#include "translations/translations.h"
-#include "constants/filefilterconstants.h"
-#include "utilities/filefilters.h"
-#include "utilities/fileutils.h"
-#include "utilities/jsonutils.h"
-#include "utilities/strutils.h"
-
-#include <adwaita.h>
-
-#include <algorithm>
+#include <utility>
 #include <memory>
 
-namespace {
+#include <QtGlobal>
+#include <QGuiApplication>
+#include <QtConcurrentRun>
+#include <QFuture>
+#include <QFutureWatcher>
+#include <QScreen>
+#include <QWidget>
+#include <QDialog>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QMimeData>
+#include <QSet>
+#include <QList>
+#include <QVariant>
+#include <QString>
+#include <QRegularExpression>
+#include <QUrl>
+#include <QImage>
+#include <QImageWriter>
+#include <QPixmap>
+#include <QIcon>
+#include <QRect>
+#include <QFileDialog>
+#include <QLabel>
+#include <QAction>
+#include <QActionGroup>
+#include <QMenu>
+#include <QSettings>
+#include <QtEvents>
 
-struct CoverSaveFileState {
-  AlbumCoverChoiceController *controller = nullptr;
-  std::string *bytes = nullptr;
-};
+#include "constants/filenameconstants.h"
+#include "constants/filefilterconstants.h"
+#include "constants/coverssettings.h"
+#include "utilities/strutils.h"
+#include "utilities/mimeutils.h"
+#include "utilities/coveroptions.h"
+#include "utilities/coverutils.h"
+#include "utilities/screenutils.h"
+#include "core/logging.h"
+#include "core/song.h"
+#include "core/iconloader.h"
+#include "core/settings.h"
+#include "tagreader/tagreaderclient.h"
+#include "collection/collectionfilteroptions.h"
+#include "collection/collectionbackend.h"
+#include "streaming/streamingservices.h"
+#include "streaming/streamingservice.h"
+#include "albumcoverchoicecontroller.h"
+#include "albumcoverfetcher.h"
+#include "albumcoverloader.h"
+#include "albumcoversearcher.h"
+#include "albumcoverimageresult.h"
+#include "coverfromurldialog.h"
+#include "currentalbumcoverloader.h"
 
-struct CoverOpenFileState {
-  AlbumCoverChoiceController *controller = nullptr;
-  Song *song = nullptr;
-  GtkWidget *image = nullptr;
-};
+using std::make_shared;
+using namespace Qt::Literals::StringLiterals;
 
-}  // namespace
 
-AlbumCoverChoiceController::AlbumCoverChoiceController(Application *app) : app_(app) {
+AlbumCoverChoiceController::AlbumCoverChoiceController(QWidget *parent)
+    : QWidget(parent),
+      cover_searcher_(nullptr),
+      cover_fetcher_(nullptr),
+      save_file_dialog_(nullptr),
+      cover_from_url_dialog_(nullptr),
+      cover_from_file_(nullptr),
+      cover_to_file_(nullptr),
+      cover_from_url_(nullptr),
+      search_for_cover_(nullptr),
+      separator1_(nullptr),
+      unset_cover_(nullptr),
+      delete_cover_(nullptr),
+      clear_cover_(nullptr),
+      separator2_(nullptr),
+      show_cover_(nullptr),
+      search_cover_auto_(nullptr),
+      save_embedded_cover_override_(false) {
+
+  cover_from_file_ = new QAction(IconLoader::Load(u"document-open"_s), tr("Load cover from disk..."), this);
+  cover_to_file_ = new QAction(IconLoader::Load(u"document-save"_s), tr("Save cover to disk..."), this);
+  cover_from_url_ = new QAction(IconLoader::Load(u"download"_s), tr("Load cover from URL..."), this);
+  search_for_cover_ = new QAction(IconLoader::Load(u"search"_s), tr("Search for album covers..."), this);
+  unset_cover_ = new QAction(IconLoader::Load(u"list-remove"_s), tr("Unset cover"), this);
+  delete_cover_ = new QAction(IconLoader::Load(u"list-remove"_s), tr("Delete cover"), this);
+  clear_cover_ = new QAction(IconLoader::Load(u"list-remove"_s), tr("Clear cover"), this);
+  separator1_ = new QAction(this);
+  separator1_->setSeparator(true);
+  show_cover_ = new QAction(IconLoader::Load(u"zoom-in"_s), tr("Show fullsize..."), this);
+
+  search_cover_auto_ = new QAction(tr("Search automatically"), this);
+  search_cover_auto_->setCheckable(true);
+  search_cover_auto_->setChecked(false);
+
+  separator2_ = new QAction(this);
+  separator2_->setSeparator(true);
+
   ReloadSettings();
-  Error.Connect([](const std::string &message) { UiError::Report(message); });
+
 }
 
-void AlbumCoverChoiceController::ReloadSettings() { cover_options_ = CoverOptions::LoadFromSettings(); }
+AlbumCoverChoiceController::~AlbumCoverChoiceController() = default;
 
-bool AlbumCoverChoiceController::IsKnownImageExtension(const std::string &extension) {
-  const std::string ext = StrUtils::ToLower(extension);
-  const std::vector<std::string> known = ImageExtensions();
-  return std::find(known.begin(), known.end(), ext) != known.end();
+void AlbumCoverChoiceController::Init(const SharedPtr<NetworkAccessManager> network,
+                                      const SharedPtr<TagReaderClient> tagreader_client,
+                                      const SharedPtr<CollectionBackend> collection_backend,
+                                      const SharedPtr<AlbumCoverLoader> albumcover_loader,
+                                      const SharedPtr<CurrentAlbumCoverLoader> current_albumcover_loader,
+                                      const SharedPtr<CoverProviders> cover_providers,
+                                      const SharedPtr<StreamingServices> streaming_services) {
+
+  network_ = network;
+  tagreader_client_ = tagreader_client;
+  collection_backend_ = collection_backend;
+  current_albumcover_loader_ = current_albumcover_loader;
+  streaming_services_ = streaming_services;
+
+  cover_fetcher_ = new AlbumCoverFetcher(cover_providers, network, this);
+  cover_searcher_ = new AlbumCoverSearcher(QIcon(u":/pictures/cdcase.png"_s), albumcover_loader, this);
+  cover_searcher_->Init(cover_fetcher_);
+
+  QObject::connect(cover_fetcher_, &AlbumCoverFetcher::AlbumCoverFetched, this, &AlbumCoverChoiceController::AlbumCoverFetched);
+
 }
 
-std::vector<std::string> AlbumCoverChoiceController::ImageExtensions() {
-  std::vector<std::string> extensions;
-  for (const std::string &glob : FileFilterConstants::SplitGlobs(FileFilterConstants::kLoadImages)) {
-    if (glob.size() > 2 && glob[0] == '*' && glob[1] == '.') {
-      extensions.push_back(glob.substr(2));
-    }
+void AlbumCoverChoiceController::ReloadSettings() {
+
+  Settings s;
+  s.beginGroup(CoversSettings::kSettingsGroup);
+  cover_options_.cover_type = static_cast<CoverOptions::CoverType>(s.value(CoversSettings::kSaveType, static_cast<int>(CoverOptions::CoverType::Cache)).toInt());
+  cover_options_.cover_filename = static_cast<CoverOptions::CoverFilename>(s.value(CoversSettings::kSaveFilename, static_cast<int>(CoverOptions::CoverFilename::Pattern)).toInt());
+  cover_options_.cover_pattern = s.value(CoversSettings::kSavePattern, QLatin1String(CoversSettings::kDefaultSavePattern)).toString();
+  cover_options_.cover_overwrite = s.value(CoversSettings::kSaveOverwrite, CoversSettings::kDefaultSaveOverwrite).toBool();
+  cover_options_.cover_lowercase = s.value(CoversSettings::kSaveLowercase, CoversSettings::kDefaultSaveLowercase).toBool();
+  cover_options_.cover_replace_spaces = s.value(CoversSettings::kSaveReplaceSpaces, CoversSettings::kDefaultSaveReplaceSpaces).toBool();
+  s.endGroup();
+
+  cover_types_ = AlbumCoverLoaderOptions::LoadTypes();
+
+}
+
+QList<QAction*> AlbumCoverChoiceController::GetAllActions() {
+
+  return QList<QAction*>() << show_cover_
+                           << cover_to_file_
+                           << separator1_
+                           << cover_from_file_
+                           << cover_from_url_
+                           << search_for_cover_
+                           << separator2_
+                           << unset_cover_
+                           << clear_cover_
+                           << delete_cover_;
+
+}
+
+AlbumCoverImageResult AlbumCoverChoiceController::LoadImageFromFile(Song *song) {
+
+  if (!song->url().isValid() || !song->url().isLocalFile()) {
+    return AlbumCoverImageResult();
   }
-  return extensions;
-}
 
-bool AlbumCoverChoiceController::SaveCover(Application *app, Song *song, const std::string &image) {
-  return DialogHelpers::ApplyCover(app, song, image);
-}
+  QString cover_file = QFileDialog::getOpenFileName(this, tr("Load cover from disk"), GetInitialPathForFileDialog(*song, QString()), tr(kLoadImageFileFilter) + u";;"_s + tr(kAllFilesFilterSpec));
+  if (cover_file.isEmpty()) return AlbumCoverImageResult();
 
-bool AlbumCoverChoiceController::SaveCover(Song *song, const std::string &image) {
-  const bool ok = DialogHelpers::ApplyCover(app_, song, image, EffectiveOptions());
-  if (!ok && song) {
-    const std::string path = FileUtils::PathFromUri(song->url());
-    Error.Emit(CoverErrorMessage::CouldNotSaveCover(path.empty() ? song->url() : path));
+  QFile file(cover_file);
+  if (!file.open(QIODevice::ReadOnly)) {
+    qLog(Error) << "Failed to open cover file" << cover_file << "for reading:" << file.errorString();
+    Q_EMIT Error(tr("Failed to open cover file %1 for reading: %2").arg(cover_file, file.errorString()));
+    return AlbumCoverImageResult();
   }
-  return ok;
+  AlbumCoverImageResult result;
+  result.image_data = file.readAll();
+  file.close();
+  if (result.image_data.isEmpty()) {
+    qLog(Error) << "Cover file" << cover_file << "is empty.";
+    Q_EMIT Error(tr("Cover file %1 is empty.").arg(cover_file));
+    return AlbumCoverImageResult();
+  }
+
+  if (result.image.loadFromData(result.image_data)) {
+    result.cover_url = QUrl::fromLocalFile(cover_file);
+    result.mime_type = Utilities::MimeTypeFromData(result.image_data);
+  }
+
+  return result;
+
 }
 
-void AlbumCoverChoiceController::ApplyImage(Song *song, GtkWidget *image, const std::string &data) {
-  if (image && !data.empty()) {
-    DialogHelpers::SetImageFromBytes(image, std::vector<unsigned char>(data.begin(), data.end()), 160);
-  } else if (image) {
-    DialogHelpers::SetImageFromBytes(image, {}, 160);
-  }
-  (void)song;
-}
+QUrl AlbumCoverChoiceController::LoadCoverFromFile(Song *song) {
 
-void AlbumCoverChoiceController::FetchCover(const Song &song, GtkWidget *image, GtkWidget *status, CoverFetchedCallback done) {
-  if (!app_) {
-    if (done) {
-      done(false, song);
-    }
-    return;
-  }
-  ++statistics_.network_requests_made;
-  auto owned = std::make_shared<Song>(song);
-  app_->cover_providers()->Fetch(*owned, [this, owned, image, status, done](const std::string &data, const std::string &) {
-    if (data.empty()) {
-      ++statistics_.missing_images;
-      if (status) gtk_button_set_label(GTK_BUTTON(status), "Failed");
-      if (done) {
-        done(false, *owned);
+  if (!song->url().isValid() || !song->url().isLocalFile() || song->effective_albumartist().isEmpty() || song->album().isEmpty()) return QUrl();
+
+  QString cover_file = QFileDialog::getOpenFileName(this, tr("Load cover from disk"), GetInitialPathForFileDialog(*song, QString()), tr(kLoadImageFileFilter) + u";;"_s + tr(kAllFilesFilterSpec));
+  if (cover_file.isEmpty() || QImage(cover_file).isNull()) return QUrl();
+
+  switch (get_save_album_cover_type()) {
+    case CoverOptions::CoverType::Embedded:
+      if (song->save_embedded_cover_supported()) {
+        SaveCoverEmbeddedToCollectionSongs(*song, cover_file);
+        return QUrl();
       }
+      [[fallthrough]];
+    case CoverOptions::CoverType::Cache:
+    case CoverOptions::CoverType::Album:{
+      const QUrl cover_url = QUrl::fromLocalFile(cover_file);
+      SaveArtManualToSong(song, cover_url);
+      return cover_url;
+    }
+  }
+
+  return QUrl();
+
+}
+
+void AlbumCoverChoiceController::SaveCoverToFileManual(const Song &song, const AlbumCoverImageResult &result) {
+
+  QString initial_file_name = "/"_L1;
+
+  if (!song.effective_albumartist().isEmpty()) {
+    initial_file_name = initial_file_name + song.effective_albumartist();
+  }
+  initial_file_name = initial_file_name + QLatin1Char('-') + (song.effective_album().isEmpty() ? tr("unknown") : song.effective_album()) + ".jpg"_L1;
+  initial_file_name = initial_file_name.toLower();
+  static const QRegularExpression regex_whitespaces(u"\\s"_s);
+  initial_file_name.replace(regex_whitespaces, u"-"_s);
+  static const QRegularExpression regex_invalid_fat_characters(QLatin1String(kInvalidFatCharactersRegex), QRegularExpression::CaseInsensitiveOption);
+  initial_file_name.remove(regex_invalid_fat_characters);
+
+  QString save_filename = QFileDialog::getSaveFileName(this, tr("Save album cover"), GetInitialPathForFileDialog(song, initial_file_name), tr(kSaveImageFileFilter) + u";;"_s + tr(kAllFilesFilterSpec));
+
+  if (save_filename.isEmpty()) return;
+
+  QFileInfo fileinfo(save_filename);
+  if (fileinfo.suffix().isEmpty()) {
+    save_filename.append(".jpg"_L1);
+    fileinfo.setFile(save_filename);
+  }
+
+  if (!QImageWriter::supportedImageFormats().contains(fileinfo.completeSuffix().toUtf8().toLower())) {
+    save_filename = Utilities::PathWithoutFilenameExtension(save_filename) + ".jpg"_L1;
+    fileinfo.setFile(save_filename);
+  }
+
+  if (result.is_jpeg() && fileinfo.completeSuffix().compare("jpg"_L1, Qt::CaseInsensitive) == 0) {
+    QFile file(save_filename);
+    if (!file.open(QIODevice::WriteOnly)) {
+      qLog(Error) << "Failed to open cover file" << save_filename << "for writing:" << file.errorString();
+      Q_EMIT Error(tr("Failed to open cover file %1 for writing: %2").arg(save_filename, file.errorString()));
+      file.close();
       return;
     }
-    statistics_.bytes_transferred += data.size();
-    if (SaveCover(owned.get(), data)) {
-      ++statistics_.chosen_images;
-      ApplyImage(owned.get(), image, data);
-      if (status) gtk_button_set_label(GTK_BUTTON(status), "Saved");
-      if (done) {
-        done(true, *owned);
+    if (file.write(result.image_data) <= 0) {
+      qLog(Error) << "Failed writing cover to file" << save_filename << file.errorString();
+      Q_EMIT Error(tr("Failed writing cover to file %1: %2").arg(save_filename, file.errorString()));
+      file.close();
+      return;
+    }
+    file.close();
+  }
+  else {
+    if (!result.image.save(save_filename)) {
+      qLog(Error) << "Failed writing cover to file" << save_filename;
+      Q_EMIT Error(tr("Failed writing cover to file %1.").arg(save_filename));
+    }
+  }
+
+}
+
+QString AlbumCoverChoiceController::GetInitialPathForFileDialog(const Song &song, const QString &filename) {
+
+  // Art automatic is first to show user which cover the album may be using now;
+  // The song is using it if there's no manual path but we cannot use manual path here because it can contain cached paths
+  if (song.art_automatic_is_valid()) {
+    return song.art_automatic().toLocalFile();
+  }
+
+  // If no automatic art, start in the song's folder
+  if (!song.url().isEmpty() && song.url().isValid() && song.url().isLocalFile() && song.url().toLocalFile().contains(u'/')) {
+    return song.url().toLocalFile().section(u'/', 0, -2) + filename;
+  }
+
+  return QDir::home().absolutePath() + filename;
+
+}
+
+void AlbumCoverChoiceController::LoadCoverFromURL(Song *song) {
+
+  if (!song->url().isValid() || !song->url().isLocalFile() || song->effective_albumartist().isEmpty() || song->album().isEmpty()) return;
+
+  const AlbumCoverImageResult result = LoadImageFromURL();
+  if (!result.image.isNull()) {
+    SaveCoverAutomatic(song, result);
+  }
+
+}
+
+AlbumCoverImageResult AlbumCoverChoiceController::LoadImageFromURL() {
+
+  if (!cover_from_url_dialog_) { cover_from_url_dialog_ = new CoverFromURLDialog(network_, this); }
+
+  return cover_from_url_dialog_->Exec();
+
+}
+
+void AlbumCoverChoiceController::SearchForCover(Song *song) {
+
+  if (!song->url().isValid() || !song->url().isLocalFile() || song->effective_albumartist().isEmpty() || song->album().isEmpty()) return;
+
+  // Get something sensible to stick in the search box
+  AlbumCoverImageResult result = SearchForImage(song);
+  if (result.is_valid()) {
+    SaveCoverAutomatic(song, result);
+  }
+
+}
+
+AlbumCoverImageResult AlbumCoverChoiceController::SearchForImage(Song *song) {
+
+  if (!song->url().isValid() || !song->url().isLocalFile() || song->effective_albumartist().isEmpty() || song->album().isEmpty()) return AlbumCoverImageResult();
+
+  QString album = song->effective_album();
+  album = Song::AlbumRemoveDiscMisc(album);
+
+  // Get something sensible to stick in the search box
+  return cover_searcher_->Exec(song->effective_albumartist(), album);
+
+}
+
+void AlbumCoverChoiceController::UnsetCover(Song *song) {
+
+  if (!song->url().isValid() || !song->url().isLocalFile() || song->effective_albumartist().isEmpty() || song->album().isEmpty()) return;
+
+  UnsetAlbumCoverForSong(song);
+
+}
+
+void AlbumCoverChoiceController::ClearCover(Song *song) {
+
+  if (!song->url().isValid() || !song->url().isLocalFile() || song->effective_albumartist().isEmpty() || song->album().isEmpty()) return;
+
+  ClearAlbumCoverForSong(song);
+
+}
+
+bool AlbumCoverChoiceController::DeleteCover(Song *song, const bool unset) {
+
+  if (!song->url().isValid() || !song->url().isLocalFile() || song->effective_albumartist().isEmpty() || song->album().isEmpty()) return false;
+
+  if (song->art_embedded() && song->save_embedded_cover_supported()) {
+    SaveCoverEmbeddedToCollectionSongs(*song, AlbumCoverImageResult());
+  }
+
+  bool success = true;
+
+  if (song->art_automatic().isValid() && song->art_automatic().isLocalFile()) {
+    const QString art_automatic = song->art_automatic().toLocalFile();
+    QFile file(art_automatic);
+    if (file.exists()) {
+      if (file.remove()) {
+        song->clear_art_automatic();
       }
-    } else {
-      if (status) {
-        gtk_button_set_label(GTK_BUTTON(status), "Failed");
+      else {
+        success = false;
+        qLog(Error) << "Failed to delete cover file" << art_automatic << file.errorString();
+        Q_EMIT Error(tr("Failed to delete cover file %1: %2").arg(art_automatic, file.errorString()));
       }
-      if (done) {
-        done(false, *owned);
+    }
+    else song->clear_art_automatic();
+  }
+  else song->clear_art_automatic();
+
+  if (song->art_manual().isValid() && song->art_manual().isLocalFile()) {
+    const QString art_manual = song->art_manual().toLocalFile();
+    QFile file(art_manual);
+    if (file.exists()) {
+      if (file.remove()) {
+        song->clear_art_manual();
       }
+      else {
+        success = false;
+        qLog(Error) << "Failed to delete cover file" << art_manual << file.errorString();
+        Q_EMIT Error(tr("Failed to delete cover file %1: %2").arg(art_manual, file.errorString()));
+      }
+    }
+    else song->clear_art_manual();
+  }
+  else song->clear_art_manual();
+
+  if (success) {
+    if (unset) UnsetCover(song);
+    else ClearCover(song);
+  }
+
+  return success;
+
+}
+
+void AlbumCoverChoiceController::ShowCover(const Song &song, const QImage &image) {
+
+  if (!image.isNull()) {
+    QPixmap pixmap = QPixmap::fromImage(image);
+    if (!pixmap.isNull()) {
+      pixmap.setDevicePixelRatio(devicePixelRatioF());
+      ShowCover(song, pixmap);
+      return;
+    }
+  }
+
+  for (const AlbumCoverLoaderOptions::Type type : std::as_const(cover_types_)) {
+    switch (type) {
+      case AlbumCoverLoaderOptions::Type::Unset:{
+        if (song.art_unset()) {
+          return;
+        }
+        break;
+      }
+      case AlbumCoverLoaderOptions::Type::Manual:{
+        QPixmap pixmap;
+        if (song.art_manual_is_valid() && song.art_manual().isLocalFile() && pixmap.load(song.art_manual().toLocalFile())) {
+          pixmap.setDevicePixelRatio(devicePixelRatioF());
+          ShowCover(song, pixmap);
+          return;
+        }
+        break;
+      }
+      case AlbumCoverLoaderOptions::Type::Embedded:{
+        if (song.art_embedded() && !song.url().isEmpty() && song.url().isValid() && song.url().isLocalFile()) {
+          QImage image_embedded_cover;
+          const TagReaderResult result = tagreader_client_->LoadCoverImageBlocking(song.url().toLocalFile(), image_embedded_cover);
+          if (result.success() && !image_embedded_cover.isNull()) {
+            QPixmap pixmap = QPixmap::fromImage(image_embedded_cover);
+            if (!pixmap.isNull()) {
+              pixmap.setDevicePixelRatio(devicePixelRatioF());
+              ShowCover(song, pixmap);
+              return;
+            }
+          }
+        }
+        break;
+      }
+      case AlbumCoverLoaderOptions::Type::Automatic:{
+        QPixmap pixmap;
+        if (song.art_automatic_is_valid() && song.art_automatic().isLocalFile() && pixmap.load(song.art_automatic().toLocalFile())) {
+          pixmap.setDevicePixelRatio(devicePixelRatioF());
+          ShowCover(song, pixmap);
+          return;
+        }
+        break;
+      }
+    }
+  }
+
+}
+
+void AlbumCoverChoiceController::ShowCover(const Song &song, const QPixmap &pixmap) {
+
+  QDialog *dialog = new QDialog(this);
+  dialog->setAttribute(Qt::WA_DeleteOnClose, true);
+
+  // Use Artist - Album as the window title
+  QString title_text(song.effective_albumartist());
+  if (!song.effective_album().isEmpty()) title_text += " - "_L1 + song.effective_album();
+
+  QLabel *label = new QLabel(dialog);
+  label->setPixmap(pixmap);
+
+  // Add (WxHpx) to the title before possibly resizing
+  title_text += QLatin1String(" (") + QString::number(pixmap.width()) + QLatin1Char('x') + QString::number(pixmap.height()) + "px)"_L1;
+
+  // If the cover is larger than the screen, resize the window 85% seems to be enough to account for title bar and taskbar etc.
+  QScreen *screen = Utilities::GetScreen(this);
+  QRect screenGeometry = screen->availableGeometry();
+  int desktop_height = screenGeometry.height();
+  int desktop_width = screenGeometry.width();
+
+  // Resize differently if monitor is in portrait mode
+  if (desktop_width < desktop_height) {
+    const int new_width = static_cast<int>(static_cast<double>(desktop_width) * 0.95);
+    if (new_width < pixmap.width()) {
+      label->setPixmap(pixmap.scaledToWidth(static_cast<int>(new_width * pixmap.devicePixelRatioF()), Qt::SmoothTransformation));
+    }
+  }
+  else {
+    const int new_height = static_cast<int>(static_cast<double>(desktop_height) * 0.85);
+    if (new_height < pixmap.height()) {
+      label->setPixmap(pixmap.scaledToHeight(static_cast<int>(new_height * pixmap.devicePixelRatioF()), Qt::SmoothTransformation));
+    }
+  }
+
+  dialog->setWindowTitle(title_text);
+  dialog->setFixedSize(label->pixmap(Qt::ReturnByValue).size() / pixmap.devicePixelRatioF());
+  dialog->show();
+
+}
+
+quint64 AlbumCoverChoiceController::SearchCoverAutomatically(const Song &song) {
+
+  quint64 id = cover_fetcher_->FetchAlbumCover(song.effective_albumartist(), song.album(), song.title(), true);
+
+  cover_fetching_tasks_.insert(id, song);
+
+  return id;
+
+}
+
+void AlbumCoverChoiceController::AlbumCoverFetched(const quint64 id, const AlbumCoverImageResult &result, const CoverSearchStatistics &statistics) {
+
+  Q_UNUSED(statistics);
+
+  Song song;
+  if (cover_fetching_tasks_.contains(id)) {
+    song = cover_fetching_tasks_.take(id);
+  }
+
+  if (result.is_valid()) {
+    SaveCoverAutomatic(&song, result);
+  }
+
+  Q_EMIT AutomaticCoverSearchDone();
+
+}
+
+void AlbumCoverChoiceController::SaveArtEmbeddedToSong(Song *song, const bool art_embedded) {
+
+  if (!song->is_valid()) return;
+
+  song->set_art_embedded(art_embedded);
+  song->set_art_unset(false);
+
+  if (song->source() == Song::Source::Collection) {
+    collection_backend_->UpdateEmbeddedAlbumArtAsync(song->effective_albumartist(), song->album(), art_embedded);
+  }
+
+  if (*song == current_albumcover_loader_->last_song()) {
+    current_albumcover_loader_->LoadAlbumCover(*song);
+  }
+
+}
+
+void AlbumCoverChoiceController::SaveArtManualToSong(Song *song, const QUrl &art_manual) {
+
+  if (!song->is_valid()) return;
+
+  song->set_art_manual(art_manual);
+  song->set_art_unset(false);
+
+  // Update the backends.
+  switch (song->source()) {
+    case Song::Source::Collection:
+      collection_backend_->UpdateManualAlbumArtAsync(song->effective_albumartist(), song->album(), art_manual);
+      break;
+    case Song::Source::LocalFile:
+    case Song::Source::CDDA:
+    case Song::Source::Device:
+    case Song::Source::Stream:
+    case Song::Source::RadioParadise:
+    case Song::Source::SomaFM:
+    case Song::Source::RadioBrowser:
+    case Song::Source::Unknown:
+      break;
+    case Song::Source::Subsonic:
+    case Song::Source::Tidal:
+    case Song::Source::Spotify:
+    case Song::Source::Qobuz:
+      StreamingServicePtr service = streaming_services_->ServiceBySource(song->source());
+      if (!service) break;
+      if (service->artists_collection_backend()) {
+        service->artists_collection_backend()->UpdateManualAlbumArtAsync(song->effective_albumartist(), song->album(), art_manual);
+      }
+      if (service->albums_collection_backend()) {
+        service->albums_collection_backend()->UpdateManualAlbumArtAsync(song->effective_albumartist(), song->album(), art_manual);
+      }
+      if (service->songs_collection_backend()) {
+        service->songs_collection_backend()->UpdateManualAlbumArtAsync(song->effective_albumartist(), song->album(), art_manual);
+      }
+      break;
+  }
+
+  if (*song == current_albumcover_loader_->last_song()) {
+    current_albumcover_loader_->LoadAlbumCover(*song);
+  }
+
+}
+
+void AlbumCoverChoiceController::ClearAlbumCoverForSong(Song *song) {
+
+  if (!song->is_valid()) return;
+
+  song->set_art_unset(false);
+  song->set_art_embedded(false);
+  song->clear_art_automatic();
+  song->clear_art_manual();
+
+  if (song->source() == Song::Source::Collection) {
+    collection_backend_->ClearAlbumArtAsync(song->effective_albumartist(), song->album(), false);
+  }
+
+  if (*song == current_albumcover_loader_->last_song()) {
+    current_albumcover_loader_->LoadAlbumCover(*song);
+  }
+
+}
+
+void AlbumCoverChoiceController::UnsetAlbumCoverForSong(Song *song) {
+
+  if (!song->is_valid()) return;
+
+  song->set_art_unset(true);
+  song->set_art_embedded(false);
+  song->clear_art_manual();
+  song->clear_art_automatic();
+
+  if (song->source() == Song::Source::Collection) {
+    collection_backend_->UnsetAlbumArtAsync(song->effective_albumartist(), song->album());
+  }
+
+  if (*song == current_albumcover_loader_->last_song()) {
+    current_albumcover_loader_->LoadAlbumCover(*song);
+  }
+
+}
+
+QUrl AlbumCoverChoiceController::SaveCoverToFileAutomatic(const Song *song, const AlbumCoverImageResult &result, const bool force_overwrite) {
+
+  return SaveCoverToFileAutomatic(song->source(),
+                                  song->effective_albumartist(),
+                                  song->effective_album(),
+                                  song->album_id(),
+                                  QFileInfo(song->url().toLocalFile()).path(),
+                                  result,
+                                  force_overwrite);
+
+}
+
+QUrl AlbumCoverChoiceController::SaveCoverToFileAutomatic(const Song::Source source,
+                                                          const QString &artist,
+                                                          const QString &album,
+                                                          const QString &album_id,
+                                                          const QString &album_dir,
+                                                          const AlbumCoverImageResult &result,
+                                                          const bool force_overwrite) {
+
+  QString filepath = CoverUtils::CoverFilePath(cover_options_, source, artist, album, album_id, album_dir, result.cover_url, u"jpg"_s);
+  if (filepath.isEmpty()) return QUrl();
+
+  QFile file(filepath);
+  // Don't overwrite when saving in album dir if the filename is set to pattern unless "force_overwrite" is set.
+  if (source == Song::Source::Collection && !cover_options_.cover_overwrite && !force_overwrite && get_save_album_cover_type() == CoverOptions::CoverType::Album && cover_options_.cover_filename == CoverOptions::CoverFilename::Pattern && file.exists()) {
+    while (file.exists()) {
+      QFileInfo fileinfo(file.fileName());
+      file.setFileName(fileinfo.path() + "/0"_L1 + fileinfo.fileName());
+    }
+    filepath = file.fileName();
+  }
+
+  if (!result.image_data.isEmpty() && result.is_jpeg()) {
+    if (file.open(QIODevice::WriteOnly)) {
+      if (file.write(result.image_data) > 0) {
+        file.close();
+        return QUrl::fromLocalFile(filepath);
+      }
+      else {
+        qLog(Error) << "Failed to write cover to file" << file.fileName() << file.errorString();
+        Q_EMIT Error(tr("Failed to write cover to file %1: %2").arg(file.fileName(), file.errorString()));
+      }
+      file.close();
+    }
+    else {
+      qLog(Error) << "Failed to open cover file" << file.fileName() << "for writing:" << file.errorString();
+      Q_EMIT Error(tr("Failed to open cover file %1 for writing: %2").arg(file.fileName(), file.errorString()));
+    }
+  }
+  else {
+    if (result.image.save(filepath, "JPG")) {
+      return QUrl::fromLocalFile(filepath);
+    }
+  }
+
+  return QUrl();
+
+}
+
+void AlbumCoverChoiceController::SaveCoverEmbeddedToCollectionSongs(const Song &song, const AlbumCoverImageResult &result) {
+
+  SaveCoverEmbeddedToCollectionSongs(song, QString(), result.image_data, result.mime_type);
+
+}
+
+void AlbumCoverChoiceController::SaveCoverEmbeddedToCollectionSongs(const Song &song, const QString &cover_filename, const QByteArray &image_data, const QString &mime_type) {
+
+  if (song.source() == Song::Source::Collection) {
+    SaveCoverEmbeddedToCollectionSongs(song.effective_albumartist(), song.effective_album(), cover_filename, image_data, mime_type);
+  }
+  else {
+    SaveCoverEmbeddedToSong(song, cover_filename, image_data, mime_type);
+  }
+
+}
+
+void AlbumCoverChoiceController::SaveCoverEmbeddedToCollectionSongs(const QString &effective_albumartist, const QString &effective_album, const QString &cover_filename, const QByteArray &image_data, const QString &mime_type) {
+
+  QFuture<SongList> future = QtConcurrent::run(&CollectionBackend::GetAlbumSongs, collection_backend_, effective_albumartist, effective_album, CollectionFilterOptions());
+  QFutureWatcher<SongList> *watcher = new QFutureWatcher<SongList>(this);
+  QObject::connect(watcher, &QFutureWatcher<SongList>::finished, this, [this, watcher, cover_filename, image_data, mime_type]() {
+    const SongList collection_songs = watcher->result();
+    watcher->deleteLater();
+    for (const Song &collection_song : collection_songs) {
+      SaveCoverEmbeddedToSong(collection_song, cover_filename, image_data, mime_type);
     }
   });
+  watcher->setFuture(future);
+
 }
 
-void AlbumCoverChoiceController::SearchForCover(GtkWindow *parent) { SearchForCover(parent, Song(), {}); }
+void AlbumCoverChoiceController::SaveCoverEmbeddedToSong(const Song &song, const QString &cover_filename, const QByteArray &image_data, const QString &mime_type) {
 
-void AlbumCoverChoiceController::SearchForCover(GtkWindow *parent, const Song &song, std::function<void(bool)> done) {
-  if (app_) {
-    AlbumCoverSearcher::Show(parent, app_, song, std::move(done));
-  }
+  QMutexLocker l(&mutex_cover_save_tasks_);
+  cover_save_tasks_.append(song);
+  const bool art_embedded = !image_data.isNull();
+  TagReaderReplyPtr reply = tagreader_client_->SaveCoverAsync(song.url().toLocalFile(), SaveTagCoverData(cover_filename, image_data, mime_type));
+  SharedPtr<QMetaObject::Connection> connection = make_shared<QMetaObject::Connection>();
+  *connection = QObject::connect(&*reply, &TagReaderReply::Finished, this, [this, reply, song, art_embedded, connection]() {
+    SaveEmbeddedCoverFinished(reply, song, art_embedded);
+    QObject::disconnect(*connection);
+  });
+
 }
 
-void AlbumCoverChoiceController::UnsetCover(Song *song, GtkWidget *image) {
-  if (!app_ || !song) {
-    return;
-  }
-  song->set_art_unset(true);
-  song->set_art_manual({});
-  song->set_art_automatic({});
-  song->set_art_embedded(false);
-  if (CollectionAlbumArt::ShouldPropagate(song->source()) && CollectionAlbumArt::AlbumKeyValid(*song)) {
-    app_->collection()->backend()->UnsetAlbumArt(song->EffectiveAlbumartist(), song->album());
-  } else if (song->id() > 0) {
-    app_->collection()->backend()->AddOrUpdateSong(*song);
-  }
-  ApplyImage(song, image, {});
+bool AlbumCoverChoiceController::IsKnownImageExtension(const QString &suffix) {
+
+  static const QSet<QString> extensions = {u"png"_s, u"jpg"_s, u"jpeg"_s, u"bmp"_s, u"gif"_s, u"xpm"_s, u"pbm"_s, u"pgm"_s, u"ppm"_s, u"xbm"_s};
+
+  return extensions.contains(suffix);
+
 }
 
-void AlbumCoverChoiceController::ClearCover(Song *song, GtkWidget *image) {
-  if (!app_ || !song) {
-    return;
+bool AlbumCoverChoiceController::CanAcceptDrag(const QDragEnterEvent *e) {
+
+  const QList<QUrl> urls = e->mimeData()->urls();
+  for (const QUrl &url : urls) {
+    const QString suffix = QFileInfo(url.toLocalFile()).suffix().toLower();
+    if (IsKnownImageExtension(suffix)) return true;
   }
-  song->set_art_manual({});
-  song->set_art_automatic({});
-  song->set_art_unset(false);
-  if (CollectionAlbumArt::ShouldPropagate(song->source()) && CollectionAlbumArt::AlbumKeyValid(*song)) {
-    app_->collection()->backend()->ClearAlbumArt(song->EffectiveAlbumartist(), song->album(), false);
-  } else if (song->id() > 0) {
-    app_->collection()->backend()->AddOrUpdateSong(*song);
-  }
-  const auto data = app_->albumcover_loader()->LoadData(*song);
-  ApplyImage(song, image, std::string(data.begin(), data.end()));
+  return e->mimeData()->hasImage();
+
 }
 
-void AlbumCoverChoiceController::DeleteCover(Song *song, GtkWidget *image) {
-  if (!app_ || !song) {
-    return;
-  }
-  const std::string path = FileUtils::PathFromUri(song->url());
-  if (!path.empty() && FileUtils::Exists(path)) {
-    app_->tagreader()->ClearCover(path);
-  }
-  const std::string dir = FileUtils::DirName(path);
-  for (const char *name : {"cover.jpg", "cover.png", "folder.jpg", "front.jpg", "album.jpg"}) {
-    FileUtils::Remove(FileUtils::Join(dir, name));
-  }
-  if (!song->art_manual().empty()) {
-    const std::string art = FileUtils::PathFromUri(song->art_manual());
-    if (FileUtils::Exists(art) && !FileUtils::Remove(art)) {
-      Error.Emit(CoverErrorMessage::FailedToDeleteCover(art, {}));
-    }
-  }
-  if (!song->art_automatic().empty()) {
-    const std::string art = FileUtils::PathFromUri(song->art_automatic());
-    if (FileUtils::Exists(art) && !FileUtils::Remove(art)) {
-      Error.Emit(CoverErrorMessage::FailedToDeleteCover(art, {}));
-    }
-  }
-  song->set_art_manual({});
-  song->set_art_automatic({});
-  song->set_art_embedded(false);
-  song->set_art_unset(false);
-  if (CollectionAlbumArt::ShouldPropagate(song->source()) && CollectionAlbumArt::AlbumKeyValid(*song)) {
-    app_->collection()->backend()->ClearAlbumArt(song->EffectiveAlbumartist(), song->album(), false);
-  } else if (song->id() > 0) {
-    app_->collection()->backend()->AddOrUpdateSong(*song);
-  }
-  ApplyImage(song, image, {});
-}
+void AlbumCoverChoiceController::SaveCover(Song *song, const QDropEvent *e) {
 
-void AlbumCoverChoiceController::SaveCoverToFile(GtkWindow *parent, const Song &song) {
-  if (!app_) {
-    return;
-  }
-  const auto data = app_->albumcover_loader()->LoadData(song);
-  if (data.empty()) {
-    return;
-  }
-  GtkFileDialog *dialog = gtk_file_dialog_new();
-  gtk_file_dialog_set_title(dialog, "Save cover image");
-  gtk_file_dialog_set_initial_name(dialog, "cover.jpg");
-  FileFilters::Apply(dialog, FileFilters::ImageFilters(true));
-  auto *state = new CoverSaveFileState{this, new std::string(data.begin(), data.end())};
-  gtk_file_dialog_save(dialog, parent, nullptr, +[](GObject *source, GAsyncResult *result, gpointer data) {
-    auto *pair = static_cast<CoverSaveFileState *>(data);
-    GError *error = nullptr;
-    GFile *file = gtk_file_dialog_save_finish(GTK_FILE_DIALOG(source), result, &error);
-    if (file) {
-      gchar *path = g_file_get_path(file);
-      if (path) {
-        if (pair->bytes && !FileUtils::WriteFile(path, *pair->bytes) && pair->controller) {
-          pair->controller->Error.Emit(CoverErrorMessage::FailedWritingCover(path, {}));
-        }
-        g_free(path);
+  const QList<QUrl> urls = e->mimeData()->urls();
+  for (const QUrl &url : urls) {
+
+    const QString filename = url.toLocalFile();
+    const QString suffix = QFileInfo(filename).suffix().toLower();
+
+    if (IsKnownImageExtension(suffix)) {
+      if (get_save_album_cover_type() == CoverOptions::CoverType::Embedded && song->save_embedded_cover_supported()) {
+        SaveCoverEmbeddedToCollectionSongs(*song, filename);
       }
-      g_object_unref(file);
-    }
-    if (error) {
-      if (pair->controller) {
-        pair->controller->Error.Emit(CoverErrorMessage::FailedToOpenForWriting({}, error->message ? error->message : ""));
+      else {
+        SaveArtManualToSong(song, url);
       }
-      g_error_free(error);
-    }
-    delete pair->bytes;
-    delete pair;
-    g_object_unref(source);
-  }, state);
-}
-
-void AlbumCoverChoiceController::ShowCover(GtkWindow *parent, const Song &song) {
-  if (!app_) {
-    return;
-  }
-  const auto data = app_->albumcover_loader()->LoadData(song);
-  AdwDialog *dialog = adw_dialog_new();
-  adw_dialog_set_title(dialog, song.PrettyTitleWithArtist().c_str());
-  adw_dialog_set_content_width(dialog, 520);
-  adw_dialog_set_content_height(dialog, 560);
-  GtkWidget *image = gtk_image_new();
-  gtk_widget_set_hexpand(image, TRUE);
-  gtk_widget_set_vexpand(image, TRUE);
-  DialogHelpers::SetImageFromBytes(image, data, 480);
-  adw_dialog_set_child(dialog, image);
-  adw_dialog_present(dialog, GTK_WIDGET(parent));
-}
-
-void AlbumCoverChoiceController::SearchCoverAutomatically(Song *song, GtkWidget *image) {
-  if (!app_ || !song) {
-    return;
-  }
-  Settings settings;
-  settings.BeginGroup(CoversSettings::kSettingsGroup);
-  const bool covers_automatic = settings.BoolValue(CoversSettings::kAutomaticSearch, CoversSettings::kDefaultAutomaticSearch);
-  if (!ContextCover::ShouldSearchForSong(ContextCover::LoadEnabled(settings), covers_automatic, song->art_unset(), song->art_embedded(),
-                                         song->art_automatic(), song->art_manual(), song->EffectiveAlbumartist(),
-                                         ContextCover::EffectiveAlbum(song->album(), song->title()))) {
-    return;
-  }
-  if (!app_->albumcover_loader()->LoadData(*song).empty()) {
-    return;
-  }
-  FetchCover(*song, image, nullptr);
-}
-
-void AlbumCoverChoiceController::Perform(CoverChoiceMenu::Action action, GtkWindow *parent, Song *song, GtkWidget *image) {
-  switch (action) {
-    case CoverChoiceMenu::Action::Show:
-      if (song) {
-        ShowCover(parent, *song);
-      }
-      break;
-    case CoverChoiceMenu::Action::Search:
-      SearchForCover(parent, song ? *song : Song());
-      break;
-    case CoverChoiceMenu::Action::File:
-      LoadCoverFromFile(parent, song, image);
-      break;
-    case CoverChoiceMenu::Action::Url:
-      LoadCoverFromURL(parent, song, image);
-      break;
-    case CoverChoiceMenu::Action::Save:
-      if (song) {
-        SaveCoverToFile(parent, *song);
-      }
-      break;
-    case CoverChoiceMenu::Action::Fetch:
-      if (song) {
-        FetchCover(*song, image, nullptr);
-      }
-      break;
-    case CoverChoiceMenu::Action::Unset:
-      UnsetCover(song, image);
-      break;
-    case CoverChoiceMenu::Action::Clear:
-      ClearCover(song, image);
-      break;
-    case CoverChoiceMenu::Action::Delete:
-      DeleteCover(song, image);
-      break;
-  }
-}
-
-void AlbumCoverChoiceController::PopupAttachedMenu(GtkWidget *widget, GtkWindow *parent) {
-  if (!widget) {
-    return;
-  }
-  auto *fn = static_cast<std::function<Song()> *>(g_object_get_data(G_OBJECT(widget), "cover-song-fn"));
-  if (!fn) {
-    return;
-  }
-  Song song = (*fn)();
-  auto *has_cover = static_cast<std::function<bool()> *>(g_object_get_data(G_OBJECT(widget), "cover-has-cover-fn"));
-  if (has_cover) {
-    if (!CoverChoiceMenu::ShouldShowContextAlbumMenu(song.is_valid(), !song.url().empty(), (*has_cover)())) {
       return;
     }
-  } else if (!CoverChoiceMenu::ShouldShowAttachedMenu(song.is_valid(), !song.url().empty())) {
-    return;
   }
-  auto *owned = new Song(song);
-  const bool has_providers = app_ && app_->cover_providers() && !app_->cover_providers()->All().empty();
-  GMenu *menu = g_menu_new();
-  for (const CoverChoiceMenu::Item &item : CoverChoiceMenu::Items()) {
-    g_menu_append(menu, Translations::CStr(item.label), CoverChoiceMenu::ActionPath("cover", item.id).c_str());
-  }
-  g_menu_append(menu, Translations::CStr(CoverChoiceMenu::SearchAutomaticallyLabel()), CoverChoiceMenu::SearchAutomaticallyPath("cover").c_str());
-  GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
-  gtk_widget_set_parent(popover, widget);
-  GSimpleActionGroup *group = g_simple_action_group_new();
-  auto add = [&](const char *name) {
-    GSimpleAction *action = g_simple_action_new(name, nullptr);
-    g_simple_action_set_enabled(action, CoverActionEnable::Enabled(CoverChoiceMenu::FromId(name), song, has_providers) ? TRUE : FALSE);
-    g_object_set_data(G_OBJECT(action), "song", owned);
-    g_object_set_data(G_OBJECT(action), "parent", parent);
-    g_signal_connect(action, "activate", G_CALLBACK(+[](GSimpleAction *act, GVariant *, gpointer controller) {
-                       auto *self = static_cast<AlbumCoverChoiceController *>(controller);
-                       auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(act), "song"));
-                       auto *parent = GTK_WINDOW(g_object_get_data(G_OBJECT(act), "parent"));
-                       const char *name = g_action_get_name(G_ACTION(act));
-                       if (!name) {
-                         return;
-                       }
-                       self->Perform(CoverChoiceMenu::FromId(name), parent, song, nullptr);
-                     }),
-                     this);
-    g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(action));
-  };
-  for (const CoverChoiceMenu::Item &item : CoverChoiceMenu::Items()) {
-    add(item.id);
-  }
-  Settings auto_settings;
-  GSimpleAction *auto_action = g_simple_action_new_stateful(CoverChoiceMenu::SearchAutomaticallyId(), nullptr,
-                                                           g_variant_new_boolean(ContextCover::LoadEnabled(auto_settings)));
-  g_signal_connect(auto_action, "activate", G_CALLBACK(+[](GSimpleAction *act, GVariant *, gpointer controller) {
-                     auto *self = static_cast<AlbumCoverChoiceController *>(controller);
-                     Settings settings;
-                     const bool enabled = ContextCover::ToggleEnabled(settings);
-                     g_simple_action_set_state(act, g_variant_new_boolean(enabled));
-                     if (self->search_auto_changed_) {
-                       self->search_auto_changed_(enabled);
-                     }
-                   }),
-                   this);
-  g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(auto_action));
-  gtk_widget_insert_action_group(popover, "cover", G_ACTION_GROUP(group));
-  g_object_set_data_full(G_OBJECT(popover), "song", owned, [](gpointer p) { delete static_cast<Song *>(p); });
-  gtk_popover_popup(GTK_POPOVER(popover));
-}
 
-gboolean AlbumCoverChoiceController::OnAttachedKey(GtkWidget *widget, guint keyval, GdkModifierType state) {
-  if (!CoverChoiceMenu::IsKeyboardTrigger(keyval, static_cast<unsigned>(state))) {
-    return FALSE;
-  }
-  auto *parent = widget ? GTK_WINDOW(g_object_get_data(G_OBJECT(widget), "cover-parent")) : nullptr;
-  PopupAttachedMenu(widget, parent);
-  return TRUE;
-}
-
-void AlbumCoverChoiceController::AttachMenu(GtkWidget *widget, GtkWindow *parent, const std::function<Song()> &song_for_menu,
-                                           const std::function<bool()> &has_cover) {
-  if (!widget) {
-    return;
-  }
-  auto *holder = new std::function<Song()>(song_for_menu);
-  g_object_set_data_full(G_OBJECT(widget), "cover-song-fn", holder, [](gpointer p) { delete static_cast<std::function<Song()> *>(p); });
-  if (has_cover) {
-    auto *cover = new std::function<bool()>(has_cover);
-    g_object_set_data_full(G_OBJECT(widget), "cover-has-cover-fn", cover, [](gpointer p) { delete static_cast<std::function<bool()> *>(p); });
-  }
-  g_object_set_data(G_OBJECT(widget), "cover-parent", parent);
-  gtk_widget_set_focusable(widget, TRUE);
-  GtkGesture *gesture = gtk_gesture_click_new();
-  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gesture), GDK_BUTTON_SECONDARY);
-  gtk_widget_add_controller(widget, GTK_EVENT_CONTROLLER(gesture));
-  g_signal_connect(gesture, "pressed", G_CALLBACK((+[](GtkGestureClick *click, gint, gdouble, gdouble, gpointer data) {
-                     auto *self = static_cast<AlbumCoverChoiceController *>(data);
-                     GtkWidget *widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(click));
-                     auto *parent = widget ? GTK_WINDOW(g_object_get_data(G_OBJECT(widget), "cover-parent")) : nullptr;
-                     self->PopupAttachedMenu(widget, parent);
-                   })),
-                   this);
-  GtkEventController *keys = gtk_event_controller_key_new();
-  gtk_widget_add_controller(widget, keys);
-  g_signal_connect(keys, "key-pressed",
-                   G_CALLBACK((+[](GtkEventControllerKey *controller, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
-                     GtkWidget *widget = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(controller));
-                     return static_cast<AlbumCoverChoiceController *>(data)->OnAttachedKey(widget, keyval, state);
-                   })),
-                   this);
-}
-
-void AlbumCoverChoiceController::LoadCoverFromURL(GtkWindow *parent, Song *song, GtkWidget *image) {
-  if (!app_ || !song) {
-    return;
-  }
-  AdwAlertDialog *dialog = ADW_ALERT_DIALOG(adw_alert_dialog_new("Cover from URL", "Download artwork for this album."));
-  GtkWidget *entry = gtk_entry_new();
-  gtk_entry_set_placeholder_text(GTK_ENTRY(entry), "https://");
-  adw_alert_dialog_set_extra_child(dialog, entry);
-  adw_alert_dialog_add_responses(dialog, "cancel", "Cancel", "fetch", "Download", nullptr);
-  adw_alert_dialog_set_default_response(dialog, "fetch");
-  adw_alert_dialog_set_close_response(dialog, "cancel");
-  g_object_set_data(G_OBJECT(dialog), "entry", entry);
-  g_object_set_data(G_OBJECT(dialog), "song", song);
-  g_object_set_data(G_OBJECT(dialog), "image", image);
-  g_signal_connect(dialog, "response", G_CALLBACK(+[](AdwAlertDialog *alert, const char *response, gpointer data) {
-                     if (g_strcmp0(response, "fetch") != 0) {
-                       return;
-                     }
-                     auto *self = static_cast<AlbumCoverChoiceController *>(data);
-                     const char *url = gtk_editable_get_text(GTK_EDITABLE(g_object_get_data(G_OBJECT(alert), "entry")));
-                     auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(alert), "song"));
-                     GtkWidget *image = GTK_WIDGET(g_object_get_data(G_OBJECT(alert), "image"));
-                     if (!url || !*url || !song) {
-                       return;
-                     }
-                     ++self->statistics_.network_requests_made;
-                     self->app_->network()->Get(url, [self, song, image](const NetworkAccessManager::Response &result) {
-                       if (result.ok() && JsonUtils::LooksLikeImage(result.body)) {
-                         self->statistics_.bytes_transferred += result.body.size();
-                         if (self->SaveCover(song, result.body)) {
-                           ++self->statistics_.chosen_images;
-                           self->ApplyImage(song, image, result.body);
-                         }
-                       } else {
-                         ++self->statistics_.missing_images;
-                       }
-                     });
-                   }),
-                   this);
-  adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(parent));
-}
-
-void AlbumCoverChoiceController::LoadCoverFromFile(GtkWindow *parent, Song *song, GtkWidget *image) {
-  if (!app_ || !song) {
-    return;
-  }
-  GtkFileDialog *dialog = gtk_file_dialog_new();
-  gtk_file_dialog_set_title(dialog, "Choose cover image");
-  FileFilters::Apply(dialog, FileFilters::ImageFilters(false));
-  auto *state = new CoverOpenFileState{this, song, image};
-  gtk_file_dialog_open(dialog, parent, nullptr, +[](GObject *source, GAsyncResult *result, gpointer data) {
-    auto *pair = static_cast<CoverOpenFileState *>(data);
-    GError *error = nullptr;
-    GFile *file = gtk_file_dialog_open_finish(GTK_FILE_DIALOG(source), result, &error);
-    if (file) {
-      gchar *path = g_file_get_path(file);
-      if (path) {
-        const std::string bytes = FileUtils::ReadFile(path);
-        if (bytes.empty() && pair->controller) {
-          pair->controller->Error.Emit(CoverErrorMessage::CoverFileEmpty(path));
-        } else if (!bytes.empty() && pair->controller->SaveCover(pair->song, bytes)) {
-          ++pair->controller->statistics_.chosen_images;
-          pair->controller->ApplyImage(pair->song, pair->image, bytes);
-        }
-        g_free(path);
-      }
-      g_object_unref(file);
+  if (e->mimeData()->hasImage()) {
+    QImage image = qvariant_cast<QImage>(e->mimeData()->imageData());
+    if (!image.isNull()) {
+      SaveCoverAutomatic(song, AlbumCoverImageResult(image));
     }
-    if (error) {
-      if (pair->controller) {
-        pair->controller->Error.Emit(CoverErrorMessage::FailedToOpenForReading({}, error->message ? error->message : ""));
-      }
-      g_error_free(error);
-    }
-    delete pair;
-    g_object_unref(source);
-  }, state);
+  }
+
 }
 
-void AlbumCoverChoiceController::ShowStatistics(GtkWindow *parent) {
-  CoverSearchStatisticsDialog::Show(parent, statistics_);
+QUrl AlbumCoverChoiceController::SaveCoverAutomatic(Song *song, const AlbumCoverImageResult &result) {
+
+  QUrl cover_url;
+  switch (get_save_album_cover_type()) {
+    case CoverOptions::CoverType::Embedded:{
+      if (song->save_embedded_cover_supported()) {
+        SaveCoverEmbeddedToCollectionSongs(*song, result);
+        break;
+      }
+      [[fallthrough]];
+    }
+    case CoverOptions::CoverType::Cache:
+    case CoverOptions::CoverType::Album:{
+      cover_url = SaveCoverToFileAutomatic(song, result);
+      if (!cover_url.isEmpty()) SaveArtManualToSong(song, cover_url);
+      break;
+    }
+  }
+
+  return cover_url;
+
+}
+
+void AlbumCoverChoiceController::SaveEmbeddedCoverFinished(TagReaderReplyPtr reply, Song song, const bool art_embedded) {
+
+  if (!cover_save_tasks_.contains(song)) return;
+  cover_save_tasks_.removeAll(song);
+
+  if (reply->success()) {
+    SaveArtEmbeddedToSong(&song, art_embedded);
+  }
+  else {
+    Q_EMIT Error(tr("Could not save cover to file %1.").arg(song.url().toLocalFile()));
+  }
+
 }

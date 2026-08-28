@@ -1,82 +1,145 @@
-#ifndef STRAWBERRY_PLAYLISTCONTAINER_H
-#define STRAWBERRY_PLAYLISTCONTAINER_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "playlist/dynamicplaylistcontrols.h"
-#include "playlist/playlistsequence.h"
-#include "playlist/playlisttabbar.h"
-#include "playlist/playlistview.h"
+#ifndef PLAYLISTCONTAINER_H
+#define PLAYLISTCONTAINER_H
 
-#include <gtk/gtk.h>
+#include "config.h"
 
-#include <functional>
-#include <memory>
-#include <string>
-#include <vector>
+#include <QObject>
+#include <QWidget>
+#include <QString>
+#include <QIcon>
 
+class QTimer;
+class QTimeLine;
+class QLabel;
+class QAction;
+class QEvent;
+class QKeyEvent;
+class QResizeEvent;
+
+class Playlist;
 class PlaylistManager;
+class PlaylistView;
 
-class PlaylistContainer {
+class Ui_PlaylistContainer;
+
+#include "includes/shared_ptr.h"
+
+class PlaylistContainer : public QWidget {
+  Q_OBJECT
+
  public:
-  using ActionCallback = std::function<void()>;
+  explicit PlaylistContainer(QWidget *parent = nullptr);
+  ~PlaylistContainer() override;
 
-  PlaylistContainer();
-  ~PlaylistContainer();
+  struct Actions {
+    QAction *new_playlist = nullptr;
+    QAction *load_playlist = nullptr;
+    QAction *save_playlist = nullptr;
+    QAction *clear_playlist = nullptr;
+    QAction *next_playlist = nullptr;
+    QAction *previous_playlist = nullptr;
+    QAction *last_playlist = nullptr;
+    QAction *active_playlist = nullptr;
+    QAction *close_playlist = nullptr;
+    QAction *save_all_playlists = nullptr;
+  };
 
-  GtkWidget *widget() const { return widget_; }
-  PlaylistView *view() { return view_.get(); }
-  PlaylistTabBar *tab_bar() { return tab_bar_.get(); }
-  DynamicPlaylistControls *dynamic_controls() { return dynamic_controls_.get(); }
-  GtkWidget *summary() const { return summary_; }
-  GtkWidget *repeat_button() const { return repeat_button_; }
-  GtkWidget *shuffle_button() const { return shuffle_button_; }
-  const std::string &filter_string() const { return filter_; }
+  void SetActions(const Actions &actions);
+  void SetManager(SharedPtr<PlaylistManager> manager);
+  void ReloadSettings();
 
-  void SetFilterChangedCallback(const std::function<void(const std::string &)> &callback);
-  void SetFilterRowCountCallback(const std::function<int()> &callback);
-  void SetActionCallback(const char *name, ActionCallback callback);
-  void SetRepeatChangedCallback(const std::function<void(PlaylistSequence::RepeatMode)> &callback);
-  void SetShuffleChangedCallback(const std::function<void(PlaylistSequence::ShuffleMode)> &callback);
-  void SetRepeatMode(PlaylistSequence::RepeatMode mode);
-  void SetShuffleMode(PlaylistSequence::ShuffleMode mode);
-  void SetSummary(const std::string &text);
-  void ApplyLook();
-  void FocusFilter();
-  void FocusFilterFromKey(unsigned keyval, const char *utf8);
   bool SearchFieldHasFocus() const;
-  void SetFilterText(const std::string &text);
-  void UpdateNoMatchesOverlay();
-  void UpdateUndoRedoChrome(bool can_undo, bool can_redo);
-  GtkWidget *filter_entry() const { return filter_entry_; }
+  void FocusSearchField();
+
+  PlaylistView *view() const;
+
+  bool eventFilter(QObject *objectWatched, QEvent *event) override;
+
+ Q_SIGNALS:
+  void UndoRedoActionsChanged(QAction *undo, QAction *redo);
+  void ViewSelectionModelChanged();
+  void LastTabCloseRequested();
+
+ protected:
+  // QWidget
+  void resizeEvent(QResizeEvent *e) override;
+
+ private Q_SLOTS:
+  void NewPlaylist();
+  void LoadPlaylist();
+  void SaveCurrentPlaylist() { SavePlaylist(-1); }
+  void SavePlaylist(const int id);
+  void ClearPlaylist();
+  void GoToNextPlaylistTab();
+  void GoToPreviousPlaylistTab();
+  void GoToLastPlaylistTab();
+  void GoToActivePlaylistTab();
+
+  void SetViewModel(Playlist *playlist, const int scroll_position);
+  void PlaylistAdded(const int id, const QString &name, bool favorite);
+  void PlaylistClosed(const int id);
+  void PlaylistRenamed(const int id, const QString &new_name);
+
+  void Started();
+
+  void Save();
+
+  void SetTabBarVisible(const bool visible);
+  void SetTabBarHeight(const int height);
+
+  void SelectionChanged();
+  void MaybeUpdateFilter();
+  void UpdateFilter();
+  void FocusOnFilter(QKeyEvent *event);
+
+  void UpdateNoMatchesLabel();
+
+ public Q_SLOTS:
+  void ActivePlaying();
+  void ActivePaused();
+  void ActiveStopped();
 
  private:
-  GtkWidget *widget_ = nullptr;
-  GtkWidget *toolbar_ = nullptr;
-  GtkWidget *clear_button_ = nullptr;
-  GtkWidget *undo_button_ = nullptr;
-  GtkWidget *redo_button_ = nullptr;
-  GtkWidget *summary_ = nullptr;
-  GtkWidget *repeat_button_ = nullptr;
-  GtkWidget *shuffle_button_ = nullptr;
-  GtkWidget *filter_entry_ = nullptr;
-  bool updating_filter_ = false;
-  std::vector<GtkWidget *> repeat_items_;
-  std::vector<GtkWidget *> shuffle_items_;
-  bool updating_sequence_ = false;
-  std::function<void(PlaylistSequence::RepeatMode)> repeat_changed_;
-  std::function<void(PlaylistSequence::ShuffleMode)> shuffle_changed_;
-  std::unique_ptr<PlaylistTabBar> tab_bar_;
-  std::unique_ptr<PlaylistView> view_;
-  std::unique_ptr<DynamicPlaylistControls> dynamic_controls_;
-  std::string filter_;
-  std::function<void(const std::string &)> filter_changed_;
-  std::function<int()> filter_row_count_;
-  guint filter_timeout_ = 0;
-  int filter_timeout_gen_ = 0;
+  void UpdateActiveIcon(const QIcon &icon);
+  void RepositionNoMatchesLabel(bool force = false);
 
-  void CancelFilterTimer();
-  void ScheduleFilter();
-  void ApplyPendingFilter();
-  int FilterRowCount() const;
+ private:
+  Ui_PlaylistContainer *ui_;
+
+  SharedPtr<PlaylistManager> manager_;
+  QAction *undo_;
+  QAction *redo_;
+  Playlist *playlist_;
+
+  bool starting_up_;
+
+  bool tab_bar_visible_;
+  QTimeLine *tab_bar_animation_;
+
+  QLabel *no_matches_label_;
+
+  QTimer *filter_timer_;
 };
 
-#endif
+#endif  // PLAYLISTCONTAINER_H

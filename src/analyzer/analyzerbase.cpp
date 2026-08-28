@@ -1,44 +1,267 @@
-#include "analyzer/analyzerbase.h"
+/*
+   Strawberry Music Player
+   This file was part of Amarok.
+   Copyright 2003-2004, Max Howell <max.howell@methylblue.com>
+   Copyright 2009-2012, David Sansome <me@davidsansome.com>
+   Copyright 2010, 2012, 2014, John Maguire <john.maguire@gmail.com>
+   Copyright 2017, Santiago Gil
 
-#include <algorithm>
+   Strawberry is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+
+   Strawberry is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+#include "config.h"
+
+#include "analyzerbase.h"
+
+#include <cstdint>
 #include <cmath>
+#include <algorithm>
 
-double AnalyzerBase::BarWidth(int width, const std::vector<float> &bands) {
-  return bands.empty() ? 0.0 : static_cast<double>(width) / static_cast<double>(bands.size());
+#include <QWidget>
+#include <QList>
+#include <QPainter>
+#include <QPalette>
+#include <QBasicTimer>
+#include <QShowEvent>
+#include <QHideEvent>
+#include <QTimerEvent>
+
+#include "engine/enginebase.h"
+
+// INSTRUCTIONS Base2D
+// 1. do anything that depends on height() in init(), Base2D will call it before you are shown
+// 2. otherwise you can use the constructor to initialize things
+// 3. reimplement analyze(), and paint to canvas(), Base2D will update the widget when you return control to it
+// 4. if you want to manipulate the scope, reimplement transform()
+// 5. for convenience <vector> <qpixmap.h> <qwdiget.h> are pre-included
+//
+// TODO:
+// Make an INSTRUCTIONS file
+// can't mod scope in analyze you have to use transform for 2D use setErasePixmap Qt function insetead of m_background
+
+AnalyzerBase::AnalyzerBase(QWidget *parent, const uint scope_size)
+    : QWidget(parent),
+      fht_(new FHT(scope_size)),
+      engine_(nullptr),
+      lastscope_(512),
+      new_frame_(false),
+      is_playing_(false),
+      timeout_(40) {
+
+  setAttribute(Qt::WA_OpaquePaintEvent, true);
+
 }
 
-void AnalyzerBase::DrawWave(cairo_t *cr, int width, int height, const std::vector<float> &bands, double r, double g, double b) {
-  const double bar_w = BarWidth(width, bands);
-  cairo_set_source_rgb(cr, r, g, b);
-  cairo_move_to(cr, 0, height / 2.0);
-  for (size_t i = 0; i < bands.size(); ++i) {
-    cairo_line_to(cr, static_cast<double>(i) * bar_w, height / 2.0 - static_cast<double>(bands[i]) * height / 2.0);
+AnalyzerBase::~AnalyzerBase() {
+  delete fht_;
+}
+
+void AnalyzerBase::showEvent(QShowEvent *e) {
+  Q_UNUSED(e)
+  timer_.start(timeout(), this);
+}
+
+void AnalyzerBase::hideEvent(QHideEvent *e) {
+  Q_UNUSED(e)
+  timer_.stop();
+}
+
+void AnalyzerBase::ChangeTimeout(const int timeout) {
+
+  timeout_ = timeout;
+  if (timer_.isActive()) {
+    timer_.stop();
+    timer_.start(timeout_, this);
   }
-  cairo_stroke(cr);
+
 }
 
-void AnalyzerBase::DrawBars(cairo_t *cr, int width, int height, const std::vector<float> &bands, bool rainbow, bool turbine, bool blocks) {
-  const double bar_w = BarWidth(width, bands);
-  for (size_t i = 0; i < bands.size(); ++i) {
-    const double h = std::max(1.0, static_cast<double>(bands[i]) * height);
-    if (rainbow) {
-      cairo_set_source_rgb(cr, static_cast<double>(i) / bands.size(), 0.4, 1.0 - static_cast<double>(i) / bands.size());
-    } else if (turbine) {
-      cairo_set_source_rgb(cr, 0.9, 0.45 + bands[i] * 0.4, 0.1);
-    } else if (blocks) {
-      cairo_set_source_rgb(cr, 0.2, 0.8, 0.4);
-    } else {
-      cairo_set_source_rgb(cr, 0.23, 0.63, 0.95);
-    }
-    if (blocks) {
-      const int count = std::max(1, static_cast<int>(h / 4));
-      for (int b = 0; b < count; ++b) {
-        cairo_rectangle(cr, static_cast<double>(i) * bar_w, height - (b + 1) * 4, bar_w - 1.0, 3);
-        cairo_fill(cr);
+void AnalyzerBase::transform(Scope &scope) {
+
+  QList<float> aux(fht_->size());
+  if (static_cast<quint64>(aux.size()) >= scope.size()) {
+    std::copy(scope.begin(), scope.end(), aux.begin());
+  }
+  else {
+    std::copy(scope.begin(), scope.begin() + aux.size(), aux.begin());
+  }
+
+  fht_->logSpectrum(scope.data(), aux.data());
+  fht_->scale(scope.data(), 1.0F / 20);
+
+  scope.resize(static_cast<size_t>(fht_->size() / 2));  // second half of values are rubbish
+
+}
+
+void AnalyzerBase::paintEvent(QPaintEvent *e) {
+
+  QPainter p(this);
+  p.fillRect(e->rect(), palette().color(QPalette::Window));
+
+  if (!engine_) return;
+
+  switch (engine_->state()) {
+    case EngineBase::State::Playing:{
+      const EngineBase::Scope &thescope = engine_->scope(timeout_);
+      size_t i = 0;
+
+      // convert to mono here - our built in analyzers need mono, but the engines provide interleaved pcm
+      // Clamp to the samples actually available so a short scope buffer can't be read past its end.
+      const size_t scope_frames = thescope.size() / 2;
+      for (uint x = 0; static_cast<int>(x) < fht_->size() && x < scope_frames; ++x) {
+        lastscope_[x] = static_cast<float>(thescope[i] + thescope[i + 1]) / (2 * (1U << 15U));
+        i += 2;
       }
-    } else {
-      cairo_rectangle(cr, static_cast<double>(i) * bar_w, height - h, bar_w - 1.0, h);
-      cairo_fill(cr);
+
+      is_playing_ = true;
+      transform(lastscope_);
+      analyze(p, lastscope_, new_frame_);
+
+      lastscope_.resize(static_cast<size_t>(fht_->size()));
+
+      break;
     }
+    case EngineBase::State::Paused:
+      is_playing_ = false;
+      analyze(p, lastscope_, new_frame_);
+      break;
+
+    default:
+      is_playing_ = false;
+      demo(p);
   }
+
+  new_frame_ = false;
+
+}
+
+int AnalyzerBase::resizeExponent(int exp) {
+
+  if (exp < 3) {
+    exp = 3;
+  }
+  else if (exp > 9) {
+    exp = 9;
+  }
+
+  if (exp != fht_->sizeExp()) {
+    delete fht_;
+    fht_ = nullptr;
+    fht_ = new FHT(static_cast<uint>(exp));
+  }
+  return exp;
+
+}
+
+int AnalyzerBase::resizeForBands(const int bands) {
+
+  int exp = 0;
+  if (bands <= 8) {
+    exp = 4;
+  }
+  else if (bands <= 16) {
+    exp = 5;
+  }
+  else if (bands <= 32) {
+    exp = 6;
+  }
+  else if (bands <= 64) {
+    exp = 7;
+  }
+  else if (bands <= 128) {
+    exp = 8;
+  }
+  else {
+    exp = 9;
+  }
+
+  resizeExponent(exp);
+  return fht_->size() / 2;
+
+}
+
+void AnalyzerBase::demo(QPainter &p) {
+
+  static int t = 201;  // FIXME make static to namespace perhaps
+
+  if (t > 999) {
+    t = 1;  // 0 = wasted calculations
+  }
+  if (t < 201) {
+    Scope s(32);
+
+    const double dt = static_cast<double>(t) / 200;
+    for (uint i = 0; i < s.size(); ++i) {
+      s[i] = static_cast<float>(dt * (sin(M_PI + (i * M_PI) / static_cast<double>(s.size())) + 1.0));
+    }
+
+    analyze(p, s, new_frame_);
+  }
+  else {
+    analyze(p, Scope(32, 0), new_frame_);
+  }
+
+  ++t;
+
+}
+
+void AnalyzerBase::interpolate(const Scope &in_scope, Scope &out_scope) {
+
+  double pos = 0.0;
+  const double step = static_cast<double>(in_scope.size()) / static_cast<double>(out_scope.size());
+
+  for (uint i = 0; i < out_scope.size(); ++i, pos += step) {
+    const double error = pos - std::floor(pos);
+    const uint64_t offset = static_cast<uint64_t>(pos);
+
+    uint64_t indexLeft = offset + 0;
+
+    if (indexLeft >= in_scope.size()) {
+      indexLeft = in_scope.size() - 1;
+    }
+
+    uint64_t indexRight = offset + 1;
+
+    if (indexRight >= in_scope.size()) {
+      indexRight = in_scope.size() - 1;
+    }
+
+    out_scope[i] = in_scope[indexLeft] * (1.0F - static_cast<float>(error)) + in_scope[indexRight] * static_cast<float>(error);
+  }
+
+}
+
+void AnalyzerBase::initSin(Scope &v, const uint size) {
+
+  double step = (M_PI * 2) / size;
+  double radian = 0;
+
+  for (uint i = 0; i < size; i++) {
+    v.push_back(static_cast<float>(sin(radian)));
+    radian += step;
+  }
+
+}
+
+void AnalyzerBase::timerEvent(QTimerEvent *e) {
+
+  QWidget::timerEvent(e);
+  if (e->timerId() != timer_.timerId()) {
+    return;
+  }
+
+  new_frame_ = true;
+  update();
+
 }

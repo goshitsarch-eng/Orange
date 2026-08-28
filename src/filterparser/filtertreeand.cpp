@@ -1,31 +1,34 @@
-#include "filterparser/filtertreeand.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2012, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2024, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-void FilterTreeAnd::Add(std::unique_ptr<FilterTree> child) {
-  if (child) {
-    children_.push_back(std::move(child));
-  }
+#include "filtertreeand.h"
+
+FilterTreeAnd::FilterTreeAnd() = default;
+
+FilterTreeAnd::~FilterTreeAnd() {
+  qDeleteAll(children_);
 }
 
-std::string FilterTreeAnd::ToSql() const {
-  if (children_.empty()) {
-    return "1=1";
-  }
-  std::string sql = "(";
-  for (size_t i = 0; i < children_.size(); ++i) {
-    if (i) {
-      sql += " AND ";
-    }
-    sql += children_[i] ? children_[i]->ToSql() : "1=1";
-  }
-  sql += ")";
-  return sql;
-}
+void FilterTreeAnd::add(FilterTree *child) { children_.append(child); }
 
 bool FilterTreeAnd::accept(const Song &song) const {
-  for (const auto &child : children_) {
-    if (child && !child->accept(song)) {
-      return false;
-    }
-  }
-  return true;
+  return !std::any_of(children_.begin(), children_.end(), [&song](FilterTree *child) { return !child->accept(song); });
 }

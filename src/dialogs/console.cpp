@@ -1,92 +1,93 @@
-#include "dialogs/console.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2019-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "dialogs/consolequery.h"
-#include "translations/translations.h"
+#include "config.h"
 
-#include <adwaita.h>
+#include <QWidget>
+#include <QDialog>
+#include <QString>
+#include <QStringList>
+#include <QFont>
+#include <QSqlDatabase>
+#include <QSqlQuery>
+#include <QSqlRecord>
+#include <QSqlError>
+#include <QLineEdit>
+#include <QPushButton>
+#include <QScrollBar>
+#include <QTextBrowser>
 
-#include <string>
+#include "console.h"
 
-namespace {
+#include "includes/shared_ptr.h"
+#include "core/logging.h"
+#include "core/database.h"
 
-void AppendText(GtkTextBuffer *buffer, const std::string &text) {
-  GtkTextIter end;
-  gtk_text_buffer_get_end_iter(buffer, &end);
-  gtk_text_buffer_insert(buffer, &end, text.c_str(), -1);
+using namespace Qt::Literals::StringLiterals;
+
+Console::Console(const SharedPtr<Database> database, QWidget *parent) : QDialog(parent), ui_{}, database_(database) {
+
+  ui_.setupUi(this);
+
+  setWindowFlags(windowFlags() | Qt::WindowMaximizeButtonHint);
+
+  QObject::connect(ui_.run, &QPushButton::clicked, this, &Console::RunQuery);
+
+  QFont font(u"Monospace"_s);
+  font.setStyleHint(QFont::TypeWriter);
+
+  ui_.output->setFont(font);
+  ui_.query->setFont(font);
+
 }
 
-void ScrollToEnd(GtkTextView *view) {
-  GtkTextBuffer *buffer = gtk_text_view_get_buffer(view);
-  GtkTextIter end;
-  gtk_text_buffer_get_end_iter(buffer, &end);
-  GtkTextMark *mark = gtk_text_buffer_create_mark(buffer, nullptr, &end, FALSE);
-  gtk_text_view_scroll_mark_onscreen(view, mark);
-  gtk_text_buffer_delete_mark(buffer, mark);
-}
+void Console::RunQuery() {
 
-void RunClicked(GtkEntry *entry, GtkTextView *view, Database *database) {
-  const char *sql = gtk_editable_get_text(GTK_EDITABLE(entry));
-  if (!sql || !*sql) {
+  QSqlDatabase db = database_->Connect();
+  QSqlQuery query(db);
+  if (!query.prepare(ui_.query->text())) {
+    qLog(Error) << query.lastError();
+    Q_EMIT Error(query.lastError().text());
     return;
   }
-  const ConsoleQuery::Result result = ConsoleQuery::Run(database, sql);
-  AppendText(gtk_text_view_get_buffer(view), ConsoleQuery::Format(result));
-  ScrollToEnd(view);
-}
+  if (!query.exec()) {
+    qLog(Error) << query.lastError();
+    Q_EMIT Error(query.lastError().text());
+    return;
+  }
 
-}  // namespace
+  ui_.output->append(u"<b>&gt; "_s + query.executedQuery() + u"</b>"_s);
 
-void Console::Show(GtkWindow *parent, Database *database) {
-  AdwDialog *dialog = adw_dialog_new();
-  adw_dialog_set_title(dialog, Translations::CStr("Debug console"));
-  adw_dialog_set_content_width(dialog, 760);
-  adw_dialog_set_content_height(dialog, 520);
+  while (query.next() && query.isValid()) {
+    QSqlRecord record = query.record();
+    QStringList values;  // clazy:exclude=container-inside-loop
+    values.reserve(record.count());
+    for (int i = 0; i < record.count(); ++i) {
+      values.append(record.value(i).toString());
+    }
 
-  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
-  gtk_widget_set_margin_start(box, 12);
-  gtk_widget_set_margin_end(box, 12);
-  gtk_widget_set_margin_top(box, 12);
-  gtk_widget_set_margin_bottom(box, 12);
+    ui_.output->append(values.join(u'|'));
 
-  GtkWidget *row = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-  GtkWidget *entry = gtk_entry_new();
-  gtk_widget_set_hexpand(entry, TRUE);
-  gtk_entry_set_placeholder_text(GTK_ENTRY(entry), Translations::CStr("SQL query"));
-  GtkWidget *run = gtk_button_new_with_label(Translations::CStr("Run"));
-  gtk_widget_add_css_class(run, "suggested-action");
-  gtk_box_append(GTK_BOX(row), entry);
-  gtk_box_append(GTK_BOX(row), run);
+  }
 
-  GtkWidget *scroll = gtk_scrolled_window_new();
-  gtk_widget_set_vexpand(scroll, TRUE);
-  GtkWidget *view = gtk_text_view_new();
-  gtk_text_view_set_editable(GTK_TEXT_VIEW(view), FALSE);
-  gtk_text_view_set_monospace(GTK_TEXT_VIEW(view), TRUE);
-  gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(view), GTK_WRAP_WORD_CHAR);
-  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), view);
+  ui_.output->verticalScrollBar()->setValue(ui_.output->verticalScrollBar()->maximum());
 
-  gtk_box_append(GTK_BOX(box), row);
-  gtk_box_append(GTK_BOX(box), scroll);
-  adw_dialog_set_child(dialog, box);
-
-  struct State {
-    Database *database = nullptr;
-    GtkEntry *entry = nullptr;
-    GtkTextView *view = nullptr;
-  };
-  auto *state = new State{database, GTK_ENTRY(entry), GTK_TEXT_VIEW(view)};
-  g_object_set_data_full(G_OBJECT(dialog), "console-state", state, +[](gpointer data) { delete static_cast<State *>(data); });
-
-  g_signal_connect(run, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
-                     auto *s = static_cast<State *>(data);
-                     RunClicked(s->entry, s->view, s->database);
-                   }),
-                   state);
-  g_signal_connect(entry, "activate", G_CALLBACK(+[](GtkEntry *, gpointer data) {
-                     auto *s = static_cast<State *>(data);
-                     RunClicked(s->entry, s->view, s->database);
-                   }),
-                   state);
-
-  adw_dialog_present(dialog, GTK_WIDGET(parent));
 }

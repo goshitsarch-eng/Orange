@@ -1,76 +1,114 @@
-#include "dialogs/errordialog.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2017-2025, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "dialogs/dialogclosekeys.h"
-#include "dialogs/errordialoglabels.h"
-#include "dialogs/errordialogqueue.h"
-#include "translations/translations.h"
+#include "config.h"
 
-#include <adwaita.h>
+#include <utility>
 
-void ErrorDialog::Show(GtkWindow *parent, const std::string &message) {
-  AdwAlertDialog *dialog = ADW_ALERT_DIALOG(adw_alert_dialog_new(Translations::CStr(ErrorDialogLabels::Title()), message.c_str()));
-  adw_alert_dialog_add_response(dialog, "ok", Translations::CStr("OK"));
-  adw_alert_dialog_set_default_response(dialog, "ok");
-  adw_alert_dialog_set_close_response(dialog, "ok");
-  DialogCloseKeys::Attach(ADW_DIALOG(dialog));
-  adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(parent));
+#include <QWidget>
+#include <QApplication>
+#include <QString>
+#include <QIcon>
+#include <QPalette>
+#include <QPixmap>
+#include <QStyle>
+#include <QLabel>
+#include <QTextEdit>
+#include <QCloseEvent>
+
+#include "utilities/screenutils.h"
+
+#include "errordialog.h"
+#include "ui_errordialog.h"
+
+using namespace Qt::Literals::StringLiterals;
+
+ErrorDialog::ErrorDialog(QWidget *parent)
+    : QDialog(parent),
+      ui_(new Ui_ErrorDialog) {
+
+  ui_->setupUi(this);
+
+  QIcon warning_icon(style()->standardIcon(QStyle::SP_MessageBoxWarning));
+  QPixmap warning_pixmap(warning_icon.pixmap(48));
+
+  QPalette messages_palette(ui_->messages->palette());
+  messages_palette.setColor(QPalette::Base, messages_palette.color(QPalette::Window));
+
+  ui_->messages->setPalette(messages_palette);
+  ui_->icon->setPixmap(warning_pixmap);
+
 }
 
-QueuedErrorDialog::QueuedErrorDialog(GtkWindow *parent) : parent_(parent) {}
-
-QueuedErrorDialog::~QueuedErrorDialog() {
-  if (dialog_) {
-    g_signal_handlers_disconnect_by_data(dialog_, this);
-    dialog_ = nullptr;
-  }
+ErrorDialog::~ErrorDialog() {
+  delete ui_;
 }
 
-void QueuedErrorDialog::ShowMessage(const std::string &message) {
-  if (!ErrorDialogQueue::Enqueue(&messages_, message)) {
-    return;
+void ErrorDialog::ShowDialog() {
+
+  QWidget *active_window = QApplication::activeWindow();
+  if (active_window && screen() && active_window->screen() && screen() != active_window->screen()) {
+    Utilities::CenterWidgetOnScreen(active_window->screen(), this);
   }
-  EnsureDialog();
-  RefreshBody();
-  if (ErrorDialogQueue::ShouldShowNow(parent_ && gtk_widget_get_mapped(GTK_WIDGET(parent_)))) {
-    Present();
-  }
+  setWindowState((windowState() & ~Qt::WindowMinimized) | Qt::WindowActive);
+  show();
+  raise();
+  activateWindow();
+
 }
 
-void QueuedErrorDialog::Present() {
-  if (messages_.empty() || !parent_) {
-    return;
+void ErrorDialog::ShowMessage(const QString &message) {
+
+  if (message.isEmpty()) return;
+
+  current_messages_ << message;
+  UpdateContent();
+
+  if (QApplication::activeWindow()) {
+    ShowDialog();
   }
-  EnsureDialog();
-  RefreshBody();
-  adw_dialog_present(ADW_DIALOG(dialog_), GTK_WIDGET(parent_));
-  visible_ = true;
-  active_ = true;
+  else if (!isVisible()) {
+    showMinimized();
+  }
+
 }
 
-void QueuedErrorDialog::EnsureDialog() {
-  if (dialog_) {
-    return;
-  }
-  dialog_ = ADW_ALERT_DIALOG(adw_alert_dialog_new(Translations::CStr(ErrorDialogLabels::Title()), ""));
-  adw_alert_dialog_add_response(dialog_, "ok", Translations::CStr("OK"));
-  adw_alert_dialog_set_default_response(dialog_, "ok");
-  adw_alert_dialog_set_close_response(dialog_, "ok");
-  DialogCloseKeys::Attach(ADW_DIALOG(dialog_));
-  g_signal_connect(dialog_, "closed", G_CALLBACK((+[](AdwDialog *, gpointer data) {
-                     static_cast<QueuedErrorDialog *>(data)->OnClosed();
-                   })),
-                   this);
+void ErrorDialog::closeEvent(QCloseEvent *e) {
+
+  current_messages_.clear();
+  UpdateContent();
+
+  QDialog::closeEvent(e);
+
 }
 
-void QueuedErrorDialog::RefreshBody() {
-  if (dialog_) {
-    adw_alert_dialog_set_body(dialog_, ErrorDialogQueue::JoinPlain(messages_).c_str());
-  }
-}
+void ErrorDialog::UpdateContent() {
 
-void QueuedErrorDialog::OnClosed() {
-  ErrorDialogQueue::Clear(&messages_);
-  dialog_ = nullptr;
-  visible_ = false;
-  active_ = false;
+  QString html;
+  for (const QString &message : std::as_const(current_messages_)) {
+    if (!html.isEmpty()) {
+      html += "<hr/>"_L1;
+    }
+    html += message.toHtmlEscaped();
+  }
+  ui_->messages->setHtml(html);
+
 }

@@ -1,22 +1,57 @@
-#ifndef STRAWBERRY_COLLECTIONFILTER_H
-#define STRAWBERRY_COLLECTIONFILTER_H
+/*
+ * Strawberry Music Player
+ * Copyright 2021-2024, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "collection/collectionitem.h"
+#ifndef COLLECTIONFILTER_H
+#define COLLECTIONFILTER_H
+
+#include "config.h"
+
+#include <QSortFilterProxyModel>
+#include <QScopedPointer>
+#include <QSet>
+#include <QList>
+#include <QUrl>
+
 #include "core/song.h"
+#include "filterparser/filtertree.h"
 
-#include <string>
+class CollectionItem;
 
-class CollectionFilter {
+class CollectionFilter : public QSortFilterProxyModel {
+  Q_OBJECT
+
  public:
-  void SetFilterString(const std::string &filter_string);
-  const std::string &filter_string() const { return filter_string_; }
+  explicit CollectionFilter(QObject *parent = nullptr);
 
-  bool Accepts(const Song &song) const;
-  bool AcceptsItem(const CollectionItem *item) const;
-  SongList FilterSongs(const SongList &songs) const;
+  void SetFilterString(const QString &filter_string);
+  QString filter_string() const { return filter_string_; }
+
+ protected:
+  bool filterAcceptsRow(const int source_row, const QModelIndex &source_parent) const override;
+  QMimeData *mimeData(const QModelIndexList &indexes) const override;
 
  private:
-  std::string filter_string_;
+  void GetChildSongs(CollectionItem *item, QSet<int> &song_ids, QList<QUrl> &urls, SongList &songs) const;
+
+ private:
+  QScopedPointer<FilterTree> filter_tree_;
+  QString filter_string_;
 };
 
-#endif
+#endif  // COLLECTIONFILTER_H

@@ -1,159 +1,203 @@
-#include "core/appearance.h"
+/*
+ * Strawberry Music Player
+ * Copyright 2026, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
+#include "config.h"
+
+#include <QApplication>
+#include <QObject>
+#include <QThread>
+#include <QList>
+#include <QMap>
+#include <QPalette>
+#include <QColor>
+#include <QStyleHints>
+
+#include "settings.h"
+#include "appearance.h"
 #include "constants/appearancesettings.h"
-#include "core/appearancestyle.h"
-#include "core/settings.h"
-#include "utilities/styleutils.h"
 
-#include <adwaita.h>
+Appearance::Appearance(QObject *parent) : QObject(parent), system_palette_(QApplication::palette()) {}
 
-#include <algorithm>
+namespace {
 
-void Appearance::ReloadSettings() {
-  Settings settings;
-  settings.BeginGroup(AppearanceSettings::kSettingsGroup);
-  dark_mode_ = settings.BoolValue(AppearanceSettings::kDarkMode, AppearanceSettings::kDefaultDarkMode);
-  system_icons_ = settings.BoolValue(AppearanceSettings::kSystemThemeIcons, AppearanceSettings::kDefaultSystemIcons);
-  style_ = settings.Value(AppearanceSettings::kStyle);
-  use_custom_colors_ = settings.BoolValue(AppearanceSettings::kUseCustomColorSet, AppearanceSettings::kDefaultUseCustomColorSet);
-  custom_colors_.clear();
-  for (const auto &role : AppearanceColors::Roles()) {
-    custom_colors_[role.key] = settings.Value(role.key);
-  }
-  tabbar_system_color_ = settings.BoolValue(AppearanceSettings::kTabBarSystemColor, AppearanceSettings::kDefaultTabBarSystemColor);
-  tabbar_gradient_ = settings.BoolValue(AppearanceSettings::kTabBarGradient, AppearanceSettings::kDefaultTabBarGradient);
-  tabbar_color_ = settings.Value(AppearanceSettings::kTabBarColor);
-  playing_song_color_ = settings.Value(AppearanceSettings::kPlaylistPlayingSongColor);
-  background_filename_ = settings.Value(AppearanceSettings::kBackgroundImageFilename);
-  background_type_ = settings.IntValue(AppearanceSettings::kBackgroundImageType, static_cast<int>(AppearanceSettings::kDefaultBackgroundImageType));
-  background_position_ = settings.IntValue(AppearanceSettings::kBackgroundImagePosition,
-                                           static_cast<int>(AppearanceSettings::kDefaultBackgroundImagePosition));
-  blur_radius_ = settings.IntValue(AppearanceSettings::kBackgroundImageBlurRadius, AppearanceSettings::kDefaultBackgroundImageBlurRadius);
-  opacity_ = settings.IntValue(AppearanceSettings::kBackgroundImageOpacityLevel, AppearanceSettings::kDefaultBackgroundImageOpacityLevel);
-  background_stretch_ = settings.BoolValue(AppearanceSettings::kBackgroundImageStretch, AppearanceSettings::kDefaultBackgroundImageStretch);
-  background_keep_aspect_ = settings.BoolValue(AppearanceSettings::kBackgroundImageKeepAspectRatio,
-                                               AppearanceSettings::kDefaultBackgroundImageKeepAspectRatio);
-  background_do_not_cut_ = settings.BoolValue(AppearanceSettings::kBackgroundImageDoNotCut, AppearanceSettings::kDefaultBackgroundImageDoNotCut);
-  background_max_size_ = settings.IntValue(AppearanceSettings::kBackgroundImageMaxSize, AppearanceSettings::kDefaultBackgroundImageMaxSize);
-  icon_sizes_.tabbar_small = settings.IntValue(AppearanceSettings::kIconSizeTabbarSmallMode, AppearanceSettings::kDefaultIconSizeTabbarSmallMode);
-  icon_sizes_.tabbar_large = settings.IntValue(AppearanceSettings::kIconSizeTabbarLargeMode, AppearanceSettings::kDefaultIconSizeTabbarLargeMode);
-  icon_sizes_.play_controls =
-      settings.IntValue(AppearanceSettings::kIconSizePlayControlButtons, AppearanceSettings::kDefaultIconSizePlayControlButtons);
-  icon_sizes_.playlist_buttons =
-      settings.IntValue(AppearanceSettings::kIconSizePlaylistButtons, AppearanceSettings::kDefaultIconSizePlaylistButtons);
-  icon_sizes_.left_panel = settings.IntValue(AppearanceSettings::kIconSizeLeftPanelButtons, AppearanceSettings::kDefaultIconSizeLeftPanelButtons);
-  icon_sizes_.configure = settings.IntValue(AppearanceSettings::kIconSizeConfigureButtons, AppearanceSettings::kDefaultIconSizeConfigureButtons);
+bool IsTextColorRole(const QPalette::ColorRole color_role) {
+
+  return color_role == QPalette::WindowText || color_role == QPalette::Text || color_role == QPalette::ButtonText || color_role == QPalette::BrightText || color_role == QPalette::PlaceholderText;
+
 }
 
-void Appearance::Apply() {
-  ReloadSettings();
-  AdwStyleManager *manager = adw_style_manager_get_default();
-  if (manager) {
-    const bool dark = dark_mode_ || AppearanceStyle::ForcesDark(style_);
-    adw_style_manager_set_color_scheme(manager, dark ? ADW_COLOR_SCHEME_FORCE_DARK : ADW_COLOR_SCHEME_DEFAULT);
-  }
-  const std::string style_css = AppearanceStyle::CssFor(style_);
-  if (!style_css.empty()) {
-    StyleUtils::LoadCss(style_css, StyleUtils::Slot::kAppearanceStyle);
-  } else if (!style_.empty() && style_.find('{') != std::string::npos) {
-    StyleUtils::LoadCss(style_, StyleUtils::Slot::kAppearanceStyle);
-  }
-  const std::string theme = ThemeCss();
-  if (!theme.empty()) {
-    StyleUtils::LoadCss(theme, StyleUtils::Slot::kAppearanceTheme);
-  }
-}
+QPalette::ColorRole BackgroundRoleForTextRole(const QPalette::ColorRole color_role) {
 
-std::string Appearance::ThemeCss() const {
-  return AppearanceColors::BuildPaletteCss(use_custom_colors_, custom_colors_) +
-         AppearanceColors::BuildTabBarCss(tabbar_system_color_, tabbar_gradient_, tabbar_color_) +
-         AppearanceColors::BuildPlayingSongCss(playing_song_color_) + AppearanceColors::BuildIconSizeCss(icon_sizes_);
-}
-
-std::string Appearance::CssUrl(const std::string &path) {
-  if (path.empty()) {
-    return {};
-  }
-  std::string url = path;
-  if (url.find("://") == std::string::npos) {
-    url = "file://" + url;
-  }
-  std::string escaped;
-  escaped.reserve(url.size());
-  for (char ch : url) {
-    if (ch == '\\' || ch == '"') {
-      escaped.push_back('\\');
-    }
-    escaped.push_back(ch);
-  }
-  return escaped;
-}
-
-std::string Appearance::BackgroundPositionCss(int position) {
-  using Position = AppearanceSettings::BackgroundImagePosition;
-  switch (static_cast<Position>(position)) {
-    case Position::UpperLeft:
-      return "top left";
-    case Position::UpperRight:
-      return "top right";
-    case Position::Middle:
-      return "center";
-    case Position::BottomLeft:
-      return "bottom left";
-    case Position::BottomRight:
+  switch (color_role) {
+    case QPalette::Text:
+    case QPalette::PlaceholderText:
+      return QPalette::Base;
+    case QPalette::ButtonText:
+      return QPalette::Button;
     default:
-      return "bottom right";
+      return QPalette::Window;
   }
+
 }
 
-std::string Appearance::BackgroundCss(const std::string &override_path) const {
-  using Type = AppearanceSettings::BackgroundImageType;
-  const Type type = static_cast<Type>(background_type_);
-  std::string path = override_path;
-  if (type == Type::Custom || path.empty()) {
-    path = background_filename_;
-  }
-  if (type == Type::Album && !override_path.empty()) {
-    path = override_path;
-  }
-  return BuildBackgroundCss(background_type_, path, background_position_, blur_radius_, opacity_, background_stretch_,
-                            background_keep_aspect_, background_do_not_cut_, background_max_size_);
+QColor DimmedTextColor(const QColor &text_color, const QColor &background_color) {
+
+  return QColor((text_color.red() + background_color.red()) / 2, (text_color.green() + background_color.green()) / 2, (text_color.blue() + background_color.blue()) / 2);
+
 }
 
-std::string Appearance::BuildBackgroundCss(int type, const std::string &path, int position, int blur, int opacity) {
-  return BuildBackgroundCss(type, path, position, blur, opacity, AppearanceSettings::kDefaultBackgroundImageStretch,
-                            AppearanceSettings::kDefaultBackgroundImageKeepAspectRatio, AppearanceSettings::kDefaultBackgroundImageDoNotCut,
-                            AppearanceSettings::kDefaultBackgroundImageMaxSize);
+}  // namespace
+
+const QList<Appearance::ColorRole> &Appearance::ColorRoles() {
+
+  static const QList<ColorRole> color_roles = {
+    { QPalette::Window, QLatin1String(AppearanceSettings::kColorWindow) },
+    { QPalette::WindowText, QLatin1String(AppearanceSettings::kColorWindowText) },
+    { QPalette::Base, QLatin1String(AppearanceSettings::kColorBase) },
+    { QPalette::AlternateBase, QLatin1String(AppearanceSettings::kColorAlternateBase) },
+    { QPalette::Text, QLatin1String(AppearanceSettings::kColorText) },
+    { QPalette::Button, QLatin1String(AppearanceSettings::kColorButton) },
+    { QPalette::ButtonText, QLatin1String(AppearanceSettings::kColorButtonText) },
+    { QPalette::BrightText, QLatin1String(AppearanceSettings::kColorBrightText) },
+    { QPalette::PlaceholderText, QLatin1String(AppearanceSettings::kColorPlaceholderText) },
+    { QPalette::ToolTipBase, QLatin1String(AppearanceSettings::kColorToolTipBase) },
+    { QPalette::ToolTipText, QLatin1String(AppearanceSettings::kColorToolTipText) }
+  };
+
+  return color_roles;
+
 }
 
-std::string Appearance::BuildBackgroundCss(int type, const std::string &path, int position, int blur, int opacity, bool stretch,
-                                           bool keep_aspect, bool do_not_cut, int max_size) {
-  using Type = AppearanceSettings::BackgroundImageType;
-  const Type kind = static_cast<Type>(type);
-  if (kind == Type::Default) {
-    return {};
+const QMap<QPalette::ColorRole, QColor> &Appearance::DarkColors() {
+
+  static const QMap<QPalette::ColorRole, QColor> dark_colors = {
+    { QPalette::Window, QColor(53, 53, 53) },
+    { QPalette::WindowText, QColor(240, 240, 240) },
+    { QPalette::Base, QColor(35, 35, 35) },
+    { QPalette::AlternateBase, QColor(53, 53, 53) },
+    { QPalette::Text, QColor(240, 240, 240) },
+    { QPalette::Button, QColor(53, 53, 53) },
+    { QPalette::ButtonText, QColor(240, 240, 240) },
+    { QPalette::BrightText, QColor(255, 80, 80) },
+    { QPalette::PlaceholderText, QColor(140, 140, 140) },
+    { QPalette::ToolTipBase, QColor(53, 53, 53) },
+    { QPalette::ToolTipText, QColor(240, 240, 240) }
+  };
+
+  return dark_colors;
+
+}
+
+AppearanceSettings::ColorScheme Appearance::LoadColorScheme() {
+
+  using AppearanceSettings::ColorScheme;
+
+  Settings s;
+  s.beginGroup(AppearanceSettings::kSettingsGroup);
+  const QVariant value = s.value(AppearanceSettings::kColorScheme);
+  // Settings written before the color scheme setting existed only have the dark mode boolean.
+  const bool legacy_dark_mode = s.value(AppearanceSettings::kDarkMode, AppearanceSettings::kDefaultDarkMode).toBool();
+  s.endGroup();
+
+  if (!value.isValid()) {
+    return legacy_dark_mode ? ColorScheme::Dark : AppearanceSettings::kDefaultColorScheme;
   }
-  const std::string reset_main = std::string(kMainSelector) + " { background-image: none; filter: none; }";
-  if (kind == Type::None) {
-    return reset_main + kPlaylistViewportSelector + " { background-image: none; }";
+
+  switch (value.toInt()) {
+    case static_cast<int>(ColorScheme::Light):
+      return ColorScheme::Light;
+    case static_cast<int>(ColorScheme::Dark):
+      return ColorScheme::Dark;
+    default:
+      return ColorScheme::System;
   }
-  if (kind == Type::Strawbs) {
-    return reset_main + kPlaylistViewportSelector + " { background-color: #8B1E3F; background-image: none; }";
+
+}
+
+void Appearance::ApplyColorScheme(const AppearanceSettings::ColorScheme scheme) {
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+  switch (scheme) {
+    case AppearanceSettings::ColorScheme::Light:
+      QGuiApplication::styleHints()->setColorScheme(Qt::ColorScheme::Light);
+      break;
+    case AppearanceSettings::ColorScheme::Dark:
+      QGuiApplication::styleHints()->setColorScheme(Qt::ColorScheme::Dark);
+      break;
+    case AppearanceSettings::ColorScheme::System:
+      QGuiApplication::styleHints()->setColorScheme(Qt::ColorScheme::Unknown);
+      break;
   }
-  const std::string url = CssUrl(path);
-  if (url.empty()) {
-    return reset_main + kPlaylistViewportSelector + " { background-image: none; }";
+#else
+  Q_UNUSED(scheme)
+#endif
+
+}
+
+void Appearance::LoadCustomPaletteColors() {
+
+  Settings s;
+  s.beginGroup(AppearanceSettings::kSettingsGroup);
+  const bool use_custom_color_set = s.value(AppearanceSettings::kUseCustomColorSet).toBool();
+
+  if (use_custom_color_set) {
+    QMap<QPalette::ColorRole, QColor> colors;
+    for (const ColorRole &color_role : ColorRoles()) {
+      const QVariant value = s.value(color_role.settings_key);
+      if (value.isValid()) {
+        const QColor color = value.value<QColor>();
+        if (color.isValid()) {
+          colors.insert(color_role.role, color);
+        }
+      }
+    }
+    SetCustomPaletteColors(colors);
   }
-  const int level = std::clamp(opacity, 0, 100);
-  const double veil = 1.0 - (static_cast<double>(level) / 100.0);
-  const int radius = std::max(0, blur);
-  std::string css = reset_main + kPlaylistViewportSelector + " { background-image: linear-gradient(rgba(0,0,0," + std::to_string(veil) +
-                    "), rgba(0,0,0," + std::to_string(veil) + ")), url(\"" + url +
-                    "\"); background-repeat: no-repeat; background-size: " + AppearanceColors::BackgroundSizeCss(stretch, keep_aspect, do_not_cut, max_size) +
-                    "; background-position: " + BackgroundPositionCss(position) + ";";
-  if (radius > 0) {
-    css += " filter: blur(" + std::to_string(radius) + "px);";
+
+  s.endGroup();
+
+}
+
+void Appearance::SetCustomPaletteColors(const QMap<QPalette::ColorRole, QColor> &colors) {
+
+  Q_ASSERT(QThread::currentThread() == qApp->thread());
+
+  // Only set the active and inactive color groups here, the disabled color group is handled below so that disabled widgets still look greyed out with a custom color set.
+  QPalette palette = QApplication::palette();
+  for (QMap<QPalette::ColorRole, QColor>::const_iterator it = colors.constBegin(); it != colors.constEnd(); ++it) {
+    if (it.value().isValid()) {
+      palette.setColor(QPalette::Active, it.key(), it.value());
+      palette.setColor(QPalette::Inactive, it.key(), it.value());
+      if (!IsTextColorRole(it.key())) {
+        palette.setColor(QPalette::Disabled, it.key(), it.value());
+      }
+    }
   }
-  css += " }";
-  return css;
+
+  // Dim the text roles for the disabled color group by blending them with the corresponding background color.
+  for (QMap<QPalette::ColorRole, QColor>::const_iterator it = colors.constBegin(); it != colors.constEnd(); ++it) {
+    if (it.value().isValid() && IsTextColorRole(it.key())) {
+      const QColor background_color = palette.color(QPalette::Disabled, BackgroundRoleForTextRole(it.key()));
+      palette.setColor(QPalette::Disabled, it.key(), DimmedTextColor(it.value(), background_color));
+    }
+  }
+
+  QApplication::setPalette(palette);
+
 }

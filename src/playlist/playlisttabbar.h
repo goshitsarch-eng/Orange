@@ -1,96 +1,131 @@
-#ifndef STRAWBERRY_PLAYLISTTABBAR_H
-#define STRAWBERRY_PLAYLISTTABBAR_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2020-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "playlist/playlistlistlook.h"
-#include "playlist/playlistmanager.h"
-#include "playlist/playlisttabmenu.h"
-#include "widgets/favoritewidget.h"
+#ifndef PLAYLISTTABBAR_H
+#define PLAYLISTTABBAR_H
 
-#include <gtk/gtk.h>
+#include "config.h"
 
-#include <functional>
-#include <memory>
-#include <string>
-#include <vector>
+#include <QObject>
+#include <QBasicTimer>
+#include <QList>
+#include <QString>
+#include <QIcon>
+#include <QTabBar>
 
-class PlaylistTabBar {
+class QWidget;
+class QMenu;
+class QAction;
+class QEvent;
+class QContextMenuEvent;
+class QDragEnterEvent;
+class QDragLeaveEvent;
+class QDragMoveEvent;
+class QDropEvent;
+class QMouseEvent;
+class QTimerEvent;
+
+class PlaylistManager;
+class RenameTabLineEdit;
+
+#include "includes/shared_ptr.h"
+
+class PlaylistTabBar : public QTabBar {
+  Q_OBJECT
+
  public:
-  using ChangedCallback = std::function<void(const std::string &)>;
-  using FavoriteCallback = std::function<void(const std::string &, bool)>;
-  using CloseCallback = std::function<void(int)>;
-  using RenameCallback = std::function<void(int, const std::string &)>;
-  using SaveCallback = std::function<void(int)>;
-  using NewCallback = std::function<void()>;
-  using LoadCallback = std::function<void()>;
-  using ReorderCallback = std::function<void(const std::vector<int> &)>;
-  using LastTabCloseCallback = std::function<void()>;
-  using DropCallback = std::function<void(int, const std::string &)>;
+  explicit PlaylistTabBar(QWidget *parent = nullptr);
 
-  PlaylistTabBar();
-  ~PlaylistTabBar();
+  void SetActions(QAction *new_playlist, QAction *load_playlist);
+  void SetManager(SharedPtr<PlaylistManager> manager);
 
-  GtkWidget *widget() const { return widget_; }
-  void Refresh(PlaylistManager *manager, const std::string &active_name = {},
-               PlaylistListLook::Playback playback = PlaylistListLook::Playback::Stopped);
-  void SetChangedCallback(ChangedCallback callback);
-  void SetFavoriteCallback(FavoriteCallback callback);
-  void SetCloseCallback(CloseCallback callback) { close_ = std::move(callback); }
-  void SetRenameCallback(RenameCallback callback) { rename_ = std::move(callback); }
-  void SetSaveCallback(SaveCallback callback) { save_ = std::move(callback); }
-  void SetNewCallback(NewCallback callback) { new_ = std::move(callback); }
-  void SetLoadCallback(LoadCallback callback) { load_ = std::move(callback); }
-  void SetReorderCallback(ReorderCallback callback) { reorder_ = std::move(callback); }
-  void SetLastTabCloseCallback(LastTabCloseCallback callback) { last_close_ = std::move(callback); }
-  void SetDropCallback(DropCallback callback) { drop_ = std::move(callback); }
-  gboolean OnKeyPressed(guint keyval, GdkModifierType state);
+  // We use IDs to refer to tabs so the tabs can be moved around (and their indexes change).
+  int index_of(const int id) const;
+  int current_id() const;
+  int id_of(int index) const;
+
+  // Utility functions that use IDs rather than indexes
+  void set_current_id(const int id);
+  void set_icon_by_id(const int id, const QIcon &icon);
+  void set_text_by_id(const int id, const QString &text);
+
+  void RemoveTab(const int id);
+  void InsertTab(const int id, const int index, const QString &text, const bool favorite);
+
+  void CloseCurrentTab();
+
+ Q_SIGNALS:
+  void CurrentIdChanged(const int id);
+  void Rename(const int id, const QString &name);
+  void Close(const int id);
+  void Save(const int id);
+  void PlaylistOrderChanged(const QList<int> &ids);
+  void PlaylistFavorited(const int id, const bool favorite);
+  void LastTabCloseRequested();
+
+ protected:
+  void contextMenuEvent(QContextMenuEvent *e) override;
+  void mouseReleaseEvent(QMouseEvent *e) override;
+  void mouseDoubleClickEvent(QMouseEvent *e) override;
+  void dragEnterEvent(QDragEnterEvent *e) override;
+  void dragMoveEvent(QDragMoveEvent *e) override;
+  void dragLeaveEvent(QDragLeaveEvent *e) override;
+  void dropEvent(QDropEvent *e) override;
+  void timerEvent(QTimerEvent *e) override;
+  bool event(QEvent *e) override;
+
+ private Q_SLOTS:
+  void CurrentIndexChanged(const int index);
+  void RenameSlot();
+  void RenameInline();
+  void HideEditor();
+  void StarSlot();
+  void CloseSlot();
+  void CloseFromTabIndex(const int index);
+  // Used when playlist's favorite flag isn't changed from the favorite widget (e.g. from the playlistlistcontainer): will update the favorite widget
+  void PlaylistFavoritedSlot(const int id, const bool favorite);
+  // Used to signal that the playlist manager is done starting up
+  void PlaylistManagerInitialized();
+  void TabMoved();
+  void SaveSlot();
 
  private:
-  int TabCount() const;
-  int CurrentIndex() const;
-  int TabIdAt(int index) const;
-  std::string TabNameAt(int index) const;
-  std::vector<int> TabIds() const;
-  int IndexOfWidget(GtkWidget *widget) const;
-  int IndexAt(double x, double y) const;
-  const char *PartAt(double x, double y) const;
-  GtkWidget *TabWidget(int index) const;
-  void ShowContextMenu(int index, double x, double y);
-  void ActivateAction(PlaylistTabMenu::Action action, int index);
-  void StartInlineRename(int index);
-  void ApplyInlineRename();
-  void HideEditor();
-  void RequestClose(int id);
-  void StartDragHover(int index);
-  void CancelDragHover();
-  void SetupTab(GtkWidget *tab, int index, int id, const std::string &name);
-  void UpdateVisibility(bool show);
-  void TickVisibility();
-  void StopVisibilityAnim();
+  SharedPtr<PlaylistManager> manager_;
 
-  GtkWidget *widget_ = nullptr;
-  GtkWidget *popover_ = nullptr;
-  GtkWidget *rename_entry_ = nullptr;
-  GtkWidget *rename_button_ = nullptr;
-  ChangedCallback changed_;
-  FavoriteCallback favorite_;
-  CloseCallback close_;
-  RenameCallback rename_;
-  SaveCallback save_;
-  NewCallback new_;
-  LoadCallback load_;
-  ReorderCallback reorder_;
-  LastTabCloseCallback last_close_;
-  DropCallback drop_;
-  std::vector<std::unique_ptr<FavoriteWidget>> favorites_;
-  int menu_index_ = -1;
-  int rename_id_ = -1;
-  int hover_index_ = -1;
-  guint hover_timeout_ = 0;
-  bool shown_ = false;
-  bool anim_showing_ = false;
-  int anim_natural_ = 0;
-  gint64 anim_start_us_ = 0;
-  guint anim_id_ = 0;
+  QMenu *menu_;
+  int menu_index_;
+  QAction *action_star_;
+  QAction *action_close_;
+  QAction *action_rename_;
+  QAction *action_save_;
+  QAction *action_new_;
+
+  QBasicTimer drag_hover_timer_;
+  int drag_hover_tab_;
+
+  bool suppress_current_changed_;
+  bool initialized_;
+
+  // Editor for inline renaming
+  RenameTabLineEdit *rename_editor_;
 };
 
-#endif
+#endif  // PLAYLISTTABBAR_H

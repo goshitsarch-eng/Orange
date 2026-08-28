@@ -1,179 +1,169 @@
-#include "smartplaylists/smartplaylistsearchpreview.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "playlist/playlistdelegates.h"
-#include "smartplaylists/smartplaylistpreviewdisplay.h"
-#include "smartplaylists/smartplaylistpreviewpolicy.h"
-#include "translations/translations.h"
+#include "config.h"
 
 #include <memory>
 
+#include <QWidget>
+#include <QAbstractItemView>
+#include <QString>
+#include <QtConcurrentRun>
+#include <QFuture>
+#include <QFutureWatcher>
+
+#include "includes/shared_ptr.h"
+
+#include "smartplaylistsearchpreview.h"
+#include "ui_smartplaylistsearchpreview.h"
+
+#include "playlist/playlist.h"
+#include "playlistquerygenerator.h"
+
+using std::make_shared;
+
+SmartPlaylistSearchPreview::SmartPlaylistSearchPreview(QWidget *parent)
+    : QWidget(parent),
+      ui_(new Ui_SmartPlaylistSearchPreview),
+      collection_backend_(nullptr),
+      model_(nullptr) {
+
+  ui_->setupUi(this);
+
+  // Prevent editing songs and saving settings (like header columns and geometry)
+  ui_->tree->setEditTriggers(QAbstractItemView::NoEditTriggers);
+  ui_->tree->SetReadOnlySettings(true);
+
+  QFont bold_font;
+  bold_font.setBold(true);
+  ui_->preview_label->setFont(bold_font);
+  ui_->busy_container->hide();
+
+}
+
+SmartPlaylistSearchPreview::~SmartPlaylistSearchPreview() {
+  delete ui_;
+}
+
+void SmartPlaylistSearchPreview::Init(const SharedPtr<Player> player,
+                                      const SharedPtr<PlaylistManager> playlist_manager,
+                                      const SharedPtr<CollectionBackend> collection_backend,
+#ifdef HAVE_MOODBAR
+                                      const SharedPtr<MoodbarLoader> moodbar_loader,
+#endif
+                                      const SharedPtr<CurrentAlbumCoverLoader> current_albumcover_loader) {
+
+  collection_backend_ = collection_backend;
+
+  model_ = new Playlist(nullptr, nullptr, nullptr, collection_backend_, nullptr, -1, QString(), false, this);
+  ui_->tree->setModel(model_);
+  ui_->tree->SetPlaylist(model_);
+
+  ui_->tree->Init(player,
+                  playlist_manager,
+                  collection_backend,
+#ifdef HAVE_MOODBAR
+                  moodbar_loader,
+#endif
+                  current_albumcover_loader);
+
+}
+
+void SmartPlaylistSearchPreview::Update(const SmartPlaylistSearch &search) {
+
+  if (search == last_search_) {
+    // This search was the same as the last one we did
+    return;
+  }
+
+  if (generator_ || isHidden()) {
+    // It's busy generating something already, or the widget isn't visible
+    pending_search_ = search;
+    return;
+  }
+
+  RunSearch(search);
+
+}
+
+void SmartPlaylistSearchPreview::showEvent(QShowEvent *e) {
+
+  if (pending_search_.is_valid() && !generator_) {
+    // There was a search waiting while we were hidden, so run it now
+    RunSearch(pending_search_);
+    pending_search_ = SmartPlaylistSearch();
+  }
+
+  QWidget::showEvent(e);
+
+}
+
 namespace {
-
-void ClearList(GtkWidget *list) {
-  GtkWidget *child = gtk_widget_get_first_child(list);
-  while (child) {
-    GtkWidget *next = gtk_widget_get_next_sibling(child);
-    gtk_list_box_remove(GTK_LIST_BOX(list), child);
-    child = next;
-  }
-}
-
-GtkWidget *ColumnLabel(const std::string &text, bool dim) {
-  GtkWidget *label = gtk_label_new(text.c_str());
-  gtk_label_set_xalign(GTK_LABEL(label), 0.0f);
-  gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
-  gtk_widget_set_hexpand(label, TRUE);
-  gtk_widget_set_margin_start(label, 6);
-  gtk_widget_set_margin_end(label, 6);
-  if (dim) {
-    gtk_widget_add_css_class(label, "dim-label");
-  }
-  return label;
-}
-
-GtkWidget *ColumnRow(const std::vector<std::string> &cells, bool header) {
-  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
-  for (const std::string &cell : cells) {
-    gtk_box_append(GTK_BOX(box), ColumnLabel(cell, header));
-  }
-  return box;
-}
-
-struct PreviewSearchJob {
-  SmartPlaylistSearchPreview *self = nullptr;
-  std::shared_ptr<bool> alive;
-  guint generation = 0;
-  SmartPlaylistSearch search;
-  SongList library;
-  SongList matches;
-};
-
-gpointer PreviewSearchThread(gpointer data) {
-  auto *job = static_cast<PreviewSearchJob *>(data);
-  job->matches = job->search.Search(job->library);
-  g_idle_add(+[](gpointer idle_data) -> gboolean {
-    std::unique_ptr<PreviewSearchJob> finished(static_cast<PreviewSearchJob *>(idle_data));
-    if (!finished->alive || !*finished->alive || !finished->self) {
-      return G_SOURCE_REMOVE;
-    }
-    finished->self->OnSearchFinished(finished->generation, finished->search, std::move(finished->matches));
-    return G_SOURCE_REMOVE;
-  },
-             job);
-  return nullptr;
-}
-
+PlaylistItemPtrList DoRunSearch(PlaylistGeneratorPtr gen) { return gen->Generate(); }
 }  // namespace
 
-SmartPlaylistSearchPreview::SmartPlaylistSearchPreview() {
-  widget_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 6);
-  gtk_widget_set_vexpand(widget_, TRUE);
-  label_ = gtk_label_new(SmartPlaylistPreviewDisplay::BusyText());
-  gtk_widget_set_halign(label_, GTK_ALIGN_START);
-  gtk_box_append(GTK_BOX(widget_), label_);
-
-  std::vector<std::string> titles;
-  for (PlaylistColumn column : SmartPlaylistPreviewDisplay::Columns()) {
-    titles.push_back(PlaylistDelegates::ColumnTitle(column));
-  }
-  header_ = ColumnRow(titles, true);
-  gtk_box_append(GTK_BOX(widget_), header_);
-
-  GtkWidget *scroll = gtk_scrolled_window_new();
-  gtk_widget_set_vexpand(scroll, TRUE);
-  gtk_widget_set_hexpand(scroll, TRUE);
-  gtk_widget_set_size_request(scroll, -1, 220);
-  gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(scroll), GTK_POLICY_AUTOMATIC, GTK_POLICY_AUTOMATIC);
-  list_ = gtk_list_box_new();
-  gtk_widget_add_css_class(list_, "boxed-list");
-  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), list_);
-  gtk_box_append(GTK_BOX(widget_), scroll);
-
-  g_signal_connect(widget_, "map", G_CALLBACK((+[](GtkWidget *, gpointer data) {
-                     static_cast<SmartPlaylistSearchPreview *>(data)->OnMapped();
-                   })),
-                   this);
-}
-
-SmartPlaylistSearchPreview::~SmartPlaylistSearchPreview() { *alive_ = false; }
-
-bool SmartPlaylistSearchPreview::Hidden() const { return widget_ == nullptr || !gtk_widget_get_mapped(widget_); }
-
-void SmartPlaylistSearchPreview::Update(const SmartPlaylistSearch &search, const SongList &songs) {
-  library_ = songs;
-  const bool same = have_last_search_ && SmartPlaylistPreviewPolicy::SameSearch(search, last_search_);
-  switch (SmartPlaylistPreviewDisplay::DecideUpdate(same, busy_, Hidden())) {
-    case SmartPlaylistPreviewDisplay::UpdateAction::Ignore:
-      return;
-    case SmartPlaylistPreviewDisplay::UpdateAction::Defer:
-      pending_ = search;
-      have_pending_ = true;
-      return;
-    case SmartPlaylistPreviewDisplay::UpdateAction::Run:
-      RunSearch(search);
-      return;
-  }
-}
-
-void SmartPlaylistSearchPreview::OnMapped() {
-  if (!SmartPlaylistPreviewDisplay::ShouldRunPendingOnShow(have_pending_, busy_)) {
-    return;
-  }
-  const SmartPlaylistSearch next = pending_;
-  have_pending_ = false;
-  RunSearch(next);
-}
-
 void SmartPlaylistSearchPreview::RunSearch(const SmartPlaylistSearch &search) {
-  ++generation_;
-  busy_ = true;
-  gtk_label_set_text(GTK_LABEL(label_), SmartPlaylistPreviewDisplay::BusyText());
 
-  auto *job = new PreviewSearchJob();
-  job->self = this;
-  job->alive = alive_;
-  job->generation = generation_;
-  job->search = search;
-  job->library = library_;
-  g_thread_unref(g_thread_new("smart-preview", PreviewSearchThread, job));
+  generator_ = make_shared<PlaylistQueryGenerator>();
+  generator_->set_collection_backend(collection_backend_);
+  std::dynamic_pointer_cast<PlaylistQueryGenerator>(generator_)->Load(search);
+
+  ui_->busy_container->show();
+  ui_->count_label->hide();
+  QFuture<PlaylistItemPtrList> future = QtConcurrent::run(DoRunSearch, generator_);
+  QFutureWatcher<PlaylistItemPtrList> *watcher = new QFutureWatcher<PlaylistItemPtrList>(this);
+  QObject::connect(watcher, &QFutureWatcher<PlaylistItemPtrList>::finished, this, &SmartPlaylistSearchPreview::SearchFinished);
+  watcher->setFuture(future);
+
 }
 
-void SmartPlaylistSearchPreview::OnSearchFinished(guint generation, const SmartPlaylistSearch &search, SongList matches) {
-  if (generation != generation_) {
+void SmartPlaylistSearchPreview::SearchFinished() {
+
+  QFutureWatcher<PlaylistItemPtrList> *watcher = static_cast<QFutureWatcher<PlaylistItemPtrList>*>(sender());
+  PlaylistItemPtrList all_items = watcher->result();
+  watcher->deleteLater();
+
+  last_search_ = std::dynamic_pointer_cast<PlaylistQueryGenerator>(generator_)->search();
+  generator_.reset();
+
+  if (pending_search_.is_valid() && pending_search_ != last_search_) {
+    // There was another search done while we were running
+    // throw away these results and do that one now instead
+    RunSearch(pending_search_);
+    pending_search_ = SmartPlaylistSearch();
     return;
   }
-  last_search_ = search;
-  have_last_search_ = true;
-  busy_ = false;
 
-  if (SmartPlaylistPreviewDisplay::ShouldDiscardForPending(have_pending_, SmartPlaylistPreviewPolicy::SameSearch(pending_, search))) {
-    const SmartPlaylistSearch next = pending_;
-    have_pending_ = false;
-    RunSearch(next);
-    return;
-  }
-  have_pending_ = false;
-  ApplyResults(matches);
-  if (finished_) {
-    finished_(match_count_);
-  }
-}
+  PlaylistItemPtrList displayed_items = all_items.mid(0, PlaylistGenerator::kDefaultLimit);
 
-void SmartPlaylistSearchPreview::ApplyResults(const SongList &matches) {
-  ClearList(list_);
-  match_count_ = static_cast<int>(matches.size());
-  const SongList shown = SmartPlaylistPreviewDisplay::SliceForDisplay(matches);
-  const std::string count = SmartPlaylistPreviewDisplay::ApplyCountTemplate(
-      Translations::Tr(SmartPlaylistPreviewDisplay::CountTemplate(static_cast<int>(shown.size()) < match_count_)), match_count_,
-      static_cast<int>(shown.size()));
-  gtk_label_set_text(GTK_LABEL(label_), count.c_str());
-  for (const Song &song : shown) {
-    std::vector<std::string> cells;
-    for (PlaylistColumn column : SmartPlaylistPreviewDisplay::Columns()) {
-      cells.push_back(SmartPlaylistPreviewDisplay::CellText(song, column));
-    }
-    GtkWidget *row = gtk_list_box_row_new();
-    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), ColumnRow(cells, false));
-    gtk_list_box_append(GTK_LIST_BOX(list_), row);
+  model_->Clear();
+  model_->InsertItems(displayed_items);
+
+  if (displayed_items.count() < all_items.count()) {
+    ui_->count_label->setText(tr("%1 songs found (showing %2)").arg(all_items.count()).arg(displayed_items.count()));
   }
+  else {
+    ui_->count_label->setText(tr("%1 songs found").arg(all_items.count()));
+  }
+
+  ui_->busy_container->hide();
+  ui_->count_label->show();
+
 }

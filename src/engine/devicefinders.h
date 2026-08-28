@@ -1,37 +1,45 @@
-#ifndef STRAWBERRY_DEVICEFINDERS_H
-#define STRAWBERRY_DEVICEFINDERS_H
+/*
+ * Strawberry Music Player
+ * Copyright 2014-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "engine/devicefinder.h"
-#include "engine/enginedevice.h"
+#ifndef DEVICEFINDERS_H
+#define DEVICEFINDERS_H
 
-#include <memory>
-#include <string>
-#include <vector>
+#include "config.h"
 
-struct AudioDevice {
-  std::string id;
-  std::string description;
-  std::string iconname;
-  std::string output;
-};
+#include <QObject>
+#include <QList>
+#include <QString>
 
-class DeviceFinders {
+class DeviceFinder;
+
+class DeviceFinders : public QObject {
+  Q_OBJECT
+
  public:
-  DeviceFinders();
-  ~DeviceFinders();
+  explicit DeviceFinders(QObject *parent = nullptr);
+  ~DeviceFinders() override;
 
   void Init();
-  std::vector<DeviceFinder *> ListFinders() const;
-  std::vector<AudioDevice> ListDevices() const;
-  std::vector<std::string> Outputs() const;
-
-  static std::string ChoiceKey(const std::string &output, const std::string &device);
-  static void SplitChoiceKey(const std::string &key, std::string *output, std::string *device);
-  static std::string OutputLabel(const std::string &output);
+  QList<DeviceFinder*> ListFinders() { return device_finders_; }
 
  private:
-  std::vector<std::unique_ptr<DeviceFinder>> finders_;
-  std::vector<AudioDevice> devices_;
+  QList<DeviceFinder*> device_finders_;
 };
 
-#endif
+#endif  // DEVICEFINDERS_H

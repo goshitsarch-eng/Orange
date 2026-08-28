@@ -1,20 +1,28 @@
-#include "transcoder/transcoderoptionsinterface.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include <algorithm>
+#include <QWidget>
+#include <QString>
 
-int TranscoderOptionsInterface::BitrateKbps(int quality, int min_kbps, int max_kbps) {
-  const int clamped = std::clamp(quality, 0, 10);
-  if (max_kbps <= min_kbps) {
-    return min_kbps;
-  }
-  return min_kbps + (max_kbps - min_kbps) * clamped / 10;
-}
+#include "transcoderoptionsinterface.h"
 
-std::string TranscoderOptionsInterface::PipelineFragment() const {
-  const std::string encoder = EncoderElement();
-  const std::string muxer = MuxerElement();
-  if (muxer.empty()) {
-    return encoder;
-  }
-  return encoder + " ! " + muxer;
-}
+TranscoderOptionsInterface::TranscoderOptionsInterface(QWidget *parent) : QWidget(parent) {}
+
+TranscoderOptionsInterface::~TranscoderOptionsInterface() = default;

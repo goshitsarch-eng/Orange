@@ -1,117 +1,97 @@
-#include "engine/devicefinders.h"
+/*
+ * Strawberry Music Player
+ * Copyright 2014-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
 #include "config.h"
-#include "engine/platformdeviceoutputs.h"
+
+#include <QtAlgorithms>
+#include <QObject>
+#include <QList>
+
+#include "core/logging.h"
+#include "devicefinders.h"
+#include "devicefinder.h"
+
 #ifdef HAVE_ALSA
-#include "engine/alsadevicefinder.h"
-#include "engine/alsapcmdevicefinder.h"
-#endif
-#ifdef HAVE_PULSE
-#include "engine/pulsedevicefinder.h"
-#endif
-#ifdef _WIN32
-#include "engine/asiodevicefinder.h"
-#include "engine/directsounddevicefinder.h"
-#include "engine/mmdevicefinder.h"
-#include "engine/uwpdevicefinder.h"
-#endif
-#ifdef __APPLE__
-#include "engine/macosdevicefinder.h"
+#  include "alsadevicefinder.h"
+#  include "alsapcmdevicefinder.h"
 #endif
 
-DeviceFinders::DeviceFinders() = default;
-DeviceFinders::~DeviceFinders() = default;
+#ifdef HAVE_PULSE
+#  include "pulsedevicefinder.h"
+#endif
+
+#ifdef Q_OS_MACOS
+#  include "macosdevicefinder.h"
+#endif
+
+#ifdef Q_OS_WIN32
+#  include "directsounddevicefinder.h"
+#  include "mmdevicefinder.h"
+#  ifdef _MSC_VER
+#    include "uwpdevicefinder.h"
+#    include "asiodevicefinder.h"
+#  endif  // _MSC_VER
+#endif  // Q_OS_WIN32
+
+using namespace Qt::Literals::StringLiterals;
+
+DeviceFinders::DeviceFinders(QObject *parent) : QObject(parent) {
+
+  setObjectName(QLatin1String(QObject::metaObject()->className()));
+
+}
+
+DeviceFinders::~DeviceFinders() {
+  qDeleteAll(device_finders_);
+}
 
 void DeviceFinders::Init() {
-  finders_.clear();
-  devices_.clear();
-  devices_.push_back({"", "Default", "audio-card-symbolic", "autoaudiosink"});
-#ifdef HAVE_PULSE
-  finders_.push_back(std::make_unique<PulseDeviceFinder>());
-#endif
+
+  QList<DeviceFinder*> device_finders;
+
 #ifdef HAVE_ALSA
-  finders_.push_back(std::make_unique<AlsaDeviceFinder>());
-  finders_.push_back(std::make_unique<AlsaPCMDeviceFinder>());
+  device_finders.append(new AlsaDeviceFinder);
+  device_finders.append(new AlsaPCMDeviceFinder);
 #endif
-#ifdef _WIN32
-  finders_.push_back(std::make_unique<MMDeviceFinder>());
-  finders_.push_back(std::make_unique<DirectSoundDeviceFinder>());
-  finders_.push_back(std::make_unique<AsioDeviceFinder>());
-  finders_.push_back(std::make_unique<UWPDeviceFinder>());
+#ifdef HAVE_PULSE
+  device_finders.append(new PulseDeviceFinder);
 #endif
-#ifdef __APPLE__
-  finders_.push_back(std::make_unique<MacOsDeviceFinder>());
+#ifdef Q_OS_MACOS
+  device_finders.append(new MacOsDeviceFinder);
 #endif
-  for (auto &finder : finders_) {
+#ifdef Q_OS_WIN32
+  device_finders.append(new DirectSoundDeviceFinder);
+  device_finders.append(new MMDeviceFinder);
+#  ifdef _MSC_VER
+  device_finders.append(new UWPDeviceFinder);
+  device_finders.append(new AsioDeviceFinder);
+#  endif  // _MSC_VER
+#endif  // Q_OS_WIN32
+
+  for (DeviceFinder *finder : device_finders) {
     if (!finder->Initialize()) {
+      qLog(Warning) << "Failed to initialize DeviceFinder for" << finder->name();
+      delete finder;
       continue;
     }
-    for (const EngineDevice &device : finder->ListDevices()) {
-      AudioDevice audio;
-      audio.id = device.value;
-      audio.description = device.description.empty() ? device.value : device.description;
-      audio.iconname = device.iconname.empty() ? "audio-card-symbolic" : device.iconname;
-      audio.output = finder->outputs().empty() ? "autoaudiosink" : finder->outputs().back();
-      devices_.push_back(audio);
-    }
-  }
-  devices_.push_back({"", "PipeWire", "audio-card-symbolic", "pipewiresink"});
-}
 
-std::vector<DeviceFinder *> DeviceFinders::ListFinders() const {
-  std::vector<DeviceFinder *> out;
-  for (const auto &finder : finders_) {
-    out.push_back(finder.get());
+    device_finders_.append(finder);
   }
-  return out;
-}
 
-std::vector<AudioDevice> DeviceFinders::ListDevices() const { return devices_; }
-
-std::vector<std::string> DeviceFinders::Outputs() const {
-  std::vector<std::string> out = {"autoaudiosink", "pulsesink", "pipewiresink", "alsasink"};
-  for (const char *sink : PlatformDeviceOutputs::ExtraSinks()) {
-    out.emplace_back(sink);
-  }
-  return out;
-}
-
-std::string DeviceFinders::ChoiceKey(const std::string &output, const std::string &device) { return output + "|" + device; }
-
-void DeviceFinders::SplitChoiceKey(const std::string &key, std::string *output, std::string *device) {
-  const auto pos = key.find('|');
-  if (pos == std::string::npos) {
-    if (output) {
-      *output = key;
-    }
-    if (device) {
-      device->clear();
-    }
-    return;
-  }
-  if (output) {
-    *output = key.substr(0, pos);
-  }
-  if (device) {
-    *device = key.substr(pos + 1);
-  }
-}
-
-std::string DeviceFinders::OutputLabel(const std::string &output) {
-  if (output == "autoaudiosink") {
-    return "Automatic";
-  }
-  if (output == "pulsesink") {
-    return "PulseAudio";
-  }
-  if (output == "pipewiresink") {
-    return "PipeWire";
-  }
-  if (output == "alsasink") {
-    return "ALSA";
-  }
-  if (const char *platform = PlatformDeviceOutputs::OutputLabel(output.c_str()); platform && *platform) {
-    return platform;
-  }
-  return output;
 }

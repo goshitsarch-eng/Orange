@@ -17,9 +17,9 @@ if(MACDEPLOYTOOL_EXECUTABLE)
     COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR} --component macos_bundle_resources
   )
   if(APPLE_DEVELOPER_ID)
-    list(APPEND DEPLOY_COMMANDS COMMAND ${MACDEPLOYTOOL_EXECUTABLE} strawberry.app --verbose=3 --sign-for-notarization=${APPLE_DEVELOPER_ID} --gstreamer-plugins=all)
+    list(APPEND DEPLOY_COMMANDS COMMAND ${MACDEPLOYTOOL_EXECUTABLE} orange.app --verbose=3 --sign-for-notarization=${APPLE_DEVELOPER_ID} --gstreamer-plugins=all)
   else()
-    list(APPEND DEPLOY_COMMANDS COMMAND ${MACDEPLOYTOOL_EXECUTABLE} strawberry.app --verbose=3 --no-codesign --gstreamer-plugins=all)
+    list(APPEND DEPLOY_COMMANDS COMMAND ${MACDEPLOYTOOL_EXECUTABLE} orange.app --verbose=3 --no-codesign --gstreamer-plugins=all)
   endif()
   add_custom_target(deploy ${DEPLOY_COMMANDS} WORKING_DIRECTORY ${CMAKE_BINARY_DIR} DEPENDS strawberry)
   if(CREATEDMG_EXECUTABLE)
@@ -30,7 +30,7 @@ if(MACDEPLOYTOOL_EXECUTABLE)
       set(CREATEDMG_SKIP_JENKINS_ARG "--skip-jenkins")
     endif()
     add_custom_target(dmg
-      COMMAND ${CREATEDMG_EXECUTABLE} --volname strawberry --background "${CMAKE_SOURCE_DIR}/dist/macos/dmg_background.png" --app-drop-link 450 218 --icon strawberry.app 150 218 --window-size 600 450 ${CREATEDMG_CODESIGN} ${CREATEDMG_SKIP_JENKINS_ARG} strawberry-${STRAWBERRY_VERSION_PACKAGE}-${CMAKE_HOST_SYSTEM_PROCESSOR}.dmg strawberry.app
+      COMMAND ${CREATEDMG_EXECUTABLE} --volname orange --background "${CMAKE_SOURCE_DIR}/dist/macos/dmg_background.png" --app-drop-link 450 218 --icon orange.app 150 218 --window-size 600 450 ${CREATEDMG_CODESIGN} ${CREATEDMG_SKIP_JENKINS_ARG} orange-${STRAWBERRY_VERSION_PACKAGE}-${CMAKE_HOST_SYSTEM_PROCESSOR}.dmg orange.app
       WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     )
   endif()

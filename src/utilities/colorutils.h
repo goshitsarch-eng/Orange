@@ -1,32 +1,33 @@
-#ifndef STRAWBERRY_COLORUTILS_H
-#define STRAWBERRY_COLORUTILS_H
+/*
+ * Strawberry Music Player
+ * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include <string>
+#ifndef COLORUTILS_H
+#define COLORUTILS_H
 
-namespace ColorUtils {
+#include <QString>
+#include <QColor>
 
-struct Rgb {
-  int r = 0;
-  int g = 0;
-  int b = 0;
-};
+namespace Utilities {
 
-std::string ColorToRgba(int r, int g, int b, double a = 1.0);
-std::string HexToCss(unsigned hex);
-bool IsColorDark(int r, int g, int b);
-unsigned ParseHex(const std::string &color);
+QString ColorToRgba(const QColor &color);
+bool IsColorDark(const QColor &color);
 
-inline Rgb RgbFromHex(const std::string &color) {
-  const unsigned value = ParseHex(color);
-  return {static_cast<int>((value >> 16) & 0xFF), static_cast<int>((value >> 8) & 0xFF), static_cast<int>(value & 0xFF)};
-}
+}  // namespace Utilities
 
-inline std::string HexFromRgb(Rgb rgb) {
-  const unsigned hex = (static_cast<unsigned>(rgb.r & 0xFF) << 16) | (static_cast<unsigned>(rgb.g & 0xFF) << 8) |
-                       static_cast<unsigned>(rgb.b & 0xFF);
-  return HexToCss(hex);
-}
-
-}  // namespace ColorUtils
-
-#endif
+#endif  // COLORUTILS_H

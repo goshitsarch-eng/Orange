@@ -1,86 +1,82 @@
-#include "core/standardpaths.h"
+/*
+ * Strawberry Music Player
+ * Copyright 2025, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include <glib.h>
-#include <sys/stat.h>
+#include <QtGlobal>
+#include <QString>
+#include <QDir>
+#include <QCoreApplication>
 
-#include <string>
+#include "standardpaths.h"
 
-namespace {
+using namespace Qt::StringLiterals;
 
-void EnsureDir(const std::string &path) { g_mkdir_with_parents(path.c_str(), 0755); }
+void StandardPaths::AppendOrganizationAndApplication(QString &path) {
 
-std::string Join(const std::string &a, const std::string &b) {
-  if (a.empty()) {
-    return b;
+  const QString organization_name = QCoreApplication::organizationName().toLower();
+  if (!organization_name.isEmpty()) {
+    path += u'/' + organization_name;
   }
-  if (a.back() == '/') {
-    return a + b;
+  const QString application_name = QCoreApplication::applicationName().toLower();
+  if (!application_name.isEmpty()) {
+    path += u'/' + application_name;
   }
-  return a + "/" + b;
+
 }
 
-}  // namespace
+QString StandardPaths::WritableLocation(const StandardLocation type) {
 
-namespace StandardPaths {
-
-std::string ConfigDir() {
-  const char *dir = g_get_user_config_dir();
-  const std::string path = Join(dir ? dir : "", "strawberry");
-  EnsureDir(path);
-  return path;
-}
-
-std::string DataDir() {
-  const char *dir = g_get_user_data_dir();
-  const std::string path = Join(dir ? dir : "", "strawberry");
-  EnsureDir(path);
-  return path;
-}
-
-std::string CacheDir() {
-  const char *dir = g_get_user_cache_dir();
-  const std::string path = Join(dir ? dir : "", "strawberry");
-  EnsureDir(path);
-  return path;
-}
-
-std::string DatabasePath() { return Join(DataDir(), "strawberry.db"); }
-
-std::string SettingsPath() { return Join(ConfigDir(), "strawberry.conf"); }
-
-std::string CoverCacheDir() {
-  const std::string path = Join(CacheDir(), "albumcovers");
-  EnsureDir(path);
-  return path;
-}
-
-std::string LyricsCacheDir() {
-  const std::string path = Join(CacheDir(), "lyrics");
-  EnsureDir(path);
-  return path;
-}
-
-std::string MoodbarCacheDir() {
-  const std::string path = Join(CacheDir(), "moodbar");
-  EnsureDir(path);
-  return path;
-}
-
-std::string WaveformCacheDir() {
-  const std::string path = Join(CacheDir(), "waveform");
-  EnsureDir(path);
-  return path;
-}
-
-std::string LocaleDir() {
-  if (const char *env = g_getenv("STRAWBERRY_LOCALE_DIR")) {
-    return env;
+#if defined(Q_OS_UNIX) && !defined(Q_OS_MACOS)
+  switch (type) {
+    case StandardLocation::CacheLocation:
+    case StandardLocation::GenericCacheLocation:{
+      QString cache_location = qEnvironmentVariable("XDG_CACHE_HOME");
+      if (!cache_location.startsWith(u'/')) {
+        cache_location.clear();
+      }
+      if (cache_location.isEmpty()) {
+        cache_location = QDir::homePath() + "/.cache"_L1;
+      }
+      if (type == QStandardPaths::CacheLocation) {
+        AppendOrganizationAndApplication(cache_location);
+      }
+      return cache_location;
+    }
+    case StandardLocation::AppDataLocation:
+    case StandardLocation::AppLocalDataLocation:
+    case StandardLocation::GenericDataLocation:{
+      QString data_location = qEnvironmentVariable("XDG_DATA_HOME");
+      if (!data_location.startsWith(u'/')) {
+        data_location.clear();
+      }
+      if (data_location.isEmpty()) {
+        data_location = QDir::homePath() + "/.local/share"_L1;
+      }
+      if (type == StandardLocation::AppDataLocation || type == StandardLocation::AppLocalDataLocation) {
+        AppendOrganizationAndApplication(data_location);
+      }
+      return data_location;
+    }
+    default:
+      break;
   }
-#ifdef STRAWBERRY_LOCALE_DIR
-  return STRAWBERRY_LOCALE_DIR;
-#else
-  return "/usr/share/locale";
 #endif
-}
 
-}  // namespace StandardPaths
+  return QStandardPaths::writableLocation(type);
+
+}

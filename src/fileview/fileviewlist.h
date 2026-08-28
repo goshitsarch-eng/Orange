@@ -1,50 +1,82 @@
-#ifndef STRAWBERRY_FILEVIEWLIST_H
-#define STRAWBERRY_FILEVIEWLIST_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "fileview/fileviewkeyboard.h"
+#ifndef FILEVIEWLIST_H
+#define FILEVIEWLIST_H
 
-#include <functional>
-#include <string>
-#include <vector>
+#include <QObject>
+#include <QListView>
+#include <QItemSelectionModel>
+#include <QList>
+#include <QUrl>
+#include <QString>
+#include <QStringList>
 
-#include <gtk/gtk.h>
+class QWidget;
+class QMimeData;
+class QMenu;
+class QMouseEvent;
+class QContextMenuEvent;
 
-class FileViewList {
+class MimeData;
+
+class FileViewList : public QListView {
+  Q_OBJECT
+
  public:
-  using ActivateCallback = std::function<void(const std::string &)>;
-  using EnqueueCallback = std::function<void(const std::vector<std::string> &)>;
-  using MenuCallback = std::function<void(const std::vector<std::string> &)>;
-  using NavigateCallback = std::function<void(FileViewKeyboard::Action)>;
+  explicit FileViewList(QWidget *parent = nullptr);
 
-  FileViewList();
-  ~FileViewList();
+  void mousePressEvent(QMouseEvent *e) override;
 
-  GtkWidget *widget() const { return widget_; }
-  GtkWidget *list() const { return list_; }
-  void Reload(const std::vector<std::string> &paths);
-  void SetActivateCallback(ActivateCallback callback);
-  void SetDoubleClickCallback(ActivateCallback callback);
-  void SetEnqueueCallback(EnqueueCallback callback);
-  void SetMenuCallback(MenuCallback callback);
-  void HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state);
-  void SetNavigateCallback(NavigateCallback callback);
-  std::vector<std::string> SelectedPaths() const;
+ Q_SIGNALS:
+  void AddToPlaylist(QMimeData *data);
+  void CopyToCollection(const QList<QUrl> &urls);
+  void MoveToCollection(const QList<QUrl> &urls);
+  void CopyToDevice(const QList<QUrl> &urls);
+  void Delete(const QStringList &filenames);
+  void EditTags(const QList<QUrl> &urls);
+  void Back();
+  void Forward();
+
+ protected:
+  void contextMenuEvent(QContextMenuEvent *e) override;
 
  private:
-  void SetupRowDrag(GtkWidget *row, const std::string &path);
-  gboolean OnKeyPressed(guint keyval, GdkModifierType mods);
-  void ResetTypeAhead();
-  std::vector<std::string> Labels() const;
+  QStringList FilenamesFromSelection() const;
+  QList<QUrl> UrlListFromSelection() const;
+  MimeData *MimeDataFromSelection() const;
 
-  GtkWidget *widget_ = nullptr;
-  GtkWidget *list_ = nullptr;
-  ActivateCallback activate_;
-  ActivateCallback double_click_;
-  EnqueueCallback enqueue_;
-  MenuCallback menu_;
-  NavigateCallback navigate_;
-  std::string typeahead_;
-  guint typeahead_timeout_ = 0;
+ private Q_SLOTS:
+  void LoadSlot();
+  void AddToPlaylistSlot();
+  void OpenInNewPlaylistSlot();
+  void CopyToCollectionSlot();
+  void MoveToCollectionSlot();
+  void CopyToDeviceSlot();
+  void DeleteSlot();
+  void EditTagsSlot();
+  void ShowInBrowser();
+
+ private:
+  QMenu *menu_;
+  QItemSelection menu_selection_;
 };
 
-#endif
+#endif  // FILEVIEWLIST_H

@@ -1,17 +1,33 @@
-#ifndef STRAWBERRY_WINUTILS_H
-#define STRAWBERRY_WINUTILS_H
+/*
+ * Strawberry Music Player
+ * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#ifdef _WIN32
-#include <gtk/gtk.h>
-#endif
+#ifndef WINUTILS_H
+#define WINUTILS_H
 
-namespace WinUtils {
+#include <QRegion>
 
-#ifdef _WIN32
-void EnableBlurBehindWindow(GtkWidget *window);
-void *NativeHandle(GtkWidget *window);
-#endif
+class QWindow;
 
-}  // namespace WinUtils
+namespace Utilities {
 
-#endif
+void enableBlurBehindWindow(QWindow *window, const QRegion &region);
+
+}  // namespace Utilities
+
+#endif  // WINUTILS_H

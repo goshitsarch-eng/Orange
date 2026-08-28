@@ -1,19 +1,47 @@
-#ifndef STRAWBERRY_GLOBALSHORTCUTSBACKEND_KGLOBALACCEL_H
-#define STRAWBERRY_GLOBALSHORTCUTSBACKEND_KGLOBALACCEL_H
+/*
+ * Strawberry Music Player
+ * Copyright 2020-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "globalshortcuts/globalshortcutsbackend.h"
+#ifndef GLOBALSHORTCUTSBACKEND_KDE_H
+#define GLOBALSHORTCUTSBACKEND_KDE_H
 
-#include <gio/gio.h>
+#include "config.h"
 
-#include <string>
-#include <vector>
+#include <QList>
+#include <QMultiHash>
+#include <QString>
+#include <QStringList>
+#include <QKeySequence>
 
-class GlobalShortcut;
+#include "globalshortcutsbackend.h"
+#include "globalshortcutsmanager.h"
+
+class QDBusPendingCallWatcher;
+class QAction;
+
+class OrgKdeKGlobalAccelInterface;
+class OrgKdeKglobalaccelComponentInterface;
 
 class GlobalShortcutsBackendKGlobalAccel : public GlobalShortcutsBackend {
+  Q_OBJECT
+
  public:
-  explicit GlobalShortcutsBackendKGlobalAccel(GlobalShortcutsManager *manager);
-  ~GlobalShortcutsBackendKGlobalAccel() override;
+  explicit GlobalShortcutsBackendKGlobalAccel(GlobalShortcutsManager *manager, QObject *parent = nullptr);
 
   bool IsAvailable() const override;
   static bool IsKGlobalAccelAvailable();
@@ -23,31 +51,20 @@ class GlobalShortcutsBackendKGlobalAccel : public GlobalShortcutsBackend {
   void DoUnregister() override;
 
  private:
-  bool RegisterShortcut(const GlobalShortcut *shortcut);
-  void SubscribeComponent();
-  static void OnShortcutPressed(GDBusConnection *connection, const gchar *sender, const gchar *object_path, const gchar *interface_name,
-                                const gchar *signal_name, GVariant *parameters, gpointer data);
+  bool IsMediaShortcut(const GlobalShortcutsManager::Shortcut &shortcut) const;
+  bool RegisterShortcut(const GlobalShortcutsManager::Shortcut &shortcut);
+  static QStringList GetActionId(const QString &id, const QAction *action);
+  static QList<int> ToIntList(const QList<QKeySequence> &sequence_list);
+  static QList<QKeySequence> ToKeySequenceList(const QList<int> &sequence_list);
 
-  GDBusProxy *interface_ = nullptr;
-  guint signal_id_ = 0;
-  std::vector<std::string> registered_ids_;
-};
-
-class GlobalShortcutsBackendGnome : public GlobalShortcutsBackend {
- public:
-  explicit GlobalShortcutsBackendGnome(GlobalShortcutsManager *manager);
-  ~GlobalShortcutsBackendGnome() override;
-
-  bool IsAvailable() const override;
-
- protected:
-  bool DoRegister() override;
-  void DoUnregister() override;
+ private Q_SLOTS:
+  void RegisterFinished(QDBusPendingCallWatcher *watcher);
+  void GlobalShortcutPressed(const QString &component_unique, const QString &shortcut_unique, const qint64 timestamp);
 
  private:
-  static void OnMediaKey(GDBusProxy *proxy, const char *sender, const char *signal, GVariant *parameters, gpointer data);
-
-  GDBusProxy *media_keys_ = nullptr;
+  OrgKdeKGlobalAccelInterface *interface_;
+  OrgKdeKglobalaccelComponentInterface *component_;
+  QMultiHash<QString, QAction*> actions_;
 };
 
-#endif
+#endif  // GLOBALSHORTCUTSBACKEND_KDE_H

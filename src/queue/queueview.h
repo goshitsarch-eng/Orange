@@ -1,68 +1,64 @@
-#ifndef STRAWBERRY_QUEUEVIEW_H
-#define STRAWBERRY_QUEUEVIEW_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2019-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "core/song.h"
-#include "playlist/playlistdropindicator.h"
+#ifndef QUEUEVIEW_H
+#define QUEUEVIEW_H
 
-#include <functional>
-#include <string>
-#include <vector>
-#include <gtk/gtk.h>
+#include "config.h"
 
-class Queue;
+#include <QObject>
+#include <QWidget>
+#include <QString>
 
-class QueueView {
+#include "includes/shared_ptr.h"
+
+class Playlist;
+class PlaylistManager;
+class Ui_QueueView;
+
+class QueueView : public QWidget {
+  Q_OBJECT
+
  public:
-  using UrlDropCallback = std::function<void(const std::vector<std::string> &urls, int dest)>;
-  using PlaylistRowsDropCallback = std::function<void(const std::vector<int> &rows, int dest)>;
+  explicit QueueView(QWidget *parent = nullptr);
+  ~QueueView() override;
 
-  explicit QueueView(Queue *queue);
-  ~QueueView();
-  GtkWidget *widget() const { return widget_; }
-  void SetQueue(Queue *queue);
-  Queue *queue() const { return queue_; }
-  void Reload();
-  void ApplyLook();
+  void SetPlaylistManager(SharedPtr<PlaylistManager> playlist_manager);
+  void ReloadSettings();
+
+ private Q_SLOTS:
+  void CurrentPlaylistChanged(Playlist *playlist);
+  void PlaylistDestroyed();
+  void UpdateButtonState();
+
   void MoveUp();
   void MoveDown();
   void Remove();
   void Clear();
-  void SetActivateCallback(std::function<void(const Song &)> callback);
-  void SetUrlDropCallback(UrlDropCallback callback) { url_drop_ = std::move(callback); }
-  void SetPlaylistRowsDropCallback(PlaylistRowsDropCallback callback) { playlist_drop_ = std::move(callback); }
-  void SetNowPlayingUrl(const std::string &url);
-  const std::string &now_playing_url() const { return now_playing_url_; }
-  std::vector<int> SelectedIndexes() const;
-
-  static bool IsNowPlaying(const Song &song, const std::string &url) { return !url.empty() && song.url() == url; }
 
  private:
-  void Rebuild();
-  void SetupRowDrag(GtkWidget *row, int index);
-  int RowAtY(double y) const;
-  void UpdateDropIndicator(double y);
-  void ClearDropIndicator();
-  gboolean OnDrop(const GValue *value, double y);
-  gboolean OnKeyPressed(guint keyval, GdkModifierType modifiers);
-  void ResetTypeAhead();
-  void UpdateChrome();
+  Ui_QueueView *ui_;
 
-  Queue *queue_ = nullptr;
-  GtkWidget *widget_ = nullptr;
-  GtkWidget *list_ = nullptr;
-  GtkWidget *drop_overlay_ = nullptr;
-  PlaylistDropIndicator::State drop_state_;
-  GtkWidget *summary_ = nullptr;
-  GtkWidget *move_up_ = nullptr;
-  GtkWidget *move_down_ = nullptr;
-  GtkWidget *remove_ = nullptr;
-  GtkWidget *clear_ = nullptr;
-  std::function<void(Song)> activate_;
-  UrlDropCallback url_drop_;
-  PlaylistRowsDropCallback playlist_drop_;
-  std::string now_playing_url_;
-  std::string typeahead_;
-  guint typeahead_timeout_ = 0;
+  SharedPtr<PlaylistManager> playlist_manager_;
+  Playlist *current_playlist_;
 };
 
-#endif
+#endif  // QUEUEVIEW_H

@@ -1,39 +1,74 @@
-#ifndef STRAWBERRY_SUBSONICSCROBBLER_H
-#define STRAWBERRY_SUBSONICSCROBBLER_H
+/*
+ * Strawberry Music Player
+ * Copyright 2018-2025, Jonas Kvinge <jonas@jkvinge.net>
+ * Copyright 2020, Pascal Below <spezifisch@below.fr>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "scrobbler/audioscrobbler.h"
+#ifndef SUBSONICSCROBBLER_H
+#define SUBSONICSCROBBLER_H
 
-#include <cstdint>
-#include <string>
+#include "config.h"
+
+#include <QDateTime>
+#include <QVariant>
+#include <QString>
+#include <QTimer>
+
+#include "includes/shared_ptr.h"
+#include "core/song.h"
+#include "scrobblerservice.h"
+
+class ScrobblerSettingsService;
+class SubsonicService;
 
 class SubsonicScrobbler : public ScrobblerService {
+  Q_OBJECT
+
  public:
-  explicit SubsonicScrobbler(NetworkAccessManager *network);
+  explicit SubsonicScrobbler(const SharedPtr<ScrobblerSettingsService> settings, const SharedPtr<NetworkAccessManager> network, const SharedPtr<SubsonicService> service, QObject *parent = nullptr);
 
-  std::string name() const override { return "Subsonic"; }
-  ~SubsonicScrobbler() override;
+  void ReloadSettings() override;
 
-  void NowPlaying(const Song &song) override;
+  bool enabled() const override { return enabled_; }
+  bool authentication_required() const override { return true; }
+  bool authenticated() const override { return true; }
+  bool use_authorization_header() const override { return false; }
+  QByteArray authorization_header() const override { return QByteArray(); }
+
+  void UpdateNowPlaying(const Song &song) override;
   void ClearPlaying() override;
   void Scrobble(const Song &song) override;
-  void Love(const Song &song) override;
-  void Authenticate(const std::string &username, const std::string &password) override;
 
-  static std::string ScrobbleUrl(const std::string &server_url, const std::string &username, const std::string &password, const std::string &id,
-                                 bool submission, bool hex_auth, int64_t time_ms = 0);
+  void StartSubmit(const bool initial = false) override { Q_UNUSED(initial) }
+  bool submitted() const override { return submitted_; }
+
+  SharedPtr<SubsonicService> service() const;
+
+ public Q_SLOTS:
+  void WriteCache() override {}
+  void Submit() override;
 
  private:
-  void Ping(const Song &song, bool submission, int64_t time_ms);
-  void CancelSubmitTimer();
-  void SubmitPending();
-
-  NetworkAccessManager *network_ = nullptr;
-  std::string playing_url_;
-  std::string playing_song_id_;
-  int64_t playing_time_ms_ = 0;
-  Song pending_song_;
-  bool submitted_ = false;
-  unsigned submit_timeout_id_ = 0;
+  const SharedPtr<SubsonicService> service_;
+  bool enabled_;
+  bool submitted_;
+  Song song_playing_;
+  QDateTime time_;
+  QTimer timer_submit_;
 };
 
-#endif
+#endif  // SUBSONICSCROBBLER_H

@@ -1,19 +1,53 @@
-#ifndef STRAWBERRY_FILESYSTEMMUSICSTORAGE_H
-#define STRAWBERRY_FILESYSTEMMUSICSTORAGE_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "core/musicstorage.h"
+#ifndef FILESYSTEMMUSICSTORAGE_H
+#define FILESYSTEMMUSICSTORAGE_H
 
-class FilesystemMusicStorage : public MusicStorage {
+#include "config.h"
+
+#include <optional>
+
+#include <QString>
+
+#include "song.h"
+#include "musicstorage.h"
+
+class FilesystemMusicStorage : public virtual MusicStorage {
  public:
-  explicit FilesystemMusicStorage(std::string root);
+  explicit FilesystemMusicStorage(const Song::Source source, const QString &root, const std::optional<int> collection_directory_id = std::optional<int>());
 
-  Song::Source source() const override { return Song::Source::LocalFile; }
-  std::string LocalPath() const override { return root_; }
-  bool CopyToStorage(const CopyJob &job, std::string &error_text) override;
+  Song::Source source() const override { return source_; }
+  QString LocalPath() const override { return root_; }
+  std::optional<int> collection_directory_id() const override { return collection_directory_id_; }
+
+  bool CopyToStorage(const CopyJob &job, QString &error_text) override;
   bool DeleteFromStorage(const DeleteJob &job) override;
 
  private:
-  std::string root_;
+  Song::Source source_;
+  QString root_;
+  std::optional<int> collection_directory_id_;
+
+  Q_DISABLE_COPY(FilesystemMusicStorage)
 };
 
-#endif
+#endif  // FILESYSTEMMUSICSTORAGE_H

@@ -1,62 +1,88 @@
-#ifndef STRAWBERRY_PLAYLISTHEADER_H
-#define STRAWBERRY_PLAYLISTHEADER_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2026, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "playlist/playlistdelegates.h"
+#ifndef PLAYLISTHEADER_H
+#define PLAYLISTHEADER_H
 
-#include <gtk/gtk.h>
+#include "config.h"
 
-#include <functional>
+#include <QObject>
+#include <QWidget>
+#include <QList>
 
-class PlaylistHeader {
+#include "widgets/stretchheaderview.h"
+
+class QMenu;
+class QAction;
+class QContextMenuEvent;
+class QEnterEvent;
+
+class PlaylistView;
+
+class PlaylistHeader : public StretchHeaderView {
+  Q_OBJECT
+
  public:
-  using SortCallback = std::function<void(PlaylistColumn, PlaylistSortOrder)>;
-  using LayoutChangedCallback = std::function<void()>;
-  using WidthsChangedCallback = std::function<void()>;
+  explicit PlaylistHeader(Qt::Orientation orientation, PlaylistView *view, QWidget *parent = nullptr);
 
-  PlaylistHeader();
-  ~PlaylistHeader();
+  // QWidget
+  void contextMenuEvent(QContextMenuEvent *e) override;
+  void enterEvent(QEnterEvent *e) override;
 
-  PlaylistHeader(const PlaylistHeader &) = delete;
-  PlaylistHeader &operator=(const PlaylistHeader &) = delete;
+ Q_SIGNALS:
+  void SectionVisibilityChanged(const int logical_index, const bool visible);
+  void MouseEntered();
+  void SectionRatingLockStatusChanged(const bool);
 
-  GtkWidget *widget() const { return widget_; }
-  void SetSortCallback(SortCallback callback) { sort_ = std::move(callback); }
-  void SetLayoutChangedCallback(LayoutChangedCallback callback) { layout_changed_ = std::move(callback); }
-  void SetWidthsChangedCallback(WidthsChangedCallback callback) { widths_changed_ = std::move(callback); }
-  void SetSortState(PlaylistColumn column, bool descending);
-  void SetViewportWidth(int width);
-  void ApplyWidths();
-  void Rebuild();
-  gboolean OnKeyPressed(guint keyval, GdkModifierType state);
+ private Q_SLOTS:
+  void SortAscending();
+  void SortDescending();
+  void ClearSorting();
+  void HideCurrent();
+  void ToggleVisible(const int section);
+  void ResetColumns();
+  void SetColumnAlignment(QAction *action);
+  void ToggleRatingEditStatus();
 
  private:
-  void ShowMenu(PlaylistColumn column);
-  void NotifyLayoutChanged();
-  PlaylistColumn ColumnAtX(double x) const;
-  PlaylistColumn ResizeColumnAtX(double x) const;
-  PlaylistColumn NextVisible(PlaylistColumn column) const;
-  void UpdateResizeCursor(double x);
-  void OnDragBegin(double x);
-  void OnDragUpdate(double offset_x);
-  void OnDragEnd();
-  void ReorderButtons();
-  void NotifyWidthsChanged();
-  bool DragActive() const;
+  void AddColumnAction(const int index);
+  void SortCurrent(const Qt::SortOrder sort_order);
 
-  GtkWidget *widget_ = nullptr;
-  SortCallback sort_;
-  LayoutChangedCallback layout_changed_;
-  WidthsChangedCallback widths_changed_;
-  PlaylistColumn sort_column_ = PlaylistColumn::Count;
-  bool sort_descending_ = false;
-  int viewport_width_ = 0;
-  PlaylistColumn resize_column_ = PlaylistColumn::Count;
-  PlaylistColumn resize_next_ = PlaylistColumn::Count;
-  int resize_left_start_ = 0;
-  int resize_right_start_ = 0;
-  PlaylistColumn reorder_column_ = PlaylistColumn::Count;
-  PlaylistColumn reorder_last_hover_ = PlaylistColumn::Count;
-  double drag_start_x_ = 0;
+ private:
+  PlaylistView *view_;
+
+  int menu_section_;
+  QMenu *menu_;
+  QMenu *sort_menu_;
+  QAction *action_sort_ascending_;
+  QAction *action_sort_descending_;
+  QAction *action_sort_clear_;
+  QAction *action_hide_;
+  QAction *action_reset_;
+  QAction *action_stretch_;
+  QAction *action_rating_lock_;
+  QAction *action_align_left_;
+  QAction *action_align_center_;
+  QAction *action_align_right_;
+  QList<QAction*> show_actions_;
 };
 
-#endif
+#endif  // PLAYLISTHEADER_H

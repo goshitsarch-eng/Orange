@@ -1,78 +1,113 @@
-#ifndef STRAWBERRY_OSDBASE_H
-#define STRAWBERRY_OSDBASE_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "constants/notificationssettings.h"
+#ifndef OSDBASE_H
+#define OSDBASE_H
+
+#include "config.h"
+
+#include <QtGlobal>
+#include <QObject>
+#include <QString>
+#include <QUrl>
+#include <QDateTime>
+#include <QImage>
+
+#include "includes/shared_ptr.h"
 #include "core/song.h"
 #include "playlist/playlistsequence.h"
-
-#include <string>
-#include <vector>
+#include "constants/notificationssettings.h"
 
 class OSDPretty;
-class OSDDbus;
 class SystemTrayIcon;
 
-class OSDBase {
- public:
-  explicit OSDBase(SystemTrayIcon *tray_icon = nullptr);
-  virtual ~OSDBase();
+class OSDBase : public QObject {
+  Q_OBJECT
 
-  void set_tray_icon(SystemTrayIcon *tray_icon) { tray_icon_ = tray_icon; }
-  int timeout_msec() const { return timeout_ms_; }
+ public:
+  explicit OSDBase(const SharedPtr<SystemTrayIcon> tray_icon, QObject *parent = nullptr);
+  ~OSDBase() override;
+
+  int timeout_msec() const { return timeout_msec_; }
   void ReloadPrettyOSDSettings();
-  void ReloadSettings();
+  void SetPrettyOSDToggleMode(bool toggle);
 
   OSDSettings::Type GetSupportedType() const;
-  bool IsTypeSupported(OSDSettings::Type type) const;
+  bool IsTypeSupported(const OSDSettings::Type type) const;
   virtual bool SupportsNativeNotifications() const;
   virtual bool SupportsTrayPopups() const;
   static bool SupportsOSDPretty();
 
-  void SongChanged(const Song &song, const std::vector<unsigned char> &art = {});
-  void ReshowCurrentSong(const Song &song = Song(), const std::vector<unsigned char> &art = {});
-  bool force_show_next() const { return force_show_next_; }
-  void AlbumCoverLoaded(const Song &song, const std::vector<unsigned char> &art);
+ public Q_SLOTS:
+  void ReloadSettings();
+
+  void SongChanged(const Song &song);
   void Paused();
   void Resumed();
   void Stopped();
-  void StopAfterToggle(bool stop);
+  void StopAfterToggle(const bool stop);
   void PlaylistFinished();
-  void VolumeChanged(unsigned value);
-  void PlayModeChanged(const std::string &mode);
-  void RepeatModeChanged(PlaylistSequence::RepeatMode mode);
-  void ShuffleModeChanged(PlaylistSequence::ShuffleMode mode);
-  void SetPrettyOSDToggleMode(bool toggle);
-  void ShowPreview(OSDSettings::Type type, const std::string &line1, const std::string &line2, const Song &song);
-  void ShowMessage(const std::string &summary, const std::string &body, const std::string &icon = "audio-x-generic");
-  void ShowMessage(const std::string &summary, const std::string &body, const std::string &icon, const std::vector<unsigned char> &art);
-  bool enabled() const { return enabled_; }
-  OSDSettings::Type type() const { return type_; }
+  void VolumeChanged(const uint value);
+  void RepeatModeChanged(const PlaylistSequence::RepeatMode mode);
+  void ShuffleModeChanged(const PlaylistSequence::ShuffleMode mode);
 
- protected:
-  virtual void ShowNative(const std::string &summary, const std::string &body, const std::string &icon = "audio-x-generic",
-                          const std::vector<unsigned char> &art = {});
-  std::string PlayingSummary(const Song &song) const;
-  std::string PlayingBody(const Song &song) const;
+  void ReshowCurrentSong();
 
-  bool enabled_ = true;
-  bool show_art_ = true;
-  bool show_on_volume_change_ = false;
-  bool show_on_play_mode_change_ = true;
-  bool show_on_pause_ = true;
-  bool show_on_resume_ = false;
-  bool use_custom_text_ = false;
-  bool playing_ = false;
-  bool ignore_next_stopped_ = false;
-  bool force_show_next_ = false;
-  OSDSettings::Type type_ = OSDSettings::Type::Native;
-  int timeout_ms_ = 4000;
-  std::string custom_text1_;
-  std::string custom_text2_;
+  void ShowPreview(const OSDSettings::Type type, const QString &line1, const QString &line2, const Song &song);
+
+  void AlbumCoverLoaded(const Song &song, const QUrl &cover_url, const QImage &image);
+
+ private:
+  enum class MessageType {
+    Summary,
+    Message
+  };
+  void ShowPlaying(const Song &song, const QUrl &cover_url, const QImage &image, const bool preview = false);
+  void ShowMessage(const QString &summary, const QString &message = QString(), const QString &icon = QStringLiteral("strawberry"), const QImage &image = QImage());
+  QString ReplaceMessage(const MessageType type, const QString &message, const Song &song);
+  virtual void ShowMessageNative(const QString &summary, const QString &message, const QString &icon = QString(), const QImage &image = QImage());
+
+ private:
+  const SharedPtr<SystemTrayIcon> tray_icon_;
+  OSDPretty *pretty_popup_;
+
+  int timeout_msec_;
+  OSDSettings::Type type_;
+  bool show_on_volume_change_;
+  bool show_art_;
+  bool show_on_play_mode_change_;
+  bool show_on_pause_;
+  bool show_on_resume_;
+  bool use_custom_text_;
+  QString custom_text1_;
+  QString custom_text2_;
+
+  bool force_show_next_;
+  bool ignore_next_stopped_;
+  bool playing_;
+
+  Song song_playing_;
   Song last_song_;
-  std::vector<unsigned char> last_art_;
-  SystemTrayIcon *tray_icon_ = nullptr;
-  OSDPretty *pretty_ = nullptr;
-  OSDDbus *dbus_ = nullptr;
+  QUrl last_image_uri_;
+  QImage last_image_;
 };
 
-#endif
+#endif  // OSDBASE_H

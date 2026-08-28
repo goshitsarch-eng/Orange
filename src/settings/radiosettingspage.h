@@ -1,13 +1,51 @@
-#ifndef STRAWBERRY_RADIOSETTINGSPAGE_H
-#define STRAWBERRY_RADIOSETTINGSPAGE_H
+/*
+ * Strawberry Music Player
+ * Copyright 2026, Malte Zilinski <malte@zilinski.eu>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include <adwaita.h>
+#ifndef RADIOSETTINGSPAGE_H
+#define RADIOSETTINGSPAGE_H
 
-class Application;
-class Settings;
+#include <QObject>
+#include <QList>
+#include <QPair>
+#include <QString>
 
-namespace RadioSettingsPage {
-AdwPreferencesPage *Create(Settings *settings, Application *app = nullptr);
-}
+#include "settings/settingspage.h"
 
-#endif
+class QComboBox;
+class SettingsDialog;
+class Ui_RadioSettingsPage;
+
+class RadioSettingsPage : public SettingsPage {
+  Q_OBJECT
+
+ public:
+  explicit RadioSettingsPage(SettingsDialog *dialog, QWidget *parent = nullptr);
+  ~RadioSettingsPage() override;
+
+  static QList<QPair<QString, QString>> CountryList();
+  static void PopulateCountries(QComboBox *combo);
+
+  void Load() override;
+  void Save() override;
+
+ private:
+  Ui_RadioSettingsPage *ui_;
+};
+
+#endif  // RADIOSETTINGSPAGE_H

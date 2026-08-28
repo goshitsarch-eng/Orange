@@ -1,28 +1,52 @@
-#ifndef STRAWBERRY_DEEZERCOVERPROVIDER_H
-#define STRAWBERRY_DEEZERCOVERPROVIDER_H
+/*
+ * Strawberry Music Player
+ * Copyright 2018-2025, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "covermanager/coverproviders.h"
+#ifndef DEEZERCOVERPROVIDER_H
+#define DEEZERCOVERPROVIDER_H
 
-#include <string>
-#include <vector>
+#include "config.h"
 
-class DeezerCoverProvider : public CoverProvider {
+#include <QVariant>
+#include <QString>
+
+#include "jsoncoverprovider.h"
+
+class NetworkAccessManager;
+class QNetworkReply;
+
+class DeezerCoverProvider : public JsonCoverProvider {
+  Q_OBJECT
+
  public:
-  struct SearchResult {
-    std::string artist;
-    std::string album;
-    std::string image_url;
-  };
+  explicit DeezerCoverProvider(const SharedPtr<NetworkAccessManager> network, QObject *parent = nullptr);
 
-  static const char *kApiUrl;
-  static const int kLimit;
+  bool StartSearch(const QString &artist, const QString &album, const QString &title, const int id) override;
+  void CancelSearch(const int id) override;
 
-  std::string name() const override { return "Deezer"; }
-  void Fetch(const Song &song, NetworkAccessManager *network, Callback callback) override;
-  void Search(const Song &song, NetworkAccessManager *network, SearchCallback callback) override;
+ private Q_SLOTS:
+  void HandleSearchReply(QNetworkReply *reply, const int id);
 
-  static std::string SearchUrl(const std::string &artist, const std::string &album, const std::string &title);
-  static std::vector<SearchResult> ParseResults(const std::string &json);
+ protected:
+  JsonObjectResult ParseJsonObject(QNetworkReply *reply);
+
+ private:
+  void Error(const QString &error, const QVariant &debug = QVariant()) override;
 };
 
-#endif
+#endif  // DEEZERCOVERPROVIDER_H

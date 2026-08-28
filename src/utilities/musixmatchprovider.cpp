@@ -1,56 +1,46 @@
-#include "utilities/musixmatchprovider.h"
+/*
+ * Strawberry Music Player
+ * Copyright 2020-2022, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "utilities/strutils.h"
+#include <QString>
+#include <QRegularExpression>
 
-#include <glib.h>
+#include "musixmatchprovider.h"
+
+using namespace Qt::Literals::StringLiterals;
 
 namespace MusixmatchProvider {
 
-std::string StringFixup(const std::string &text) {
-  std::string replaced = StrUtils::Replace(text, "/", "-");
-  replaced = StrUtils::Replace(replaced, "'", "-");
-  std::string filtered;
-  const char *p = replaced.c_str();
-  while (*p) {
-    gunichar ch = g_utf8_get_char(p);
-    if (g_unichar_isalnum(ch) || ch == '-' || ch == ' ') {
-      gchar buf[8] = {};
-      const gint len = g_unichar_to_utf8(ch, buf);
-      if (len > 0) {
-        filtered.append(buf, static_cast<size_t>(len));
-      }
-    }
-    p = g_utf8_next_char(p);
-  }
-  std::string collapsed;
-  bool in_space = false;
-  for (char ch : filtered) {
-    if (ch == ' ') {
-      if (!in_space) {
-        collapsed.push_back(' ');
-      }
-      in_space = true;
-    } else {
-      collapsed.push_back(ch);
-      in_space = false;
-    }
-  }
-  collapsed = StrUtils::Trim(collapsed);
-  collapsed = StrUtils::Replace(collapsed, " ", "-");
-  std::string dashes;
-  bool in_dash = false;
-  for (char ch : collapsed) {
-    if (ch == '-') {
-      if (!in_dash) {
-        dashes.push_back('-');
-      }
-      in_dash = true;
-    } else {
-      dashes.push_back(ch);
-      in_dash = false;
-    }
-  }
-  return StrUtils::ToLower(dashes);
+QString StringFixup(QString text) {
+
+  static const QRegularExpression regex_illegal_characters(u"[^\\w0-9\\- ]"_s, QRegularExpression::UseUnicodePropertiesOption);
+  static const QRegularExpression regex_duplicate_whitespaces(u" {2,}"_s);
+  static const QRegularExpression regex_duplicate_dashes(u"(-)\\1+"_s);
+
+  return text.replace(u'/', u'-')
+             .replace(u'\'', u'-')
+             .remove(regex_illegal_characters)
+             .replace(regex_duplicate_whitespaces, u" "_s)
+             .simplified()
+             .replace(u' ', u'-')
+             .replace(regex_duplicate_dashes, u"-"_s)
+             .toLower();
+
 }
 
 }  // namespace MusixmatchProvider

@@ -1,41 +1,31 @@
-#ifndef STRAWBERRY_STYLEUTILS_H
-#define STRAWBERRY_STYLEUTILS_H
+/*
+ * Strawberry Music Player
+ * Copyright 2026, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include <gtk/gtk.h>
-#include <string>
+#ifndef STYLEUTILS_H
+#define STYLEUTILS_H
 
-namespace StyleUtils {
+#include <QString>
 
-// Style slots.
-// Each slot owns exactly one GtkCssProvider that stays attached to the display for the lifetime of the
-// application.
-// Re-loading a slot replaces the CSS in the provider it already owns instead of attaching another one,
-// so repeatedly restyling (the playlist glow animation ticks ~16 times a second) neither leaks providers
-// nor makes every subsequent style lookup walk a longer and longer provider chain.
-namespace Slot {
-inline constexpr char kAppearanceStyle[] = "appearance-style";
-inline constexpr char kAppearanceTheme[] = "appearance-theme";
-inline constexpr char kContextHeadline[] = "context-headline";
-inline constexpr char kContextIdle[] = "context-idle";
-inline constexpr char kContextNormal[] = "context-normal";
-inline constexpr char kOsdPrettyChrome[] = "osd-pretty-chrome";
-inline constexpr char kOsdPrettyMetrics[] = "osd-pretty-metrics";
-inline constexpr char kPlaylistBackground[] = "playlist-background";
-inline constexpr char kPlaylistLook[] = "playlist-look";
-inline constexpr char kQueueLook[] = "queue-look";
-inline constexpr char kUserStyleSheet[] = "user-stylesheet";
-}  // namespace Slot
+namespace Utilities {
 
-// Replaces the CSS held by the named slot, attaching the slot's provider to the default display the first
-// time the slot is used.
-// GTK re-styles automatically when a provider that is already attached is re-loaded.
-void LoadCss(const std::string &css, const std::string &slot);
+bool StyleHasCustomPaletteColorsSupport(const QString &style_name);
 
-// Drops the CSS held by the named slot without detaching its provider.
-void ClearCss(const std::string &slot);
+}  // namespace Utilities
 
-bool IsDarkTheme();
-
-}  // namespace StyleUtils
-
-#endif
+#endif  // STYLEUTILS_H

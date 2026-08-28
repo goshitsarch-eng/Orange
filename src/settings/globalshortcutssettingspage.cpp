@@ -1,252 +1,293 @@
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
 #include "config.h"
-#include "settings/globalshortcutssettingspage.h"
 
-#include "constants/globalshortcutssettings.h"
-#include "core/application.h"
+#include <QWidget>
+#include <QList>
+#include <QStringList>
+#include <QAction>
+#include <QHeaderView>
+#include <QMessageBox>
+#include <QProcess>
+#include <QTreeWidget>
+#include <QKeySequence>
+#include <QShortcut>
+#include <QSettings>
+#include <QCheckBox>
+#include <QGroupBox>
+#include <QPushButton>
+#include <QRadioButton>
+#include <QLabel>
+
+#include "core/iconloader.h"
+#include "core/logging.h"
 #include "core/settings.h"
-#include "globalshortcuts/globalshortcutbinding.h"
-#include "globalshortcuts/globalshortcuts.h"
-#include "globalshortcuts/globalshortcutsbackend-kglobalaccel.h"
-#include "globalshortcuts/macosaccessibility.h"
-#include "settings/settingspage.h"
-#include "translations/translations.h"
-#include "ui/dialogs.h"
+#include "constants/globalshortcutssettings.h"
+#include "globalshortcuts/globalshortcutgrabber.h"
+#include "globalshortcuts/globalshortcutsmanager.h"
+#include "settingspage.h"
+#include "settingsdialog.h"
+#include "globalshortcutssettingspage.h"
+#include "ui_globalshortcutssettingspage.h"
 
-namespace {
+using namespace Qt::Literals::StringLiterals;
 
-struct BackendEnableState {
-  GtkWidget *kglobalaccel = nullptr;
-  GtkWidget *x11 = nullptr;
-  GtkWidget *keys = nullptr;
-  GtkWidget *warning = nullptr;
-  bool kglobalaccel_visible = false;
-  bool x11_visible = false;
-};
+using namespace GlobalShortcutsSettings;
 
-void ApplyShortcutListEnable(BackendEnableState *state) {
-  if (!state) {
-    return;
-  }
-  const bool k_on = state->kglobalaccel && adw_switch_row_get_active(ADW_SWITCH_ROW(state->kglobalaccel));
-  const bool x_on = state->x11 && adw_switch_row_get_active(ADW_SWITCH_ROW(state->x11));
-  if (state->keys) {
-    gtk_widget_set_sensitive(state->keys, GlobalShortcutBinding::ShortcutListEnabled(state->kglobalaccel_visible, k_on, state->x11_visible, x_on));
-  }
-  if (state->warning) {
-    gtk_widget_set_visible(state->warning, GlobalShortcutBinding::X11WarningVisible(state->x11_visible, x_on));
-  }
-}
+GlobalShortcutsSettingsPage::GlobalShortcutsSettingsPage(SettingsDialog *dialog, GlobalShortcutsManager *global_shortcuts_manager, QWidget *parent)
+    : SettingsPage(dialog, parent),
+      ui_(new Ui_GlobalShortcutsSettingsPage),
+      global_shortcuts_manager_(global_shortcuts_manager),
+      initialized_(false),
+      grabber_(new GlobalShortcutGrabber()) {
 
-struct MacAccessMap {
-  GtkWidget *group = nullptr;
-  Application *app = nullptr;
-};
+  ui_->setupUi(this);
+  ui_->shortcut_options->setEnabled(false);
+  ui_->list->header()->setSectionResizeMode(QHeaderView::ResizeToContents);
+  setWindowIcon(IconLoader::Load(u"keyboard"_s, true, 0, 32));
 
-struct ShortcutRowWidgets {
-  Settings *settings = nullptr;
-  Application *app = nullptr;
-  GtkWidget *combo = nullptr;
-  GtkWidget *entry = nullptr;
-  GtkWidget *grab = nullptr;
-  char *id = nullptr;
-  char *default_key = nullptr;
-  char *description = nullptr;
-};
+  QObject::connect(ui_->list, &QTreeWidget::currentItemChanged, this, &GlobalShortcutsSettingsPage::ItemClicked);
+  QObject::connect(ui_->radio_none, &QRadioButton::clicked, this, &GlobalShortcutsSettingsPage::NoneClicked);
+  QObject::connect(ui_->radio_default, &QRadioButton::clicked, this, &GlobalShortcutsSettingsPage::DefaultClicked);
+  QObject::connect(ui_->radio_custom, &QRadioButton::clicked, this, &GlobalShortcutsSettingsPage::ChangeClicked);
+  QObject::connect(ui_->button_change, &QPushButton::clicked, this, &GlobalShortcutsSettingsPage::ChangeClicked);
 
-void FreeShortcutRowWidgets(void *data) {
-  auto *row = static_cast<ShortcutRowWidgets *>(data);
-  g_free(row->id);
-  g_free(row->default_key);
-  g_free(row->description);
-  delete row;
-}
-
-void PersistKey(ShortcutRowWidgets *row, const std::string &key) {
-  if (!row || !row->settings || !row->id) {
-    return;
-  }
-  row->settings->BeginGroup(GlobalShortcutsSettings::kSettingsGroup);
-  row->settings->SetValue(row->id, key);
-  row->settings->Sync();
-  if (row->app && row->app->shortcuts()) {
-    row->app->shortcuts()->ReloadSettings();
-  }
-}
-
-void ClearDuplicateKeys(Settings *settings, const char *keep_id, const std::string &key) {
-  if (!settings || !keep_id || key.empty()) {
-    return;
-  }
-  settings->BeginGroup(GlobalShortcutsSettings::kSettingsGroup);
-  for (const auto &def : GlobalShortcutsManager::Catalog()) {
-    if (def.id == std::string(keep_id)) {
-      continue;
-    }
-    const std::string other = GlobalShortcutBinding::ResolveStoredKey(settings->Contains(def.id), settings->Value(def.id), false, {},
-                                                                      def.default_key ? def.default_key : "");
-    if (other == key) {
-      settings->SetValue(def.id, {});
-    }
-  }
-}
-
-void SyncFromMode(ShortcutRowWidgets *row) {
-  if (!row || !row->combo || !row->entry || !row->grab) {
-    return;
-  }
-  const GlobalShortcutBinding::Mode mode =
-      GlobalShortcutBinding::FromIndex(static_cast<int>(adw_combo_row_get_selected(ADW_COMBO_ROW(row->combo))));
-  const bool custom = GlobalShortcutBinding::CustomEnabled(mode);
-  gtk_widget_set_sensitive(row->entry, custom ? TRUE : FALSE);
-  gtk_widget_set_sensitive(row->grab, custom ? TRUE : FALSE);
-  const std::string typed = gtk_editable_get_text(GTK_EDITABLE(row->entry));
-  const std::string key = GlobalShortcutBinding::EffectiveKey(mode, typed, row->default_key ? row->default_key : "");
-  if (!custom) {
-    gtk_editable_set_text(GTK_EDITABLE(row->entry), key.c_str());
-  }
-  PersistKey(row, key);
-}
-
-}  // namespace
-
-AdwPreferencesPage *GlobalShortcutsSettingsPage::Create(Settings *settings, Application *app) {
-  settings->BeginGroup(GlobalShortcutsSettings::kSettingsGroup);
-  AdwPreferencesPage *page = SettingsPage::MakePage(GlobalShortcutBinding::PageTitle(), "input-keyboard-symbolic");
-  AdwPreferencesGroup *backends = SettingsPage::AddGroup(page, "Backends");
-  SettingsPage::AddToggle(backends, settings, "enabled", "Enable global shortcuts", nullptr, true);
-  auto *enable = new BackendEnableState();
-  enable->kglobalaccel_visible = GlobalShortcutsBackendKGlobalAccel::IsKGlobalAccelAvailable();
-#ifdef HAVE_X11
-  enable->x11_visible = true;
+#ifdef HAVE_KGLOBALACCEL_GLOBALSHORTCUTS
+  QObject::connect(ui_->checkbox_kglobalaccel, &QCheckBox::toggled, this, &GlobalShortcutsSettingsPage::ShortcutOptionsChanged);
+#else
+  ui_->widget_kglobalaccel->hide();
 #endif
-  enable->kglobalaccel = SettingsPage::AddToggle(backends, settings, GlobalShortcutsSettings::kUseKGlobalAccel,
-                                                GlobalShortcutBinding::UseKGlobalAccel(), nullptr,
-                                                GlobalShortcutsSettings::kDefaultUseKGlobalAccel);
-  gtk_widget_set_visible(enable->kglobalaccel, enable->kglobalaccel_visible);
-  enable->x11 = SettingsPage::AddToggle(backends, settings, GlobalShortcutsSettings::kUseX11, GlobalShortcutBinding::UseX11(), nullptr,
-                                       GlobalShortcutsSettings::kDefaultUseX11);
-  gtk_widget_set_visible(enable->x11, enable->x11_visible);
-  enable->warning = gtk_label_new(GlobalShortcutBinding::X11Warning());
-  gtk_label_set_wrap(GTK_LABEL(enable->warning), TRUE);
-  gtk_label_set_xalign(GTK_LABEL(enable->warning), 0.0f);
-  gtk_widget_set_margin_start(enable->warning, 12);
-  gtk_widget_set_margin_end(enable->warning, 12);
-  adw_preferences_group_add(backends, enable->warning);
-  g_object_set_data_full(G_OBJECT(page), "shortcut-enable", enable, [](gpointer p) { delete static_cast<BackendEnableState *>(p); });
-  g_signal_connect(enable->kglobalaccel, "notify::active", G_CALLBACK((+[](AdwSwitchRow *, GParamSpec *, gpointer data) {
-                     ApplyShortcutListEnable(static_cast<BackendEnableState *>(data));
-                   })),
-                   enable);
-  g_signal_connect(enable->x11, "notify::active", G_CALLBACK((+[](AdwSwitchRow *, GParamSpec *, gpointer data) {
-                     ApplyShortcutListEnable(static_cast<BackendEnableState *>(data));
-                   })),
-                   enable);
 
-  AdwPreferencesGroup *keys = SettingsPage::AddGroup(page, "Shortcuts");
-  enable->keys = GTK_WIDGET(keys);
-  for (const auto &def : GlobalShortcutsManager::Catalog()) {
-    settings->BeginGroup(GlobalShortcutsSettings::kSettingsGroup);
-    const bool contains = settings->Contains(def.id);
-    const std::string stored = settings->Value(def.id);
-    const GlobalShortcutBinding::Mode mode = GlobalShortcutBinding::FromSettings(contains, stored, def.default_key);
-    const std::string display = GlobalShortcutBinding::EffectiveKey(mode, stored, def.default_key);
+#ifdef HAVE_X11_GLOBALSHORTCUTS
+  QObject::connect(ui_->checkbox_x11, &QCheckBox::toggled, this, &GlobalShortcutsSettingsPage::ShortcutOptionsChanged);
+#else
+  ui_->widget_x11->hide();
+#endif
 
-    AdwComboRow *combo = ADW_COMBO_ROW(adw_combo_row_new());
-    adw_preferences_row_set_title(ADW_PREFERENCES_ROW(combo),
-                                 Translations::CStr(GlobalShortcutBinding::ShortcutFor(def.description).c_str()));
-    GtkStringList *model = gtk_string_list_new(nullptr);
-    gtk_string_list_append(model, Translations::CStr(GlobalShortcutBinding::NoneLabel()));
-    gtk_string_list_append(model, Translations::CStr(GlobalShortcutBinding::DefaultLabel()));
-    gtk_string_list_append(model, Translations::CStr(GlobalShortcutBinding::CustomLabel()));
-    adw_combo_row_set_model(combo, G_LIST_MODEL(model));
-    adw_combo_row_set_selected(combo, static_cast<guint>(GlobalShortcutBinding::IndexOf(mode)));
+#ifndef Q_OS_MACOS
+  ui_->widget_macos_access->hide();
+#endif
 
-    GtkWidget *entry = gtk_entry_new();
-    gtk_editable_set_text(GTK_EDITABLE(entry), display.c_str());
-    gtk_widget_set_size_request(entry, 140, -1);
-    gtk_widget_set_sensitive(entry, GlobalShortcutBinding::CustomEnabled(mode) ? TRUE : FALSE);
+}
 
-    GtkWidget *grab = gtk_button_new_with_label(Translations::CStr(GlobalShortcutBinding::ChangeShortcut()));
-    gtk_widget_set_sensitive(grab, GlobalShortcutBinding::CustomEnabled(mode) ? TRUE : FALSE);
+GlobalShortcutsSettingsPage::~GlobalShortcutsSettingsPage() { delete ui_; }
 
-    auto *row = new ShortcutRowWidgets();
-    row->settings = settings;
-    row->app = app;
-    row->combo = GTK_WIDGET(combo);
-    row->entry = entry;
-    row->grab = grab;
-    row->id = g_strdup(def.id);
-    row->default_key = g_strdup(def.default_key);
-    row->description = g_strdup(def.description);
-    g_object_set_data_full(G_OBJECT(combo), "shortcut-row", row, FreeShortcutRowWidgets);
-    g_object_set_data(G_OBJECT(entry), "shortcut-row", row);
-    g_object_set_data(G_OBJECT(grab), "shortcut-row", row);
+void GlobalShortcutsSettingsPage::Load() {
 
-    g_signal_connect(combo, "notify::selected", G_CALLBACK(+[](AdwComboRow *widget, GParamSpec *, gpointer) {
-                       SyncFromMode(static_cast<ShortcutRowWidgets *>(g_object_get_data(G_OBJECT(widget), "shortcut-row")));
-                     }),
-                     nullptr);
-    g_signal_connect(entry, "changed", G_CALLBACK(+[](GtkEditable *editable, gpointer) {
-                       auto *widgets = static_cast<ShortcutRowWidgets *>(g_object_get_data(G_OBJECT(editable), "shortcut-row"));
-                       if (!widgets || !widgets->combo) {
-                         return;
-                       }
-                       const GlobalShortcutBinding::Mode current =
-                           GlobalShortcutBinding::FromIndex(static_cast<int>(adw_combo_row_get_selected(ADW_COMBO_ROW(widgets->combo))));
-                       if (!GlobalShortcutBinding::CustomEnabled(current)) {
-                         return;
-                       }
-                       PersistKey(widgets, gtk_editable_get_text(editable));
-                     }),
-                     nullptr);
-    g_signal_connect(grab, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer) {
-                       auto *widgets = static_cast<ShortcutRowWidgets *>(g_object_get_data(G_OBJECT(button), "shortcut-row"));
-                       if (!widgets) {
-                         return;
-                       }
-                       Dialogs::GrabShortcut(
-                           nullptr,
-                           [widgets](const std::string &accel) {
-                             if (accel.empty() || !widgets->entry) {
-                               return;
-                             }
-                             ClearDuplicateKeys(widgets->settings, widgets->id, accel);
-                             gtk_editable_set_text(GTK_EDITABLE(widgets->entry), accel.c_str());
-                             PersistKey(widgets, accel);
-                           },
-                           widgets->description ? widgets->description : "");
-                     }),
-                     nullptr);
+  Settings s;
+  s.beginGroup(kSettingsGroup);
 
-    adw_action_row_add_suffix(ADW_ACTION_ROW(combo), entry);
-    adw_action_row_add_suffix(ADW_ACTION_ROW(combo), grab);
-    adw_preferences_group_add(keys, GTK_WIDGET(combo));
-  }
-  ApplyShortcutListEnable(enable);
+  if (!initialized_) {
+    initialized_ = true;
 
-  AdwPreferencesGroup *access = SettingsPage::AddGroup(page, MacOsAccessibility::GroupTitle());
-  adw_preferences_group_set_description(access, Translations::CStr(MacOsAccessibility::Warning()));
-  SettingsPage::AddButtonRow(access, "", MacOsAccessibility::OpenButton(), [app]() {
-    if (app && app->shortcuts()) {
-      app->shortcuts()->ShowMacAccessibilityDialog();
+    ui_->widget_warning->hide();
+
+#ifdef Q_OS_MACOS
+    QObject::connect(ui_->button_macos_preferences, &QPushButton::clicked, global_shortcuts_manager_, &GlobalShortcutsManager::ShowMacAccessibilityDialog);
+#endif
+
+#ifdef HAVE_KGLOBALACCEL_GLOBALSHORTCUTS
+    if (GlobalShortcutsManager::IsKGlobalAccelAvailable()) {
+      qLog(Debug) << "KGlobalAccel backend is available.";
+      ui_->widget_kglobalaccel->show();
     }
-  });
-  const bool access_enabled = app && app->shortcuts() ? app->shortcuts()->IsMacAccessibilityEnabled() : false;
-  gtk_widget_set_visible(GTK_WIDGET(access), MacOsAccessibility::ShouldShowAccessRow(MacOsAccessibility::IsMacOs(), access_enabled));
-  auto *access_map = new MacAccessMap{GTK_WIDGET(access), app};
-  g_object_set_data_full(G_OBJECT(page), "macos-access", access_map, [](gpointer p) { delete static_cast<MacAccessMap *>(p); });
-  g_signal_connect(page, "map", G_CALLBACK((+[](GtkWidget *widget, gpointer) {
-                     if (!MacOsAccessibility::ShouldRefreshOnShow()) {
-                       return;
-                     }
-                     auto *state = static_cast<MacAccessMap *>(g_object_get_data(G_OBJECT(widget), "macos-access"));
-                     if (!state || !state->group) {
-                       return;
-                     }
-                     const bool enabled = state->app && state->app->shortcuts() ? state->app->shortcuts()->IsMacAccessibilityEnabled() : false;
-                     gtk_widget_set_visible(state->group, MacOsAccessibility::ShouldShowAccessRow(MacOsAccessibility::IsMacOs(), enabled));
-                   })),
-                   nullptr);
+    else {
+      qLog(Debug) << "KGlobalAccel backend is unavailable.";
+      ui_->widget_kglobalaccel->hide();
+    }
+#endif
 
-  return page;
+#ifdef HAVE_X11_GLOBALSHORTCUTS
+    if (GlobalShortcutsManager::IsX11Available()) {
+      qLog(Debug) << "X11 backend is available.";
+      ui_->widget_x11->show();
+    }
+    else {
+      qLog(Debug) << "X11 backend is unavailable.";
+      ui_->widget_x11->hide();
+    }
+#endif
+
+    for (const GlobalShortcutsManager::Shortcut &i : global_shortcuts_manager_->shortcuts()) {
+      Shortcut shortcut;
+      shortcut.s = i;
+      shortcut.key = i.action->shortcut();
+      shortcut.item = new QTreeWidgetItem(ui_->list, QStringList() << i.action->text() << i.action->shortcut().toString(QKeySequence::NativeText));
+      shortcut.item->setData(0, Qt::UserRole, i.id);
+      shortcuts_[i.id] = shortcut;
+    }
+
+    ui_->list->sortItems(0, Qt::AscendingOrder);
+    ItemClicked(ui_->list->topLevelItem(0));
+  }
+
+  const QList<Shortcut> shortcuts = shortcuts_.values();
+  for (const Shortcut &shortcut : shortcuts) {
+    SetShortcut(shortcut.s.id, shortcut.s.action->shortcut());
+  }
+
+#ifdef HAVE_KGLOBALACCEL_GLOBALSHORTCUTS
+  if (ui_->widget_kglobalaccel->isVisibleTo(this)) {
+    ui_->checkbox_kglobalaccel->setChecked(s.value(kUseKGlobalAccel, kDefaultUseKGlobalAccel).toBool());
+  }
+#endif
+
+#ifdef HAVE_X11_GLOBALSHORTCUTS
+  if (ui_->widget_x11->isVisibleTo(this)) {
+    ui_->checkbox_x11->setChecked(s.value(kUseX11, kDefaultUseX11).toBool());
+  }
+#endif
+
+#if defined(HAVE_KGLOBALACCEL_GLOBALSHORTCUTS) || defined(HAVE_X11_GLOBALSHORTCUTS)
+  ShortcutOptionsChanged();
+#endif
+
+#ifdef Q_OS_MACOS
+  ui_->widget_macos_access->setVisible(!GlobalShortcutsManager::IsMacAccessibilityEnabled());
+#endif  // Q_OS_MACOS
+
+  s.endGroup();
+
+  Init(ui_->layout_globalshortcutssettingspage->parentWidget());
+
+  if (!Settings().childGroups().contains(QLatin1String(kSettingsGroup))) set_changed();
+
+}
+
+void GlobalShortcutsSettingsPage::Save() {
+
+  Settings s;
+  s.beginGroup(kSettingsGroup);
+
+  const QList<Shortcut> shortcuts = shortcuts_.values();
+  for (const Shortcut &shortcut : shortcuts) {
+    shortcut.s.action->setShortcut(shortcut.key);
+    shortcut.s.shortcut->setKey(shortcut.key);
+    s.setValue(shortcut.s.id, shortcut.key.toString());
+  }
+
+#ifdef HAVE_KGLOBALACCEL_GLOBALSHORTCUTS
+  s.setValue(kUseKGlobalAccel, ui_->checkbox_kglobalaccel->isChecked());
+#endif
+
+#ifdef HAVE_X11_GLOBALSHORTCUTS
+  s.setValue(kUseX11, ui_->checkbox_x11->isChecked());
+#endif
+
+  s.endGroup();
+
+  global_shortcuts_manager_->ReloadSettings();
+
+}
+
+void GlobalShortcutsSettingsPage::ShortcutOptionsChanged() {
+
+  bool configure_shortcuts = (ui_->widget_kglobalaccel->isVisibleTo(this) && ui_->checkbox_kglobalaccel->isChecked()) ||
+                             (ui_->widget_x11->isVisibleTo(this) && ui_->checkbox_x11->isChecked());
+
+  ui_->list->setEnabled(configure_shortcuts);
+  ui_->shortcut_options->setEnabled(configure_shortcuts);
+
+  if (ui_->widget_x11->isVisibleTo(this) && ui_->checkbox_x11->isChecked()) {
+    ui_->widget_warning->show();
+    X11Warning();
+  }
+  else {
+    ui_->widget_warning->hide();
+  }
+
+}
+
+void GlobalShortcutsSettingsPage::SetShortcut(const QString &id, const QKeySequence &key) {
+
+  Shortcut shortcut = shortcuts_.value(id);
+
+  shortcut.key = key;
+  shortcut.item->setText(1, key.toString(QKeySequence::NativeText));
+
+  shortcuts_[id] = shortcut;
+
+}
+
+void GlobalShortcutsSettingsPage::ItemClicked(QTreeWidgetItem *item) {
+
+  if (!item) return;
+  current_id_ = item->data(0, Qt::UserRole).toString();
+  const Shortcut shortcut = shortcuts_.value(current_id_);
+
+  // Enable options
+  ui_->shortcut_options->setEnabled(true);
+  ui_->shortcut_options->setTitle(tr("Shortcut for %1").arg(shortcut.s.action->text()));
+
+  if (shortcut.key == shortcut.s.default_key) {
+    ui_->radio_default->setChecked(true);
+  }
+  else if (shortcut.key.isEmpty()) {
+    ui_->radio_none->setChecked(true);
+  }
+  else {
+    ui_->radio_custom->setChecked(true);
+  }
+
+}
+
+void GlobalShortcutsSettingsPage::NoneClicked() {
+
+  SetShortcut(current_id_, QKeySequence());
+  set_changed();
+
+}
+
+void GlobalShortcutsSettingsPage::DefaultClicked() {
+
+  SetShortcut(current_id_, shortcuts_.value(current_id_).s.default_key);
+  set_changed();
+
+}
+
+void GlobalShortcutsSettingsPage::ChangeClicked() {
+
+  global_shortcuts_manager_->Unregister();
+  QKeySequence key = grabber_->GetKey(shortcuts_.value(current_id_).s.action->text());
+  global_shortcuts_manager_->Register();
+
+  if (key.isEmpty()) return;
+
+  // Check if this key sequence is used by any other actions
+  const QStringList ids = shortcuts_.keys();
+  for (const QString &id : ids) {
+    if (shortcuts_[id].key == key) SetShortcut(id, QKeySequence());
+  }
+
+  ui_->radio_custom->setChecked(true);
+  SetShortcut(current_id_, key);
+
+  set_changed();
+
+}
+
+void GlobalShortcutsSettingsPage::X11Warning() {
+
+  ui_->label_warn_text->setText(tr("Using X11 shortcuts is not recommended and can cause keyboard to become unresponsive! Shortcuts on should usually be used through MPRIS2 / KGlobalAccel."));
+  ui_->widget_warning->show();
+
 }

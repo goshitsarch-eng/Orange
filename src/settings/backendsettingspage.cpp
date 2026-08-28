@@ -1,243 +1,781 @@
-#include "settings/backendsettingspage.h"
+/*
+ * Strawberry Music Player
+ * Copyright 2013-2025, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+#include "config.h"
+
+#include <utility>
+
+#include <QtGlobal>
+#include <QWidget>
+#include <QSettings>
+#include <QMetaType>
+#include <QVariant>
+#include <QString>
+#include <QRegularExpression>
+#include <QFontMetrics>
+#include <QAbstractItemView>
+#include <QListView>
+#include <QGroupBox>
+#include <QCheckBox>
+#include <QComboBox>
+#include <QSlider>
+#include <QSpinBox>
+#include <QLabel>
+#include <QRadioButton>
+
+#include "backendsettingspage.h"
 
 #include "constants/backendsettings.h"
-#include "core/application.h"
+#include "core/iconloader.h"
+#include "core/logging.h"
+#include "core/settings.h"
+#include "core/player.h"
+#include "engine/enginebase.h"
+#include "engine/enginedevice.h"
 #include "engine/devicefinders.h"
-#include "settings/backendoutputchoices.h"
-#include "settings/backendsettingslabels.h"
-#include "settings/settingscontrols.h"
+#include "engine/devicefinder.h"
+#include "widgets/lineedit.h"
+#include "widgets/stickyslider.h"
 #include "settings/settingspage.h"
+#include "settingsdialog.h"
+#include "ui_backendsettingspage.h"
+
+using namespace Qt::Literals::StringLiterals;
+using namespace BackendSettings;
 
 namespace {
-
-struct FadeWidgets {
-  GtkWidget *stop = nullptr;
-  GtkWidget *cross = nullptr;
-  GtkWidget *auto_cross = nullptr;
-  GtkWidget *same = nullptr;
-  GtkWidget *pause = nullptr;
-  GtkWidget *duration = nullptr;
-  GtkWidget *pause_duration = nullptr;
-};
-
-void ApplyFadeSensitivity(FadeWidgets *state) {
-  const bool fade_on = SettingsControls::FadeDurationEnabled(adw_switch_row_get_active(ADW_SWITCH_ROW(state->stop)),
-                                                            adw_switch_row_get_active(ADW_SWITCH_ROW(state->cross)),
-                                                            adw_switch_row_get_active(ADW_SWITCH_ROW(state->auto_cross)));
-  gtk_widget_set_sensitive(state->same, SettingsControls::SameAlbumFadeEnabled(adw_switch_row_get_active(ADW_SWITCH_ROW(state->auto_cross)))
-                                            ? TRUE
-                                            : FALSE);
-  gtk_widget_set_sensitive(state->duration, fade_on ? TRUE : FALSE);
-  gtk_widget_set_sensitive(state->pause_duration,
-                           SettingsControls::PauseFadeEnabled(adw_switch_row_get_active(ADW_SWITCH_ROW(state->pause))) ? TRUE : FALSE);
-}
-
-struct BackendEnableState {
-  Settings *settings = nullptr;
-  GtkWidget *alsa_group = nullptr;
-  GtkWidget *fade_group = nullptr;
-  FadeWidgets *fade = nullptr;
-};
-
-void ApplyBackendEnable(BackendEnableState *state) {
-  if (!state || !state->settings) {
-    return;
-  }
-  state->settings->BeginGroup(BackendSettings::kSettingsGroup);
-  const std::string output = state->settings->Value(BackendSettings::kOutput, "autoaudiosink");
-  const std::string device = state->settings->Value(BackendSettings::kDevice);
-  if (state->alsa_group) {
-    gtk_widget_set_sensitive(state->alsa_group, SettingsControls::AlsaPluginEnabled(output) ? TRUE : FALSE);
-  }
-  const bool fading = SettingsControls::FadingGroupEnabled(output, device);
-  if (state->fade_group) {
-    gtk_widget_set_sensitive(state->fade_group, fading ? TRUE : FALSE);
-  }
-  if (!fading && state->fade) {
-    adw_switch_row_set_active(ADW_SWITCH_ROW(state->fade->stop), FALSE);
-    adw_switch_row_set_active(ADW_SWITCH_ROW(state->fade->cross), FALSE);
-    adw_switch_row_set_active(ADW_SWITCH_ROW(state->fade->auto_cross), FALSE);
-  }
-  if (state->fade) {
-    ApplyFadeSensitivity(state->fade);
-  }
-}
-
+constexpr char kOutputAutomaticallySelect[] = "Automatically select";
+constexpr char kOutputCustom[] = "Custom";
+static const QRegularExpression kRegex_ALSA_HW(u"^hw:.*"_s);
+static const QRegularExpression kRegex_ALSA_PlugHW(u"^plughw:.*"_s);
+#ifdef HAVE_ALSA
+constexpr char kALSAHW[] = "hw:";
+constexpr char kALSAPlugHW[] = "plughw:";
+static const QRegularExpression kRegex_ALSA_PCM_Card(u"^.*:.*CARD=.*"_s);
+static const QRegularExpression kRegex_ALSA_PCM_Dev(u"^.*:.*DEV=.*"_s);
+#endif
 }  // namespace
 
-AdwPreferencesPage *BackendSettingsPage::Create(Settings *settings, Application *app) {
-  settings->BeginGroup(BackendSettings::kSettingsGroup);
-  AdwPreferencesPage *page = SettingsPage::MakePage("Backend", "audio-card-symbolic");
-  auto *enable = new BackendEnableState();
-  enable->settings = settings;
-  g_object_set_data_full(G_OBJECT(page), "backend-enable", enable, [](gpointer p) { delete static_cast<BackendEnableState *>(p); });
-  AdwPreferencesGroup *output = SettingsPage::AddGroup(page, "Output");
-  std::vector<std::pair<std::string, std::string>> outputs;
-  DeviceFinders *finders = app ? app->device_finders() : nullptr;
-  const std::vector<std::string> sink_names = finders ? finders->Outputs() : std::vector<std::string>{"autoaudiosink", "pulsesink", "pipewiresink", "alsasink"};
-  for (const std::string &sink : sink_names) {
-    outputs.emplace_back(sink, DeviceFinders::OutputLabel(sink));
-  }
-  SettingsPage::AddCombo(output, settings, BackendSettings::kOutput, "GStreamer output", outputs, "autoaudiosink",
-                         [enable](const std::string &) { ApplyBackendEnable(enable); });
+#ifdef __GNUC__
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Warray-bounds"
+#endif
 
-  const std::vector<AudioDevice> listed = finders ? finders->ListDevices() : std::vector<AudioDevice>{};
-  std::vector<std::pair<std::string, std::string>> devices = {{DeviceFinders::ChoiceKey("autoaudiosink", ""), "Default"}};
-  if (finders) {
-    devices.clear();
-    for (const AudioDevice &device : listed) {
-      devices.emplace_back(DeviceFinders::ChoiceKey(device.output, device.id), device.description);
-    }
-  }
-  BackendOutputChoices::AppendCustom(&devices);
-  const std::string current_output = settings->Value(BackendSettings::kOutput, "autoaudiosink");
-  const std::string current_device = settings->Value(BackendSettings::kDevice);
-  const bool custom_device = BackendOutputChoices::DeviceIsCustom(current_output, current_device, listed);
-  const std::string current_choice = BackendOutputChoices::ComboKey(current_output, current_device, listed);
-  auto *custom_entry = new GtkWidget *(nullptr);
-  g_object_set_data_full(G_OBJECT(page), "custom-device-entry", custom_entry, [](gpointer p) { delete static_cast<GtkWidget **>(p); });
-  SettingsPage::AddCombo(output, settings, nullptr, "Device", devices, current_choice, [settings, custom_entry, enable](const std::string &key) {
-    if (BackendOutputChoices::IsCustomKey(key)) {
-      if (*custom_entry) {
-        gtk_widget_set_sensitive(*custom_entry, TRUE);
-      }
-      ApplyBackendEnable(enable);
-      return;
-    }
-    std::string sink;
-    std::string device;
-    DeviceFinders::SplitChoiceKey(key, &sink, &device);
-    settings->SetValue(BackendSettings::kOutput, sink);
-    settings->SetValue(BackendSettings::kDevice, device);
-    settings->Sync();
-    if (*custom_entry) {
-      gtk_widget_set_sensitive(*custom_entry, FALSE);
-    }
-    ApplyBackendEnable(enable);
-  });
-  *custom_entry = SettingsPage::AddEntry(output, settings, BackendSettings::kDevice, BackendOutputChoices::CustomDeviceTitle());
-  gtk_widget_set_sensitive(*custom_entry, custom_device ? TRUE : FALSE);
-  g_signal_connect(*custom_entry, "changed", G_CALLBACK(+[](AdwEntryRow *, gpointer data) {
-                     ApplyBackendEnable(static_cast<BackendEnableState *>(data));
-                   }),
-                   enable);
-  AdwPreferencesGroup *alsa = SettingsPage::AddGroup(page, "ALSA plugin");
-  enable->alsa_group = GTK_WIDGET(alsa);
-  SettingsPage::AddChoiceRadios(alsa, settings, BackendSettings::kALSAPlugin, "ALSA plugin",
-                               {{"hw", "hw"}, {"plughw", "plughw"}, {"pcm", "pcm"}}, "hw");
-  SettingsPage::AddToggle(output, settings, BackendSettings::kExclusiveMode, BackendSettingsLabels::Exclusive(), nullptr,
-                          BackendSettings::kDefaultExclusiveMode);
-  SettingsPage::AddToggle(output, settings, BackendSettings::kVolumeControl, BackendSettingsLabels::VolumeControl(), nullptr,
-                          BackendSettings::kDefaultVolumeControl);
-  SettingsPage::AddToggle(output, settings, BackendSettings::kVolumeExponential, BackendSettingsLabels::Exponential(),
-                          BackendSettingsLabels::ExponentialHint(), BackendSettings::kDefaultVolumeExponential);
-  GtkWidget *force_channels = SettingsPage::AddToggle(output, settings, BackendSettings::kChannelsEnabled,
-                                                      BackendSettingsLabels::ForceChannels(), nullptr, BackendSettings::kDefaultChannelsEnabled);
-  GtkWidget *channels =
-      SettingsPage::AddIntEntry(output, settings, BackendSettings::kChannels, BackendSettingsLabels::Channels(), BackendSettings::kDefaultChannels);
-  gtk_widget_set_sensitive(channels, SettingsControls::ChannelsSpinEnabled(adw_switch_row_get_active(ADW_SWITCH_ROW(force_channels))) ? TRUE : FALSE);
-  g_signal_connect(force_channels, "notify::active", G_CALLBACK(+[](AdwSwitchRow *row, GParamSpec *, gpointer data) {
-                     gtk_widget_set_sensitive(GTK_WIDGET(data), SettingsControls::ChannelsSpinEnabled(adw_switch_row_get_active(row)) ? TRUE : FALSE);
-                   }),
-                   channels);
-  SettingsPage::AddToggle(output, settings, BackendSettings::kBS2B, BackendSettingsLabels::BS2B(), nullptr, BackendSettings::kDefaultBS2B);
-  SettingsPage::AddToggle(output, settings, BackendSettings::kPlaybin3, BackendSettingsLabels::Playbin3(), BackendSettingsLabels::RestartHint(),
-                          BackendSettings::kDefaultPlaybin3);
-  SettingsPage::AddToggle(output, settings, BackendSettings::kHTTP2, BackendSettingsLabels::HTTP2(), nullptr, BackendSettings::kDefaultHTTP2);
-  SettingsPage::AddToggle(output, settings, BackendSettings::kStrictSSL, BackendSettingsLabels::StrictSSL(), nullptr,
-                          BackendSettings::kDefaultStrictSSL);
+BackendSettingsPage::BackendSettingsPage(SettingsDialog *dialog, const SharedPtr<Player> player, const SharedPtr<DeviceFinders> device_finders, QWidget *parent)
+    : SettingsPage(dialog, parent),
+      ui_(new Ui_BackendSettingsPage),
+      player_(player),
+      device_finders_(device_finders),
+      configloaded_(false) {
 
-  AdwPreferencesGroup *buffer = SettingsPage::AddGroup(page, "Buffer");
-  const auto buffer_ms = SettingsControls::BufferDurationMs();
-  GtkWidget *duration_scale =
-      SettingsPage::AddIntScale(buffer, settings, BackendSettings::kSettingsGroup, BackendSettings::kBufferDuration, "Buffer duration (ms)",
-                                static_cast<int>(BackendSettings::kDefaultBufferDuration), static_cast<int>(buffer_ms.min),
-                                static_cast<int>(buffer_ms.max), static_cast<int>(buffer_ms.step));
-  const auto watermark = SettingsControls::BufferWatermark();
-  GtkWidget *low_scale =
-      SettingsPage::AddDoubleScale(buffer, settings, BackendSettings::kSettingsGroup, BackendSettings::kBufferLowWatermark, "Low watermark",
-                                   BackendSettings::kDefaultBufferLowWatermark, watermark.min, watermark.max, watermark.step);
-  GtkWidget *high_scale =
-      SettingsPage::AddDoubleScale(buffer, settings, BackendSettings::kSettingsGroup, BackendSettings::kBufferHighWatermark, "High watermark",
-                                   BackendSettings::kDefaultBufferHighWatermark, watermark.min, watermark.max, watermark.step);
-  const auto warmup = SettingsControls::DeviceWarmupMs();
-  GtkWidget *warmup_scale = SettingsPage::AddIntScale(
-      buffer, settings, BackendSettings::kSettingsGroup, BackendSettings::kDeviceWarmupDuration, "Device warmup (ms)",
-      BackendSettings::kDefaultDeviceWarmupDuration, static_cast<int>(warmup.min), static_cast<int>(warmup.max),
-      static_cast<int>(warmup.step));
-  SettingsPage::AddButtonRow(buffer, "", "Defaults", [duration_scale, low_scale, high_scale, warmup_scale]() {
-    const SettingsControls::BufferValues defaults = SettingsControls::BufferDefaults();
-    gtk_range_set_value(GTK_RANGE(duration_scale), defaults.duration_ms);
-    gtk_range_set_value(GTK_RANGE(low_scale), defaults.low_watermark);
-    gtk_range_set_value(GTK_RANGE(high_scale), defaults.high_watermark);
-    gtk_range_set_value(GTK_RANGE(warmup_scale), defaults.warmup_ms);
-  });
+  ui_->setupUi(this);
+  setWindowIcon(IconLoader::Load(u"soundcard"_s, true, 0, 32));
 
-  AdwPreferencesGroup *rg = SettingsPage::AddGroup(page, "ReplayGain / EBU R128");
-  SettingsPage::AddChoiceRadios(rg, settings, nullptr, "Normalization",
-                               {{"none", BackendSettingsLabels::NoNormalization()},
-                                {"rg", BackendSettingsLabels::ReplayGain()},
-                                {"ebu", BackendSettingsLabels::Ebu()}},
-                               SettingsControls::NormalizationChoice(settings->BoolValue(BackendSettings::kRgEnabled, BackendSettings::kDefaultRgEnabled),
-                                                                    settings->BoolValue(BackendSettings::kEBUR128LoudnessNormalization,
-                                                                                        BackendSettings::kDefaultEBUR128LoudnessNormalization)),
-                               [settings](const std::string &id) {
-                                 settings->BeginGroup(BackendSettings::kSettingsGroup);
-                                 settings->SetBoolValue(BackendSettings::kRgEnabled, SettingsControls::NormalizationUsesReplayGain(id));
-                                 settings->SetBoolValue(BackendSettings::kEBUR128LoudnessNormalization, SettingsControls::NormalizationUsesEbu(id));
-                                 settings->Sync();
-                               });
-  SettingsPage::AddIntCombo(rg, settings, BackendSettings::kSettingsGroup, BackendSettings::kRgMode, BackendSettingsLabels::ReplayGainMode(),
-                            {{"0", BackendSettingsLabels::AlbumMode()}, {"1", BackendSettingsLabels::RadioMode()}},
-                            BackendSettings::kDefaultRgMode);
-  const auto rg_db = SettingsControls::ReplayGainDb();
-  SettingsPage::AddDoubleScale(rg, settings, BackendSettings::kSettingsGroup, BackendSettings::kRgPreamp, BackendSettingsLabels::Preamp(),
-                              BackendSettings::kDefaultRgPreamp, rg_db.min, rg_db.max, rg_db.step);
-  SettingsPage::AddToggle(rg, settings, BackendSettings::kRgCompression, BackendSettingsLabels::PreventClipping(), nullptr,
-                          BackendSettings::kDefaultRgCompression);
-  SettingsPage::AddDoubleScale(rg, settings, BackendSettings::kSettingsGroup, BackendSettings::kRgFallbackGain, BackendSettingsLabels::FallbackGain(),
-                              BackendSettings::kDefaultRgFallbackGain, rg_db.min, rg_db.max, rg_db.step);
-  const auto ebu = SettingsControls::EbuTargetLufs();
-  SettingsPage::AddDoubleScale(rg, settings, BackendSettings::kSettingsGroup, BackendSettings::kEBUR128TargetLevelLUFS,
-                              BackendSettingsLabels::TargetLevel(), BackendSettings::kDefaultEBUR128TargetLevelLUFS, ebu.min, ebu.max, ebu.step);
+  ui_->label_replaygainpreamp->setMinimumWidth(QFontMetrics(ui_->label_replaygainpreamp->font()).horizontalAdvance(u"-WW.W dB"_s));
+  ui_->label_replaygainfallbackgain->setMinimumWidth(QFontMetrics(ui_->label_replaygainfallbackgain->font()).horizontalAdvance(u"-WW.W dB"_s));
 
-  AdwPreferencesGroup *fade = SettingsPage::AddGroup(page, "Fading");
-  enable->fade_group = GTK_WIDGET(fade);
-  GtkWidget *fade_stop =
-      SettingsPage::AddToggle(fade, settings, BackendSettings::kFadeoutEnabled, BackendSettingsLabels::FadeStop(), nullptr,
-                              BackendSettings::kDefaultFadeoutEnabled);
-  GtkWidget *fade_cross = SettingsPage::AddToggle(fade, settings, BackendSettings::kCrossfadeEnabled, BackendSettingsLabels::FadeManual(),
-                                                 nullptr, BackendSettings::kDefaultCrossfadeEnabled);
-  GtkWidget *fade_auto = SettingsPage::AddToggle(fade, settings, BackendSettings::kAutoCrossfadeEnabled, BackendSettingsLabels::FadeAuto(),
-                                                nullptr, BackendSettings::kDefaultAutoCrossfadeEnabled);
-  GtkWidget *fade_same = SettingsPage::AddToggle(fade, settings, BackendSettings::kNoCrossfadeSameAlbum, BackendSettingsLabels::FadeSameAlbum(),
-                                                nullptr, BackendSettings::kDefaultNoCrossfadeSameAlbum);
-  GtkWidget *fade_pause = SettingsPage::AddToggle(fade, settings, BackendSettings::kFadeoutPauseEnabled, BackendSettingsLabels::FadePause(),
-                                                 nullptr, BackendSettings::kDefaultFadeoutPauseEnabled);
-  const auto fade_ms = SettingsControls::FadeDurationMs();
-  GtkWidget *fade_duration =
-      SettingsPage::AddIntScale(fade, settings, BackendSettings::kSettingsGroup, BackendSettings::kFadeoutDuration, BackendSettingsLabels::FadeDuration(),
-                                static_cast<int>(BackendSettings::kDefaultFadeoutDuration), static_cast<int>(fade_ms.min),
-                                static_cast<int>(fade_ms.max), static_cast<int>(fade_ms.step));
-  const auto pause_ms = SettingsControls::FadePauseDurationMs();
-  GtkWidget *pause_duration = SettingsPage::AddIntScale(
-      fade, settings, BackendSettings::kSettingsGroup, BackendSettings::kFadeoutPauseDuration, BackendSettingsLabels::FadeDuration(),
-      static_cast<int>(BackendSettings::kDefaultFadeoutPauseDuration), static_cast<int>(pause_ms.min), static_cast<int>(pause_ms.max),
-      static_cast<int>(pause_ms.step));
-  auto *fade_widgets = new FadeWidgets{fade_stop, fade_cross, fade_auto, fade_same, fade_pause, fade_duration, pause_duration};
-  ApplyFadeSensitivity(fade_widgets);
-  g_object_set_data_full(G_OBJECT(page), "fade-widgets", fade_widgets, [](gpointer p) { delete static_cast<FadeWidgets *>(p); });
-  auto connect_fade = [&](GtkWidget *row) {
-    g_signal_connect(row, "notify::active", G_CALLBACK(+[](AdwSwitchRow *, GParamSpec *, gpointer data) {
-                       ApplyFadeSensitivity(static_cast<FadeWidgets *>(data));
-                     }),
-                     fade_widgets);
-  };
-  connect_fade(fade_stop);
-  connect_fade(fade_cross);
-  connect_fade(fade_auto);
-  connect_fade(fade_pause);
-  enable->fade = fade_widgets;
-  ApplyBackendEnable(enable);
-  return page;
+  ui_->label_ebur128_target_level->setMinimumWidth(QFontMetrics(ui_->label_ebur128_target_level->font()).horizontalAdvance(u"-WW.W LUFS"_s));
+
+  QObject::connect(ui_->combobox_output, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &BackendSettingsPage::OutputChanged);
+  QObject::connect(ui_->combobox_device, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &BackendSettingsPage::DeviceSelectionChanged);
+  QObject::connect(ui_->lineedit_device, &QLineEdit::textChanged, this, &BackendSettingsPage::DeviceStringChanged);
+#ifdef HAVE_ALSA
+  QObject::connect(ui_->radiobutton_alsa_hw, &QRadioButton::clicked, this, &BackendSettingsPage::radiobutton_alsa_hw_clicked);
+  QObject::connect(ui_->radiobutton_alsa_plughw, &QRadioButton::clicked, this, &BackendSettingsPage::radiobutton_alsa_plughw_clicked);
+  QObject::connect(ui_->radiobutton_alsa_pcm, &QRadioButton::clicked, this, &BackendSettingsPage::radiobutton_alsa_pcm_clicked);
+#endif
+  QObject::connect(ui_->stickyslider_replaygainpreamp, &StickySlider::valueChanged, this, &BackendSettingsPage::RgPreampChanged);
+  QObject::connect(ui_->stickyslider_replaygainfallbackgain, &StickySlider::valueChanged, this, &BackendSettingsPage::RgFallbackGainChanged);
+  QObject::connect(ui_->stickyslider_ebur128_target_level, &StickySlider::valueChanged, this, &BackendSettingsPage::EbuR128TargetLevelChanged);
+  QObject::connect(ui_->checkbox_fadeout_stop, &QCheckBox::toggled, this, &BackendSettingsPage::FadingOptionsChanged);
+  QObject::connect(ui_->checkbox_fadeout_cross, &QCheckBox::toggled, this, &BackendSettingsPage::FadingOptionsChanged);
+  QObject::connect(ui_->checkbox_fadeout_auto, &QCheckBox::toggled, this, &BackendSettingsPage::FadingOptionsChanged);
+  QObject::connect(ui_->checkbox_channels, &QCheckBox::toggled, ui_->widget_channels, &QSpinBox::setEnabled);
+  QObject::connect(ui_->button_buffer_defaults, &QPushButton::clicked, this, &BackendSettingsPage::BufferDefaults);
+
+#ifdef Q_OS_WIN32
+  ui_->widget_exclusive_mode->show();
+#else
+  ui_->widget_exclusive_mode->hide();
+#endif
+
 }
+
+BackendSettingsPage::~BackendSettingsPage() {
+
+  delete ui_;
+
+}
+
+void BackendSettingsPage::Load() {
+
+  configloaded_ = false;
+
+  Settings s;
+  s.beginGroup(kSettingsGroup);
+
+  if (s.contains(kOutputU)) {
+    output_current_ = s.value(kOutputU).toString();
+  }
+  else if (s.contains(kOutput)) {
+    output_current_ = s.value(kOutput).toString();
+  }
+
+  if (s.contains(kDeviceU)) {
+    device_current_ = s.value(kDeviceU);
+  }
+  else if (s.contains(kDevice)) {
+    device_current_ = s.value(kDevice);
+  }
+
+#ifdef HAVE_ALSA
+  ui_->lineedit_device->show();
+  ui_->widget_alsa_plugin->show();
+  const ALSAPluginType alsa_plugin_type = static_cast<ALSAPluginType>(s.value(kALSAPlugin, static_cast<int>(ALSAPluginType::PCM)).toInt());
+  switch (alsa_plugin_type) {
+    case ALSAPluginType::HW:
+      ui_->radiobutton_alsa_hw->setChecked(true);
+      break;
+    case ALSAPluginType::PlugHW:
+      ui_->radiobutton_alsa_plughw->setChecked(true);
+      break;
+    case ALSAPluginType::PCM:
+      ui_->radiobutton_alsa_pcm->setChecked(true);
+      break;
+  }
+#else
+  ui_->lineedit_device->hide();
+  ui_->widget_alsa_plugin->hide();
+#endif
+
+#ifdef Q_OS_WIN32
+  ui_->checkbox_exclusive_mode->setChecked(s.value(kExclusiveMode, kDefaultExclusiveMode).toBool());
+#endif
+
+  Load_Output(output_current_, device_current_);
+
+  ui_->checkbox_volume_control->setChecked(s.value(kVolumeControl, kDefaultVolumeControl).toBool());
+  ui_->checkbox_volume_exponential->setChecked(s.value(kVolumeExponential, kDefaultVolumeExponential).toBool());
+
+  ui_->checkbox_channels->setChecked(s.value(kChannelsEnabled, kDefaultChannelsEnabled).toBool());
+  ui_->spinbox_channels->setValue(s.value(kChannels, 2).toInt());
+  ui_->widget_channels->setEnabled(ui_->checkbox_channels->isChecked());
+
+  ui_->checkbox_bs2b->setChecked(s.value(kBS2B, kDefaultBS2B).toBool());
+
+  ui_->checkbox_playbin3->setChecked(s.value(kPlaybin3, kDefaultPlaybin3).toBool());
+
+  ui_->checkbox_http2->setChecked(s.value(kHTTP2, kDefaultHTTP2).toBool());
+  ui_->checkbox_strict_ssl->setChecked(s.value(kStrictSSL, kDefaultStrictSSL).toBool());
+
+  ui_->spinbox_bufferduration->setValue(s.value(kBufferDuration, kDefaultBufferDuration).toInt());
+  ui_->spinbox_low_watermark->setValue(s.value(kBufferLowWatermark, kDefaultBufferLowWatermark).toDouble());
+  ui_->spinbox_high_watermark->setValue(s.value(kBufferHighWatermark, kDefaultBufferHighWatermark).toDouble());
+  ui_->spinbox_device_warmup->setValue(s.value(kDeviceWarmupDuration, kDefaultDeviceWarmupDuration).toInt());
+
+  ui_->radiobutton_replaygain->setChecked(s.value(kRgEnabled, kDefaultRgEnabled).toBool());
+  ui_->combobox_replaygainmode->setCurrentIndex(s.value(kRgMode, kDefaultRgMode).toInt());
+  ui_->stickyslider_replaygainpreamp->setValue(static_cast<int>(s.value(kRgPreamp, kDefaultRgPreamp).toDouble() * 10 + 600));
+  ui_->checkbox_replaygaincompression->setChecked(s.value(kRgCompression, kDefaultRgCompression).toBool());
+  ui_->stickyslider_replaygainfallbackgain->setValue(static_cast<int>(s.value(kRgFallbackGain, kDefaultRgFallbackGain).toDouble() * 10 + 600));
+
+  ui_->radiobutton_ebur128_loudness_normalization->setChecked(s.value(kEBUR128LoudnessNormalization, kDefaultEBUR128LoudnessNormalization).toBool());
+  ui_->stickyslider_ebur128_target_level->setValue(static_cast<int>(s.value(kEBUR128TargetLevelLUFS, kDefaultEBUR128TargetLevelLUFS).toDouble() * 10));
+
+#ifdef HAVE_ALSA
+  bool fade_default = false;
+#else
+  bool fade_default = true;
+#endif
+
+  ui_->checkbox_fadeout_stop->setChecked(s.value(kFadeoutEnabled, fade_default).toBool());
+  ui_->checkbox_fadeout_cross->setChecked(s.value(kCrossfadeEnabled, fade_default).toBool());
+  ui_->checkbox_fadeout_auto->setChecked(s.value(kAutoCrossfadeEnabled, kDefaultAutoCrossfadeEnabled).toBool());
+  ui_->checkbox_fadeout_samealbum->setChecked(s.value(kNoCrossfadeSameAlbum, kDefaultNoCrossfadeSameAlbum).toBool());
+  ui_->checkbox_fadeout_pauseresume->setChecked(s.value(kFadeoutPauseEnabled, kDefaultFadeoutPauseEnabled).toBool());
+  ui_->spinbox_fadeduration->setValue(s.value(kFadeoutDuration, kDefaultFadeoutDuration).toInt());
+  ui_->spinbox_fadeduration_pauseresume->setValue(s.value(kFadeoutPauseDuration, kDefaultFadeoutPauseDuration).toInt());
+
+  configloaded_ = true;
+
+  FadingOptionsChanged();
+  RgPreampChanged(ui_->stickyslider_replaygainpreamp->value());
+  RgFallbackGainChanged(ui_->stickyslider_replaygainfallbackgain->value());
+  EbuR128TargetLevelChanged(ui_->stickyslider_ebur128_target_level->value());
+
+  Init(ui_->layout_backendsettingspage->parentWidget());
+  if (!Settings().childGroups().contains(QLatin1String(kSettingsGroup))) set_changed();
+
+  // Check if output or device is set to a different setting than the configured to force saving settings.
+
+  QString output_name;
+  if (ui_->combobox_output->currentText().isEmpty()) {
+    output_name = player_->engine()->DefaultOutput();
+  }
+  else {
+    EngineBase::OutputDetails output = ui_->combobox_output->itemData(ui_->combobox_output->currentIndex()).value<EngineBase::OutputDetails>();
+    output_name = output.name;
+  }
+  QVariant device_value;
+  if (ui_->combobox_device->currentText().isEmpty()) device_value = QVariant();
+  else if (ui_->combobox_device->currentText() == QLatin1String(kOutputCustom)) device_value = ui_->lineedit_device->text();
+  else device_value = ui_->combobox_device->itemData(ui_->combobox_device->currentIndex()).value<QVariant>();
+
+  if (output_name != output_current_ || device_value != device_current_) {
+    set_changed();
+  }
+
+  s.endGroup();
+
+}
+
+void BackendSettingsPage::Load_Output(QString output, QVariant device) {
+
+  if (output.isEmpty()) output = player_->engine()->DefaultOutput();
+
+  ui_->combobox_output->clear();
+  const EngineBase::OutputDetailsList outputs = player_->engine()->GetOutputsList();
+  for (const EngineBase::OutputDetails &o : outputs) {
+    ui_->combobox_output->addItem(IconLoader::Load(o.iconname), o.description, QVariant::fromValue(o));
+  }
+  if (ui_->combobox_output->count() > 1) ui_->combobox_output->setEnabled(true);
+
+  bool found = false;
+  for (int i = 0; i < ui_->combobox_output->count(); ++i) {
+    EngineBase::OutputDetails o = ui_->combobox_output->itemData(i).value<EngineBase::OutputDetails>();
+    if (o.name == output) {
+      ui_->combobox_output->setCurrentIndex(i);
+      found = true;
+      break;
+    }
+  }
+  if (!found) {  // Output is invalid for this engine, reset to default output.
+    output = player_->engine()->DefaultOutput();
+    device = (player_->engine()->CustomDeviceSupport(output) ? QString() : QVariant());
+    for (int i = 0; i < ui_->combobox_output->count(); ++i) {
+      EngineBase::OutputDetails o = ui_->combobox_output->itemData(i).value<EngineBase::OutputDetails>();
+      if (o.name == output) {
+        ui_->combobox_output->setCurrentIndex(i);
+        break;
+      }
+    }
+  }
+
+#ifdef Q_OS_WIN32
+  ui_->widget_exclusive_mode->setEnabled(player_->engine()->ExclusiveModeSupport(output));
+#endif
+
+  if (ui_->combobox_output->count() >= 1) Load_Device(output, device);
+
+  FadingOptionsChanged();
+
+}
+
+void BackendSettingsPage::Load_Device(const QString &output, const QVariant &device) {
+
+  int devices = 0;
+  EngineDevice df_device;
+
+  ui_->combobox_device->clear();
+  ui_->lineedit_device->clear();
+
+#ifndef Q_OS_WIN32
+  ui_->combobox_device->addItem(IconLoader::Load(u"soundcard"_s), QLatin1String(kOutputAutomaticallySelect), QVariant());
+#endif
+
+  const QList<DeviceFinder*> device_finders = device_finders_->ListFinders();
+  for (DeviceFinder *f : device_finders) {
+    if (!f->outputs().contains(output)) continue;
+    const EngineDeviceList engine_devices = f->ListDevices();
+    for (const EngineDevice &d : engine_devices) {
+      devices++;
+      ui_->combobox_device->addItem(IconLoader::Load(d.iconname), d.description, d.value);
+      if (d.value == device) { df_device = d; }
+    }
+  }
+
+  if (player_->engine()->CustomDeviceSupport(output)) {
+    ui_->combobox_device->addItem(IconLoader::Load(u"soundcard"_s), QLatin1String(kOutputCustom), QVariant());
+    ui_->lineedit_device->setEnabled(true);
+  }
+  else {
+    ui_->lineedit_device->setEnabled(false);
+  }
+
+#ifdef HAVE_ALSA
+  if (player_->engine()->ALSADeviceSupport(output)) {
+    ui_->widget_alsa_plugin->setEnabled(true);
+    ui_->radiobutton_alsa_hw->setEnabled(true);
+    ui_->radiobutton_alsa_plughw->setEnabled(true);
+    ui_->radiobutton_alsa_pcm->setEnabled(true);
+    if (device.toString().contains(kRegex_ALSA_HW)) {
+      ui_->radiobutton_alsa_hw->setChecked(true);
+      SwitchALSADevices(ALSAPluginType::HW);
+    }
+    else if (device.toString().contains(kRegex_ALSA_PlugHW)) {
+      ui_->radiobutton_alsa_plughw->setChecked(true);
+      SwitchALSADevices(ALSAPluginType::PlugHW);
+    }
+    else if (device.toString().contains(kRegex_ALSA_PCM_Card) || device.toString().contains(kRegex_ALSA_PCM_Dev)) {
+      ui_->radiobutton_alsa_pcm->setChecked(true);
+      SwitchALSADevices(ALSAPluginType::PCM);
+    }
+    else {
+      if (ui_->radiobutton_alsa_hw->isChecked()) {
+        SwitchALSADevices(ALSAPluginType::HW);
+      }
+      else if (ui_->radiobutton_alsa_plughw->isChecked()) {
+        SwitchALSADevices(ALSAPluginType::PlugHW);
+      }
+      else if (ui_->radiobutton_alsa_pcm->isChecked()) {
+        SwitchALSADevices(ALSAPluginType::PCM);
+      }
+      else {
+        ui_->radiobutton_alsa_hw->setChecked(true);
+        SwitchALSADevices(ALSAPluginType::HW);
+      }
+    }
+  }
+  else {
+    ui_->widget_alsa_plugin->setDisabled(true);
+    ui_->radiobutton_alsa_hw->setChecked(false);
+    ui_->radiobutton_alsa_plughw->setChecked(false);
+    ui_->radiobutton_alsa_pcm->setChecked(false);
+  }
+#endif
+
+  bool found = false;
+  for (int i = 0; i < ui_->combobox_device->count(); ++i) {
+    QVariant d = ui_->combobox_device->itemData(i).value<QVariant>();
+    if (df_device.value.isValid() && df_device.value == d) {
+      ui_->combobox_device->setCurrentIndex(i);
+      found = true;
+      break;
+    }
+  }
+
+  // This allows a custom ALSA device string ie: "hw:0,0" even if it is not listed.
+  if (player_->engine()->CustomDeviceSupport(output) && device.metaType().id() == QMetaType::QString && !device.toString().isEmpty()) {
+    ui_->lineedit_device->setText(device.toString());
+    if (!found) {
+      for (int i = 0; i < ui_->combobox_device->count(); ++i) {
+        if (ui_->combobox_device->itemText(i) == QLatin1String(kOutputCustom)) {
+          if (ui_->combobox_device->currentText() != QLatin1String(kOutputCustom)) ui_->combobox_device->setCurrentIndex(i);
+          break;
+        }
+      }
+    }
+  }
+
+  ui_->combobox_device->setEnabled(devices > 0 || player_->engine()->CustomDeviceSupport(output));
+
+  FadingOptionsChanged();
+
+}
+
+void BackendSettingsPage::Save() {
+
+  QString output_name;
+  QVariant device_value;
+
+  if (ui_->combobox_output->currentText().isEmpty()) {
+    output_name = player_->engine()->DefaultOutput();
+  }
+  else {
+    EngineBase::OutputDetails output = ui_->combobox_output->itemData(ui_->combobox_output->currentIndex()).value<EngineBase::OutputDetails>();
+    output_name = output.name;
+  }
+
+  if (ui_->combobox_device->currentText().isEmpty()) device_value = QVariant();
+  else if (ui_->combobox_device->currentText() == QLatin1String(kOutputCustom)) device_value = ui_->lineedit_device->text();
+  else device_value = ui_->combobox_device->itemData(ui_->combobox_device->currentIndex()).value<QVariant>();
+
+  Settings s;
+  s.beginGroup(kSettingsGroup);
+
+  if (s.contains(kEngineU)) {
+    s.remove(kEngineU);
+  }
+  if (s.contains(kEngine)) {
+    s.remove(kEngine);
+  }
+
+  if (s.contains(kOutputU)) {
+    s.remove(kOutputU);
+  }
+  if (s.contains(kDeviceU)) {
+    s.remove(kDeviceU);
+  }
+
+  s.setValue(kOutput, output_name);
+  s.setValue(kDevice, device_value);
+
+#ifdef HAVE_ALSA
+  if (ui_->radiobutton_alsa_hw->isChecked()) s.setValue(kALSAPlugin, static_cast<int>(ALSAPluginType::HW));
+  else if (ui_->radiobutton_alsa_plughw->isChecked()) s.setValue(kALSAPlugin, static_cast<int>(ALSAPluginType::PlugHW));
+  else if (ui_->radiobutton_alsa_pcm->isChecked()) s.setValue(kALSAPlugin, static_cast<int>(ALSAPluginType::PCM));
+  else s.remove(kALSAPlugin);
+#endif
+
+#ifdef Q_OS_WIN32
+  s.setValue(kExclusiveMode, ui_->checkbox_exclusive_mode->isChecked());
+#endif
+
+  s.setValue(kVolumeControl, ui_->checkbox_volume_control->isChecked());
+  s.setValue(kVolumeExponential, ui_->checkbox_volume_exponential->isChecked());
+
+  s.setValue(kChannelsEnabled, ui_->checkbox_channels->isChecked());
+  s.setValue(kChannels, ui_->spinbox_channels->value());
+
+  s.setValue(kBS2B, ui_->checkbox_bs2b->isChecked());
+
+  s.setValue(kPlaybin3, ui_->checkbox_playbin3->isChecked());
+
+  s.setValue(kHTTP2, ui_->checkbox_http2->isChecked());
+  s.setValue(kStrictSSL, ui_->checkbox_strict_ssl->isChecked());
+
+  s.setValue(kBufferDuration, ui_->spinbox_bufferduration->value());
+  s.setValue(kBufferLowWatermark, ui_->spinbox_low_watermark->value());
+  s.setValue(kBufferHighWatermark, ui_->spinbox_high_watermark->value());
+  s.setValue(kDeviceWarmupDuration, ui_->spinbox_device_warmup->value());
+
+  s.setValue(kRgEnabled, ui_->radiobutton_replaygain->isChecked());
+  s.setValue(kRgMode, ui_->combobox_replaygainmode->currentIndex());
+  s.setValue(kRgPreamp, static_cast<double>(ui_->stickyslider_replaygainpreamp->value()) / 10 - 60);
+  s.setValue(kRgFallbackGain, static_cast<double>(ui_->stickyslider_replaygainfallbackgain->value()) / 10 - 60);
+  s.setValue(kRgCompression, ui_->checkbox_replaygaincompression->isChecked());
+
+  s.setValue(kEBUR128LoudnessNormalization, ui_->radiobutton_ebur128_loudness_normalization->isChecked());
+  s.setValue(kEBUR128TargetLevelLUFS, static_cast<double>(ui_->stickyslider_ebur128_target_level->value()) / 10);
+
+  s.setValue(kFadeoutEnabled, ui_->checkbox_fadeout_stop->isChecked());
+  s.setValue(kCrossfadeEnabled, ui_->checkbox_fadeout_cross->isChecked());
+  s.setValue(kAutoCrossfadeEnabled, ui_->checkbox_fadeout_auto->isChecked());
+  s.setValue(kNoCrossfadeSameAlbum, ui_->checkbox_fadeout_samealbum->isChecked());
+  s.setValue(kFadeoutPauseEnabled, ui_->checkbox_fadeout_pauseresume->isChecked());
+  s.setValue(kFadeoutDuration, ui_->spinbox_fadeduration->value());
+  s.setValue(kFadeoutPauseDuration, ui_->spinbox_fadeduration_pauseresume->value());
+
+  s.endGroup();
+
+}
+
+void BackendSettingsPage::OutputChanged(const int index) {
+
+  if (!configloaded_) return;
+
+  EngineBase::OutputDetails output = ui_->combobox_output->itemData(index).value<EngineBase::OutputDetails>();
+
+#ifdef Q_OS_WIN32
+  const bool exclusive_mode_supported = player_->engine()->ExclusiveModeSupport(output.name);
+  ui_->widget_exclusive_mode->setEnabled(exclusive_mode_supported);
+  if (!exclusive_mode_supported && ui_->checkbox_exclusive_mode->isChecked()) {
+    ui_->checkbox_exclusive_mode->setChecked(false);
+  }
+#endif
+
+  Load_Device(output.name, QVariant());
+
+}
+
+void BackendSettingsPage::DeviceSelectionChanged(int index) {
+
+  if (!configloaded_) return;
+
+  EngineBase::OutputDetails output = ui_->combobox_output->itemData(ui_->combobox_output->currentIndex()).value<EngineBase::OutputDetails>();
+  QVariant device = ui_->combobox_device->itemData(index).value<QVariant>();
+
+  if (player_->engine()->CustomDeviceSupport(output.name)) {
+    ui_->lineedit_device->setEnabled(true);
+    if (ui_->combobox_device->currentText() != QLatin1String(kOutputCustom)) {
+      if (device.metaType().id() == QMetaType::QString)
+        ui_->lineedit_device->setText(device.toString());
+      else ui_->lineedit_device->clear();
+    }
+  }
+  else {
+    ui_->lineedit_device->setEnabled(false);
+    if (!ui_->lineedit_device->text().isEmpty()) ui_->lineedit_device->clear();
+  }
+
+  FadingOptionsChanged();
+
+}
+
+void BackendSettingsPage::DeviceStringChanged() {
+
+  if (!configloaded_) return;
+
+  EngineBase::OutputDetails output = ui_->combobox_output->itemData(ui_->combobox_output->currentIndex()).value<EngineBase::OutputDetails>();
+  bool found = false;
+
+#ifdef HAVE_ALSA
+  if (player_->engine()->ALSADeviceSupport(output.name)) {
+    if (ui_->lineedit_device->text().contains(kRegex_ALSA_HW) && !ui_->radiobutton_alsa_hw->isChecked()) {
+      ui_->radiobutton_alsa_hw->setChecked(true);
+      SwitchALSADevices(ALSAPluginType::HW);
+    }
+    else if (ui_->lineedit_device->text().contains(kRegex_ALSA_PlugHW) && !ui_->radiobutton_alsa_plughw->isChecked()) {
+      ui_->radiobutton_alsa_plughw->setChecked(true);
+      SwitchALSADevices(ALSAPluginType::PlugHW);
+    }
+    else if ((ui_->lineedit_device->text().contains(kRegex_ALSA_PCM_Card) || ui_->lineedit_device->text().contains(kRegex_ALSA_PCM_Dev)) && !ui_->radiobutton_alsa_pcm->isChecked()) {
+      ui_->radiobutton_alsa_pcm->setChecked(true);
+      SwitchALSADevices(ALSAPluginType::PCM);
+    }
+  }
+#endif
+
+  for (int i = 0; i < ui_->combobox_device->count(); ++i) {
+    QVariant device = ui_->combobox_device->itemData(i).value<QVariant>();
+    if (device.metaType().id() != QMetaType::QString) continue;
+    QString device_str = device.toString();
+    if (device_str.isEmpty()) continue;
+    if (ui_->combobox_device->itemText(i) == QLatin1String(kOutputCustom)) continue;
+    if (device_str == ui_->lineedit_device->text()) {
+      if (ui_->combobox_device->currentIndex() != i) ui_->combobox_device->setCurrentIndex(i);
+      found = true;
+    }
+  }
+
+  if (player_->engine()->CustomDeviceSupport(output.name)) {
+    ui_->lineedit_device->setEnabled(true);
+    if ((!found) && (ui_->combobox_device->currentText() != QLatin1String(kOutputCustom))) {
+      for (int i = 0; i < ui_->combobox_device->count(); ++i) {
+        if (ui_->combobox_device->itemText(i) == QLatin1String(kOutputCustom)) {
+          ui_->combobox_device->setCurrentIndex(i);
+          break;
+        }
+      }
+    }
+    if (ui_->combobox_device->currentText() == QLatin1String(kOutputCustom)) {
+      if ((ui_->lineedit_device->text().isEmpty()) && (ui_->combobox_device->count() > 0) && (ui_->combobox_device->currentIndex() != 0)) ui_->combobox_device->setCurrentIndex(0);
+    }
+  }
+  else {
+    ui_->lineedit_device->setEnabled(false);
+    if (!ui_->lineedit_device->text().isEmpty()) ui_->lineedit_device->clear();
+    if ((!found) && (ui_->combobox_device->count() > 0) && (ui_->combobox_device->currentIndex() != 0)) ui_->combobox_device->setCurrentIndex(0);
+  }
+
+  FadingOptionsChanged();
+
+}
+
+void BackendSettingsPage::RgPreampChanged(const int value) {
+
+  double db = static_cast<double>(value) / 10 - 60;
+  QString db_str = QString::asprintf("%+.1f dB", db);
+  ui_->label_replaygainpreamp->setText(db_str);
+
+}
+
+void BackendSettingsPage::RgFallbackGainChanged(const int value) {
+
+  double db = static_cast<double>(value) / 10 - 60;
+  QString db_str = QString::asprintf("%+.1f dB", db);
+  ui_->label_replaygainfallbackgain->setText(db_str);
+
+}
+
+void BackendSettingsPage::EbuR128TargetLevelChanged(const int value) {
+
+  double db = static_cast<double>(value) / 10;
+  QString db_str = QString::asprintf("%+.1f LUFS", db);
+  ui_->label_ebur128_target_level->setText(db_str);
+
+}
+
+#ifdef HAVE_ALSA
+void BackendSettingsPage::SwitchALSADevices(const ALSAPluginType alsa_plugin_type) {
+
+  // All ALSA devices are listed twice, one for "hw" and one for "plughw"
+  // Only show one of them by making the other ones invisible based on the alsa plugin radiobuttons
+  for (int i = 0; i < ui_->combobox_device->count(); ++i) {
+    QListView *view = qobject_cast<QListView*>(ui_->combobox_device->view());
+    if (!view) continue;
+    if ((ui_->combobox_device->itemData(i).toString().contains(kRegex_ALSA_HW) && alsa_plugin_type != ALSAPluginType::HW)
+        ||
+        (ui_->combobox_device->itemData(i).toString().contains(kRegex_ALSA_PlugHW) && alsa_plugin_type != ALSAPluginType::PlugHW)
+        ||
+        ((ui_->combobox_device->itemData(i).toString().contains(kRegex_ALSA_PCM_Card) || ui_->combobox_device->itemData(i).toString().contains(kRegex_ALSA_PCM_Dev)) && alsa_plugin_type != ALSAPluginType::PCM)
+    ) {
+      view->setRowHidden(i, true);
+    }
+    else {
+      view->setRowHidden(i, false);
+    }
+  }
+
+}
+#endif
+
+void BackendSettingsPage::radiobutton_alsa_hw_clicked(const bool checked) {
+
+  if (!checked) return;
+
+#ifdef HAVE_ALSA
+
+  if (!configloaded_) return;
+
+  EngineBase::OutputDetails output = ui_->combobox_output->itemData(ui_->combobox_output->currentIndex()).value<EngineBase::OutputDetails>();
+  if (!player_->engine()->ALSADeviceSupport(output.name)) return;
+
+  SwitchALSADevices(ALSAPluginType::HW);
+
+  QString device_new = ui_->lineedit_device->text();
+
+  if (device_new.contains(kRegex_ALSA_PlugHW)) {
+    device_new = device_new.replace(QLatin1String(kALSAPlugHW), QLatin1String(kALSAHW));
+  }
+
+  if (!device_new.contains(kRegex_ALSA_HW)) {
+    device_new.clear();
+  }
+
+  SelectDevice(device_new);
+
+#endif
+
+}
+
+void BackendSettingsPage::radiobutton_alsa_plughw_clicked(const bool checked) {
+
+  if (!checked) return;
+
+#ifdef HAVE_ALSA
+
+  if (!configloaded_) return;
+
+  EngineBase::OutputDetails output = ui_->combobox_output->itemData(ui_->combobox_output->currentIndex()).value<EngineBase::OutputDetails>();
+  if (!player_->engine()->ALSADeviceSupport(output.name)) return;
+
+  SwitchALSADevices(ALSAPluginType::PlugHW);
+
+  QString device_new = ui_->lineedit_device->text();
+
+  if (device_new.contains(kRegex_ALSA_HW)) {
+    device_new = device_new.replace(QLatin1String(kALSAHW), QLatin1String(kALSAPlugHW));
+  }
+
+  if (!device_new.contains(kRegex_ALSA_PlugHW)) {
+    device_new.clear();
+  }
+
+  SelectDevice(device_new);
+
+#endif
+
+}
+
+void BackendSettingsPage::radiobutton_alsa_pcm_clicked(const bool checked) {
+
+  if (!checked) return;
+
+#ifdef HAVE_ALSA
+
+  if (!configloaded_) return;
+
+  EngineBase::OutputDetails output = ui_->combobox_output->itemData(ui_->combobox_output->currentIndex()).value<EngineBase::OutputDetails>();
+  if (!player_->engine()->ALSADeviceSupport(output.name)) return;
+
+  SwitchALSADevices(ALSAPluginType::PCM);
+
+  QString device_new = ui_->lineedit_device->text();
+
+  if (!device_new.contains(kRegex_ALSA_PCM_Card) && !device_new.contains(kRegex_ALSA_PCM_Dev)) {
+    device_new.clear();
+  }
+
+  SelectDevice(device_new);
+
+#endif
+
+}
+
+void BackendSettingsPage::SelectDevice(const QString &device_new) {
+
+  if (device_new.isEmpty()) {
+    for (int i = 0; i < ui_->combobox_device->count(); ++i) {
+      if (ui_->combobox_device->itemText(i) == QLatin1String(kOutputAutomaticallySelect) && ui_->combobox_device->currentIndex() != i) {
+        ui_->combobox_device->setCurrentIndex(i);
+        break;
+      }
+    }
+  }
+  else {
+    bool found = false;
+    for (int i = 0; i < ui_->combobox_device->count(); ++i) {
+      QListView *view = qobject_cast<QListView*>(ui_->combobox_device->view());
+      if (view && view->isRowHidden(i)) continue;
+      QVariant device = ui_->combobox_device->itemData(i).value<QVariant>();
+      if (device.metaType().id() != QMetaType::QString) continue;
+      QString device_str = device.toString();
+      if (device_str.isEmpty()) continue;
+      if (device_str == device_new) {
+        if (ui_->combobox_device->currentIndex() != i) ui_->combobox_device->setCurrentIndex(i);
+        found = true;
+      }
+    }
+    if (!found) {
+      ui_->lineedit_device->setText(device_new);
+      for (int i = 0; i < ui_->combobox_device->count(); ++i) {
+        if (ui_->combobox_device->itemText(i) == QLatin1String(kOutputCustom) && ui_->combobox_device->currentIndex() != i) {
+          ui_->combobox_device->setCurrentIndex(i);
+          break;
+        }
+      }
+    }
+  }
+
+}
+
+void BackendSettingsPage::FadingOptionsChanged() {
+
+  if (!configloaded_) return;
+
+  EngineBase::OutputDetails output = ui_->combobox_output->itemData(ui_->combobox_output->currentIndex()).value<EngineBase::OutputDetails>();
+  if (!player_->engine()->ALSADeviceSupport(output.name) || ui_->lineedit_device->text().isEmpty() || (!ui_->lineedit_device->text().contains(kRegex_ALSA_HW) && !ui_->lineedit_device->text().contains(kRegex_ALSA_PlugHW))) {
+    ui_->groupbox_fading->setEnabled(true);
+  }
+  else {
+    ui_->groupbox_fading->setDisabled(true);
+    ui_->checkbox_fadeout_stop->setChecked(false);
+    ui_->checkbox_fadeout_cross->setChecked(false);
+    ui_->checkbox_fadeout_auto->setChecked(false);
+  }
+
+  ui_->widget_fading_options->setEnabled(ui_->checkbox_fadeout_stop->isChecked() || ui_->checkbox_fadeout_cross->isChecked() || ui_->checkbox_fadeout_auto->isChecked());
+  ui_->checkbox_fadeout_samealbum->setEnabled(ui_->checkbox_fadeout_auto->isChecked());
+
+}
+
+
+void BackendSettingsPage::BufferDefaults() {
+
+  ui_->spinbox_bufferduration->setValue(kDefaultBufferDuration);
+  ui_->spinbox_low_watermark->setValue(kDefaultBufferLowWatermark);
+  ui_->spinbox_high_watermark->setValue(kDefaultBufferHighWatermark);
+  ui_->spinbox_device_warmup->setValue(kDefaultDeviceWarmupDuration);
+
+}
+
+#ifdef __GNUC__
+#pragma GCC diagnostic pop
+#endif

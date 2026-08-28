@@ -1,234 +1,296 @@
-#include "widgets/fancytabbar.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2018, Vikram Ambrose <ambroseworks@gmail.com>
+ * Copyright 2018-2024, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "constants/appearancesettings.h"
-#include "core/settings.h"
-#include "translations/translations.h"
+#include <algorithm>
 
-#include <cstring>
-#include <pango/pango.h>
+#include <QTabBar>
+#include <QString>
+#include <QFontMetrics>
+#include <QFont>
+#include <QStylePainter>
+#include <QPaintEvent>
+#include <QTransform>
+#include <QLinearGradient>
+#include <QColor>
+#include <QPen>
 
-FancyTabBar::FancyTabBar() {
-  widget_ = gtk_box_new(FancyTabMode::BarOrientation(mode_), 2);
-  gtk_widget_add_css_class(widget_, "sidebar");
-  gtk_widget_add_css_class(widget_, "strawberry-tabbar");
-  gtk_widget_set_focusable(widget_, TRUE);
-  ReloadIconSizes();
+#include "core/stylehelper.h"
+#include "fancytabbar.h"
+#include "fancytabwidget.h"
+#include "fancytabdata.h"
 
-  GtkGesture *menu = gtk_gesture_click_new();
-  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(menu), GDK_BUTTON_SECONDARY);
-  gtk_widget_add_controller(widget_, GTK_EVENT_CONTROLLER(menu));
-  g_signal_connect(menu, "pressed", G_CALLBACK((+[](GtkGestureClick *gesture, gint, gdouble, gdouble, gpointer data) {
-                     auto *self = static_cast<FancyTabBar *>(data);
-                     if (FancyTabMode::ShouldShowMenu()) {
-                       self->ShowModeMenu();
-                     }
-                     gtk_gesture_set_state(GTK_GESTURE(gesture), GTK_EVENT_SEQUENCE_CLAIMED);
-                   })),
-                   this);
-  GtkEventController *keys = gtk_event_controller_key_new();
-  gtk_widget_add_controller(widget_, keys);
-  g_signal_connect(keys, "key-pressed",
-                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
-                     return static_cast<FancyTabBar *>(data)->OnKeyPressed(keyval, state);
-                   })),
-                   this);
+using namespace Qt::Literals::StringLiterals;
+
+namespace {
+constexpr int TabSize_LargeSidebarMinWidth = 70;
+}  // namespace
+
+FancyTabBar::FancyTabBar(QWidget *parent)
+    : QTabBar(parent),
+      mouseHoverTabIndex(-1) {
+
+  setMouseTracking(true);
+
 }
 
-void FancyTabBar::ReloadIconSizes() {
-  Settings settings;
-  settings.BeginGroup(AppearanceSettings::kSettingsGroup);
-  icon_large_ = settings.IntValue(AppearanceSettings::kIconSizeTabbarLargeMode, FancyTabMode::kLargeIcon);
-  icon_small_ = settings.IntValue(AppearanceSettings::kIconSizeTabbarSmallMode, FancyTabMode::kSmallIcon);
-  Rebuild();
+QString FancyTabBar::TabText(const int index) const {
+  return tabText(index).isEmpty() || !tabData(index).isValid() ? ""_L1 : tabData(index).value<FancyTabData*>()->label();
 }
 
-int FancyTabBar::IconPixels() const { return FancyTabMode::IconSize(mode_, icon_large_, icon_small_); }
+QSize FancyTabBar::sizeHint() const {
 
-int FancyTabBar::ActiveIndex() const {
-  for (int i = 0; i < static_cast<int>(tabs_.size()); ++i) {
-    if (tabs_[static_cast<size_t>(i)].id == active_) {
-      return i;
+  FancyTabWidget *tabWidget = qobject_cast<FancyTabWidget*>(parentWidget());
+  if (!tabWidget || tabWidget->mode() == FancyTabWidget::Mode::Tabs || tabWidget->mode() == FancyTabWidget::Mode::IconOnlyTabs) {
+    return QTabBar::sizeHint();
+  }
+
+  QSize size;
+  int h = 0;
+  for (int i = 0; i < count(); ++i) {
+    if (tabSizeHint(i).width() > size.width()) size.setWidth(tabSizeHint(i).width());
+    h += tabSizeHint(i).height();
+  }
+  size.setHeight(h);
+
+  return size;
+
+}
+
+int FancyTabBar::width() const {
+
+  FancyTabWidget *tabWidget = qobject_cast<FancyTabWidget*>(parentWidget());
+  if (tabWidget && (tabWidget->mode() == FancyTabWidget::Mode::LargeSidebar || tabWidget->mode() == FancyTabWidget::Mode::SmallSidebar)) {
+    int w = 0;
+    for (int i = 0; i < count(); ++i) {
+      if (tabSizeHint(i).width() > w) w = tabSizeHint(i).width();
     }
+    return w;
   }
-  return -1;
+  else {
+    return QTabBar::width();
+  }
+
 }
 
-void FancyTabBar::AddTab(const std::string &id, const std::string &title, const std::string &icon) {
-  FancyTabData tab;
-  tab.id = id;
-  tab.title = title;
-  tab.icon = icon;
-  tabs_.push_back(tab);
-  if (active_.empty()) {
-    active_ = id;
-  }
-  Rebuild();
-}
+QSize FancyTabBar::tabSizeHint(const int index) const {
 
-void FancyTabBar::SetActivateCallback(ActivateCallback callback) { activate_ = std::move(callback); }
+  FancyTabWidget *tabWidget = qobject_cast<FancyTabWidget*>(parentWidget());
+  if (!tabWidget) return QTabBar::tabSizeHint(index);
 
-void FancyTabBar::SetModeChangedCallback(ModeChangedCallback callback) { mode_changed_ = std::move(callback); }
+  QSize size;
+  if (tabWidget->mode() == FancyTabWidget::Mode::LargeSidebar) {
 
-void FancyTabBar::SetMode(FancyTabMode::Mode mode) {
-  const FancyTabMode::Mode next = FancyTabMode::FromStored(FancyTabMode::ToStored(mode));
-  if (next == mode_) {
-    Rebuild();
-    return;
-  }
-  mode_ = next;
-  gtk_orientable_set_orientation(GTK_ORIENTABLE(widget_), FancyTabMode::BarOrientation(mode_));
-  Rebuild();
-  if (mode_changed_) {
-    mode_changed_(mode_);
-  }
-}
+    QFont bold_font(font());
+    bold_font.setBold(true);
+    QFontMetrics fm(bold_font);
 
-void FancyTabBar::SetActive(const std::string &id, bool notify) {
-  bool found = false;
-  for (const FancyTabData &tab : tabs_) {
-    if (tab.id == id) {
-      found = true;
-      break;
+    // If the text of any tab is wider than the set width then use that instead.
+    int w = std::max(TabSize_LargeSidebarMinWidth, tabWidget->iconsize_largesidebar() + 22);
+    for (int i = 0; i < count(); ++i) {
+      QRect rect = fm.boundingRect(QRect(0, 0, std::max(TabSize_LargeSidebarMinWidth, tabWidget->iconsize_largesidebar() + 22), height()), Qt::TextWordWrap, TabText(i));
+      rect.setWidth(rect.width() + 10);
+      if (rect.width() > w) w = rect.width();
     }
+
+    QRect rect = fm.boundingRect(QRect(0, 0, w, height()), Qt::TextWordWrap, TabText(index));
+    size = QSize(w, tabWidget->iconsize_largesidebar() + rect.height() + 10);
   }
-  if (!found) {
-    return;
+  else if (tabWidget->mode() == FancyTabWidget::Mode::IconsSidebar) {
+    size = QSize(tabWidget->iconsize_largesidebar() + 20, tabWidget->iconsize_largesidebar() + 20);
   }
-  if (active_ == id) {
-    UpdateToggles();
-    return;
+  else if (tabWidget->mode() == FancyTabWidget::Mode::SmallSidebar) {
+
+    QFont bold_font(font());
+    bold_font.setBold(true);
+    QFontMetrics fm(bold_font);
+
+    QRect rect = fm.boundingRect(QRect(0, 0, 100, tabWidget->height()), Qt::AlignHCenter, TabText(index));
+    int w = std::max(tabWidget->iconsize_smallsidebar(), rect.height()) + 15;
+    int h = tabWidget->iconsize_smallsidebar() + rect.width() + 20;
+    size = QSize(w, h);
   }
-  active_ = id;
-  UpdateToggles();
-  if (notify && activate_) {
-    activate_(id);
+  else {
+    size = QTabBar::tabSizeHint(index);
   }
+
+  return size;
+
 }
 
-void FancyTabBar::SetActiveIndex(int index, bool notify) {
-  if (index < 0 || index >= static_cast<int>(tabs_.size())) {
-    return;
-  }
-  SetActive(tabs_[static_cast<size_t>(index)].id, notify);
+void FancyTabBar::leaveEvent(QEvent *event) {
+
+  Q_UNUSED(event);
+
+  mouseHoverTabIndex = -1;
+  update();
+
 }
 
-gboolean FancyTabBar::OnKeyPressed(guint keyval, GdkModifierType state) {
-  if (!FancyTabMode::IsKeyboardTrigger(keyval, static_cast<unsigned>(state))) {
-    return FALSE;
+void FancyTabBar::mouseMoveEvent(QMouseEvent *event) {
+
+  QPoint pos = event->pos();
+
+  mouseHoverTabIndex = tabAt(pos);
+  if (mouseHoverTabIndex > -1) {
+    update();
   }
-  if (FancyTabMode::ShouldShowMenu()) {
-    ShowModeMenu();
-  }
-  return TRUE;
+  QTabBar::mouseMoveEvent(event);
+
 }
 
-void FancyTabBar::Rebuild() {
-  if (!widget_) {
+void FancyTabBar::paintEvent(QPaintEvent *pe) {
+
+  FancyTabWidget *tabWidget = qobject_cast<FancyTabWidget*>(parentWidget());
+
+  if (!tabWidget ||
+      (tabWidget->mode() != FancyTabWidget::Mode::LargeSidebar &&
+      tabWidget->mode() != FancyTabWidget::Mode::SmallSidebar &&
+      tabWidget->mode() != FancyTabWidget::Mode::IconsSidebar)) {
+    QTabBar::paintEvent(pe);
     return;
   }
-  GtkWidget *child = gtk_widget_get_first_child(widget_);
-  while (child) {
-    GtkWidget *next = gtk_widget_get_next_sibling(child);
-    gtk_box_remove(GTK_BOX(widget_), child);
-    child = next;
-  }
-  GtkWidget *group = nullptr;
-  for (const FancyTabData &tab : tabs_) {
-    GtkWidget *button = gtk_toggle_button_new();
-    gtk_widget_add_css_class(button, "flat");
-    gtk_widget_set_hexpand(button, FancyTabMode::IsTop(mode_) ? TRUE : FALSE);
-    if (group) {
-      gtk_toggle_button_set_group(GTK_TOGGLE_BUTTON(button), GTK_TOGGLE_BUTTON(group));
-    } else {
-      group = button;
+
+  const bool vertical_text_tabs = tabWidget->mode() == FancyTabWidget::Mode::SmallSidebar;
+
+  QStylePainter p(this);
+
+  for (int index = 0; index < count(); ++index) {
+    const bool selected = tabWidget->currentIndex() == index;
+    QRect tabrect = tabRect(index);
+    QRect selectionRect = tabrect;
+    if (selected) {
+      // Selection highlight
+      p.save();
+      QLinearGradient grad(selectionRect.topLeft(), selectionRect.topRight());
+      grad.setColorAt(0, QColor(255, 255, 255, 140));
+      grad.setColorAt(1, QColor(255, 255, 255, 210));
+      p.fillRect(selectionRect.adjusted(0, 0, 0, -1), grad);
+      p.restore();
+
+      // shadow lines
+      p.setPen(QColor(0, 0, 0, 110));
+      p.drawLine(selectionRect.topLeft()    + QPoint(1, -1), selectionRect.topRight()    - QPoint(0, 1));
+      p.drawLine(selectionRect.bottomLeft(), selectionRect.bottomRight());
+      p.setPen(QColor(0, 0, 0, 40));
+      p.drawLine(selectionRect.topLeft(),    selectionRect.bottomLeft());
+
+      // highlights
+      p.setPen(QColor(255, 255, 255, 50));
+      p.drawLine(selectionRect.topLeft()    + QPoint(0, -2), selectionRect.topRight()    - QPoint(0, 2));
+      p.drawLine(selectionRect.bottomLeft() + QPoint(0, 1),  selectionRect.bottomRight() + QPoint(0, 1));
+      p.setPen(QColor(255, 255, 255, 40));
+      p.drawLine(selectionRect.topLeft()    + QPoint(0, 0),  selectionRect.topRight());
+      p.drawLine(selectionRect.topRight()   + QPoint(0, 1),  selectionRect.bottomRight() - QPoint(0, 1));
+      p.drawLine(selectionRect.bottomLeft() + QPoint(0, -1), selectionRect.bottomRight() - QPoint(0, 1));
+
     }
-    GtkWidget *box = gtk_box_new(FancyTabMode::ButtonOrientation(mode_), 4);
-    gtk_widget_set_halign(box, GTK_ALIGN_CENTER);
-    if (FancyTabMode::ShowsIcon(mode_)) {
-      GtkWidget *image = gtk_image_new_from_icon_name(tab.icon.empty() ? "audio-x-generic-symbolic" : tab.icon.c_str());
-      gtk_image_set_pixel_size(GTK_IMAGE(image), IconPixels());
-      gtk_box_append(GTK_BOX(box), image);
+
+    // Mouse hover effect
+    if (!selected && index == mouseHoverTabIndex && isTabEnabled(index)) {
+      p.save();
+      QLinearGradient grad(selectionRect.topLeft(),  selectionRect.topRight());
+      grad.setColorAt(0, Qt::transparent);
+      grad.setColorAt(0.5, QColor(255, 255, 255, 40));
+      grad.setColorAt(1, Qt::transparent);
+      p.fillRect(selectionRect, grad);
+      p.setPen(QPen(grad, 1.0));
+      p.drawLine(selectionRect.topLeft(),     selectionRect.topRight());
+      p.drawLine(selectionRect.bottomRight(), selectionRect.bottomLeft());
+      p.restore();
     }
-    if (FancyTabMode::ShowsText(mode_)) {
-      GtkWidget *label = gtk_label_new(tab.title.c_str());
-      // Tabs across the top share a fixed width and have to ellipsize.
-      // A sidebar is sized from its contents, so ellipsizing there just reports a near-zero minimum width
-      // and collapses every label to "Co...".
-      if (FancyTabMode::IsTop(mode_)) {
-        gtk_label_set_ellipsize(GTK_LABEL(label), PANGO_ELLIPSIZE_END);
+
+    // Label (Icon and Text)
+    {
+      p.save();
+      QTransform m;
+      int textFlags = 0;
+      Qt::Alignment iconFlags;
+
+      QRect tabrectText;
+      QRect tabrectLabel;
+
+      if (vertical_text_tabs) {
+        m = QTransform::fromTranslate(tabrect.left(), tabrect.bottom());
+        m.rotate(-90);
+        textFlags = Qt::AlignVCenter;
+        iconFlags = Qt::AlignVCenter;
+
+        tabrectLabel = QRect(QPoint(0, 0), m.mapRect(tabrect).size());
+
+        tabrectText = tabrectLabel;
+        tabrectText.translate(tabWidget->iconsize_smallsidebar() + 8, 0);
       }
       else {
-        gtk_label_set_max_width_chars(GTK_LABEL(label), FancyTabMode::kSidebarLabelMaxChars);
-        gtk_label_set_wrap(GTK_LABEL(label), TRUE);
-        gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_CENTER);
+        m = QTransform::fromTranslate(tabrect.left(), tabrect.top());
+        textFlags = Qt::AlignHCenter | Qt::AlignBottom | Qt::TextWordWrap;
+        iconFlags = Qt::AlignHCenter | Qt::AlignTop;
+
+        tabrectLabel = QRect(QPoint(0, 0), m.mapRect(tabrect).size());
+
+        tabrectText = tabrectLabel;
+        tabrectText.translate(0, -5);
       }
-      gtk_box_append(GTK_BOX(box), label);
-    } else {
-      gtk_widget_set_tooltip_text(button, tab.title.c_str());
-    }
-    gtk_button_set_child(GTK_BUTTON(button), box);
-    g_object_set_data_full(G_OBJECT(button), "tab-id", g_strdup(tab.id.c_str()), g_free);
-    g_signal_connect(button, "toggled", G_CALLBACK((+[](GtkToggleButton *btn, gpointer data) {
-                       if (!gtk_toggle_button_get_active(btn)) {
-                         return;
-                       }
-                       auto *self = static_cast<FancyTabBar *>(data);
-                       const char *id = static_cast<const char *>(g_object_get_data(G_OBJECT(btn), "tab-id"));
-                       if (id) {
-                         self->SetActive(id);
-                       }
-                     })),
-                     this);
-    gtk_box_append(GTK_BOX(widget_), button);
-  }
-  UpdateToggles();
-}
 
-void FancyTabBar::UpdateToggles() const {
-  for (GtkWidget *child = gtk_widget_get_first_child(widget_); child; child = gtk_widget_get_next_sibling(child)) {
-    if (!GTK_IS_TOGGLE_BUTTON(child)) {
-      continue;
-    }
-    const char *id = static_cast<const char *>(g_object_get_data(G_OBJECT(child), "tab-id"));
-    const bool on = id && active_ == id;
-    if (static_cast<bool>(gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(child))) != on) {
-      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(child), on ? TRUE : FALSE);
-    }
-  }
-}
+      p.setTransform(m);
 
-void FancyTabBar::ShowModeMenu() {
-  GtkWidget *popover = gtk_popover_new();
-  gtk_widget_set_parent(popover, widget_);
-  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 2);
-  gtk_widget_set_margin_start(box, 8);
-  gtk_widget_set_margin_end(box, 8);
-  gtk_widget_set_margin_top(box, 8);
-  gtk_widget_set_margin_bottom(box, 8);
-  GtkWidget *group = nullptr;
-  for (const FancyTabMode::Item &item : FancyTabMode::MenuItems()) {
-    GtkWidget *check = gtk_check_button_new_with_label(Translations::CStr(item.label));
-    if (group) {
-      gtk_check_button_set_group(GTK_CHECK_BUTTON(check), GTK_CHECK_BUTTON(group));
-    } else {
-      group = check;
+      QFont boldFont(p.font());
+      boldFont.setBold(true);
+      p.setFont(boldFont);
+
+      // Text drop shadow color
+      p.setPen(selected ? QColor(255, 255, 255, 160) : QColor(0, 0, 0, 110));
+      p.translate(0, 3);
+      p.drawText(tabrectText, textFlags, TabText(index));
+
+      // Text foreground color
+      p.translate(0, -1);
+      p.setPen(selected ? QColor(60, 60, 60) : StyleHelper::panelTextColor());
+      p.drawText(tabrectText, textFlags, TabText(index));
+
+
+      // Draw the icon
+      QRect tabrectIcon;
+      if (vertical_text_tabs) {
+        tabrectIcon = tabrectLabel;
+        tabrectIcon.setSize(QSize(tabWidget->iconsize_smallsidebar(), tabWidget->iconsize_smallsidebar()));
+        // Center the icon
+        const int moveRight = (QTabBar::width() - tabWidget->iconsize_smallsidebar()) / 2;
+        tabrectIcon.translate(5, moveRight);
+      }
+      else {
+        tabrectIcon = tabrectLabel;
+        tabrectIcon.setSize(QSize(tabWidget->iconsize_largesidebar(), tabWidget->iconsize_largesidebar()));
+        // Center the icon
+        const int moveRight = (QTabBar::width() - tabWidget->iconsize_largesidebar() - 1) / 2;
+
+        if (tabWidget->mode() == FancyTabWidget::Mode::IconsSidebar) {
+          tabrectIcon.translate(moveRight, (tabSizeHint(0).height() - tabWidget->iconsize_largesidebar() - 5) / 2);
+        }
+        else {
+          tabrectIcon.translate(moveRight, 5);
+        }
+      }
+      tabIcon(index).paint(&p, tabrectIcon, iconFlags);
+      p.restore();
     }
-    gtk_check_button_set_active(GTK_CHECK_BUTTON(check), item.mode == mode_ ? TRUE : FALSE);
-    g_object_set_data(G_OBJECT(check), "mode", GINT_TO_POINTER(FancyTabMode::ToStored(item.mode)));
-    g_signal_connect(check, "toggled", G_CALLBACK((+[](GtkCheckButton *button, gpointer data) {
-                       if (!gtk_check_button_get_active(button)) {
-                         return;
-                       }
-                       auto *self = static_cast<FancyTabBar *>(data);
-                       const int stored = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(button), "mode"));
-                       self->SetMode(FancyTabMode::FromStored(stored));
-                       if (GtkWidget *pop = gtk_widget_get_ancestor(GTK_WIDGET(button), GTK_TYPE_POPOVER)) {
-                         gtk_popover_popdown(GTK_POPOVER(pop));
-                       }
-                     })),
-                     this);
-    gtk_box_append(GTK_BOX(box), check);
   }
-  gtk_popover_set_child(GTK_POPOVER(popover), box);
-  gtk_popover_popup(GTK_POPOVER(popover));
+
 }

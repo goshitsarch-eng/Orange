@@ -1,238 +1,228 @@
-#include "fileview/fileviewlist.h"
-
-#include "fileview/fileviewdrag.h"
-#include "fileview/fileviewmenu.h"
-#include "fileview/fileviewicons.h"
-#include "utilities/fileutils.h"
-#include "widgets/listboxkeyboard.h"
-#include "widgets/listboxkeyboardgtk.h"
-#include "widgets/listboxtreepressgtk.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
 #include <algorithm>
+#include <utility>
 
-FileViewList::FileViewList() {
-  widget_ = gtk_scrolled_window_new();
-  gtk_widget_set_vexpand(widget_, TRUE);
-  gtk_widget_set_hexpand(widget_, TRUE);
-  list_ = gtk_list_box_new();
-  gtk_widget_add_css_class(list_, "boxed-list");
-  gtk_list_box_set_selection_mode(GTK_LIST_BOX(list_), GTK_SELECTION_MULTIPLE);
-  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(widget_), list_);
-  ListBoxTreePressGtk::Attach(list_, this);
-  g_signal_connect(list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
-                     auto *self = static_cast<FileViewList *>(data);
-                     const char *path = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "file-path"));
-                     if (path && self->activate_) {
-                       self->activate_(path);
-                     }
-                   }),
-                   this);
-  GtkGesture *gesture = gtk_gesture_click_new();
-  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(gesture), GDK_BUTTON_SECONDARY);
-  gtk_widget_add_controller(list_, GTK_EVENT_CONTROLLER(gesture));
-  g_signal_connect(gesture, "pressed", G_CALLBACK(+[](GtkGestureClick *click, gint, gdouble, gdouble y, gpointer data) {
-                     auto *self = static_cast<FileViewList *>(data);
-                     GtkListBoxRow *row = gtk_list_box_get_row_at_y(GTK_LIST_BOX(self->list_), static_cast<int>(y));
-                     if (row && !gtk_list_box_row_is_selected(row)) {
-                       gtk_list_box_unselect_all(GTK_LIST_BOX(self->list_));
-                       gtk_list_box_select_row(GTK_LIST_BOX(self->list_), row);
-                     }
-                     if (self->menu_) {
-                       self->menu_(self->SelectedPaths());
-                     }
-                     gtk_gesture_set_state(GTK_GESTURE(click), GTK_EVENT_SEQUENCE_CLAIMED);
-                   }),
-                   this);
-  GtkEventController *keys = gtk_event_controller_key_new();
-  gtk_widget_add_controller(list_, keys);
-  gtk_widget_set_focusable(list_, TRUE);
-  g_signal_connect(keys, "key-pressed",
-                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType mods, gpointer data) -> gboolean {
-                     return static_cast<FileViewList *>(data)->OnKeyPressed(keyval, mods);
-                   })),
-                   this);
+#include <QWidget>
+#include <QAbstractItemModel>
+#include <QFileInfo>
+#include <QFileSystemModel>
+#include <QDir>
+#include <QMenu>
+#include <QUrl>
+#include <QCollator>
+#include <QtEvents>
+
+#include "core/iconloader.h"
+#include "core/mimedata.h"
+#include "utilities/filemanagerutils.h"
+#include "fileviewlist.h"
+
+using namespace Qt::Literals::StringLiterals;
+
+FileViewList::FileViewList(QWidget *parent)
+    : QListView(parent),
+      menu_(new QMenu(this)) {
+
+  menu_->addAction(IconLoader::Load(u"media-playback-start"_s), tr("Append to current playlist"), this, &FileViewList::AddToPlaylistSlot);
+  menu_->addAction(IconLoader::Load(u"media-playback-start"_s), tr("Replace current playlist"), this, &FileViewList::LoadSlot);
+  menu_->addAction(IconLoader::Load(u"document-new"_s), tr("Open in new playlist"), this, &FileViewList::OpenInNewPlaylistSlot);
+  menu_->addSeparator();
+  menu_->addAction(IconLoader::Load(u"edit-copy"_s), tr("Copy to collection..."), this, &FileViewList::CopyToCollectionSlot);
+  menu_->addAction(IconLoader::Load(u"go-jump"_s), tr("Move to collection..."), this, &FileViewList::MoveToCollectionSlot);
+  menu_->addAction(IconLoader::Load(u"device"_s), tr("Copy to device..."), this, &FileViewList::CopyToDeviceSlot);
+  menu_->addAction(IconLoader::Load(u"edit-delete"_s), tr("Delete from disk..."), this, &FileViewList::DeleteSlot);
+
+  menu_->addSeparator();
+  menu_->addAction(IconLoader::Load(u"edit-rename"_s), tr("Edit track information..."), this, &FileViewList::EditTagsSlot);
+  menu_->addAction(IconLoader::Load(u"document-open-folder"_s), tr("Show in file browser..."), this, &FileViewList::ShowInBrowser);
+
+  setAttribute(Qt::WA_MacShowFocusRect, false);
+
 }
 
-FileViewList::~FileViewList() { ResetTypeAhead(); }
+void FileViewList::contextMenuEvent(QContextMenuEvent *e) {
 
-void FileViewList::SetNavigateCallback(NavigateCallback callback) { navigate_ = std::move(callback); }
+  menu_selection_ = selectionModel()->selection();
 
-void FileViewList::SetActivateCallback(ActivateCallback callback) { activate_ = std::move(callback); }
+  menu_->popup(e->globalPos());
+  e->accept();
 
-void FileViewList::SetDoubleClickCallback(ActivateCallback callback) { double_click_ = std::move(callback); }
-
-void FileViewList::SetEnqueueCallback(EnqueueCallback callback) { enqueue_ = std::move(callback); }
-
-void FileViewList::SetMenuCallback(MenuCallback callback) { menu_ = std::move(callback); }
-
-void FileViewList::HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state) {
-  (void)x;
-  if (button == CollectionTreeClick::kPrimaryButton && n_press == 2 && double_click_) {
-    GtkListBoxRow *row = ListBoxTreePressGtk::RowAtY(list_, y);
-    const char *path = row ? static_cast<const char *>(g_object_get_data(G_OBJECT(row), "file-path")) : nullptr;
-    if (path) {
-      double_click_(path);
-    }
-    return;
-  }
-  if (CollectionTreeClick::FromPress(button, n_press, state) != CollectionTreeClick::Action::Enqueue || !enqueue_) {
-    return;
-  }
-  GtkListBoxRow *row = ListBoxTreePressGtk::RowAtY(list_, y);
-  if (row && CollectionTreeClick::SelectRowBeforeEnqueue(gtk_list_box_row_is_selected(row))) {
-    ListBoxTreePressGtk::SelectRowIfNeeded(list_, row);
-  }
-  enqueue_(SelectedPaths());
 }
 
-void FileViewList::Reload(const std::vector<std::string> &paths) {
-  GtkWidget *child = gtk_widget_get_first_child(list_);
-  while (child) {
-    GtkWidget *next = gtk_widget_get_next_sibling(child);
-    gtk_list_box_remove(GTK_LIST_BOX(list_), child);
-    child = next;
+QList<QUrl> FileViewList::UrlListFromSelection() const {
+
+  QFileSystemModel *fs_model = qobject_cast<QFileSystemModel*>(model());
+  if (!fs_model) return QList<QUrl>();
+
+  QStringList filenames;
+  const QModelIndexList indexes = menu_selection_.indexes();
+  for (const QModelIndex &index : indexes) {
+    if (index.column() == 0) {
+      filenames << QDir::cleanPath(fs_model->fileInfo(index).filePath());
+    }
   }
-  for (const std::string &path : paths) {
-    GtkWidget *row = gtk_list_box_row_new();
-    const bool dir = FileUtils::IsDirectory(path);
-    GtkWidget *box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-    gtk_widget_set_margin_start(box, 12);
-    gtk_widget_set_margin_end(box, 12);
-    gtk_widget_set_margin_top(box, 8);
-    gtk_widget_set_margin_bottom(box, 8);
-    gtk_box_append(GTK_BOX(box), gtk_image_new_from_icon_name(FileViewIcons::IconName(dir, path)));
-    GtkWidget *label = gtk_label_new(FileUtils::BaseName(path).c_str());
-    gtk_widget_set_halign(label, GTK_ALIGN_START);
-    gtk_widget_set_hexpand(label, TRUE);
-    gtk_box_append(GTK_BOX(box), label);
-    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), box);
-    g_object_set_data_full(G_OBJECT(row), "file-path", g_strdup(path.c_str()), g_free);
-    g_object_set_data_full(G_OBJECT(row), "file-label", g_strdup(FileUtils::BaseName(path).c_str()), g_free);
-    SetupRowDrag(row, path);
-    gtk_list_box_append(GTK_LIST_BOX(list_), row);
+
+  QCollator collator;
+  collator.setNumericMode(true);
+  std::sort(filenames.begin(), filenames.end(), collator);
+
+  QList<QUrl> urls;
+  urls.reserve(filenames.count());
+  for (const QString &filename : std::as_const(filenames)) {
+    urls << QUrl::fromLocalFile(filename);
   }
+
+  return urls;
+
 }
 
-void FileViewList::SetupRowDrag(GtkWidget *row, const std::string &path) {
-  GtkDragSource *src = gtk_drag_source_new();
-  gtk_drag_source_set_actions(src, GDK_ACTION_COPY);
-  g_object_set_data_full(G_OBJECT(src), "file-path", g_strdup(path.c_str()), g_free);
-  g_signal_connect(src, "prepare", G_CALLBACK((+[](GtkDragSource *s, double, double, gpointer data) -> GdkContentProvider * {
-                     auto *self = static_cast<FileViewList *>(data);
-                     const char *dragged = static_cast<const char *>(g_object_get_data(G_OBJECT(s), "file-path"));
-                     const std::string payload =
-                         FileViewDrag::DragPayload(FileViewDrag::PathsForDrag(self->SelectedPaths(), dragged ? dragged : ""));
-                     if (payload.empty()) {
-                       return nullptr;
-                     }
-                     GValue v = G_VALUE_INIT;
-                     g_value_init(&v, G_TYPE_STRING);
-                     g_value_set_string(&v, payload.c_str());
-                     GdkContentProvider *provider = gdk_content_provider_new_for_value(&v);
-                     g_value_unset(&v);
-                     return provider;
-                   })),
-                   this);
-  gtk_widget_add_controller(row, GTK_EVENT_CONTROLLER(src));
+MimeData *FileViewList::MimeDataFromSelection() const {
+
+  MimeData *mimedata = new MimeData;
+  mimedata->setUrls(UrlListFromSelection());
+
+  const QStringList filenames = FilenamesFromSelection();
+
+  // If just one folder selected - use its path as the new playlist's name
+  if (filenames.size() == 1 && QFileInfo(filenames.first()).isDir()) {
+    if (filenames.first().length() > 20) {
+      mimedata->name_for_new_playlist_ = QDir(filenames.first()).dirName();
+    }
+    else {
+      mimedata->name_for_new_playlist_ = filenames.first();
+    }
+  }
+  // Otherwise, use the current root path
+  else {
+    QFileSystemModel *fs_model = qobject_cast<QFileSystemModel*>(model());
+    QString path = fs_model ? fs_model->rootPath() : QString();
+    if (path.length() > 20) {
+      QFileInfo info(path);
+      if (info.isDir()) {
+        mimedata->name_for_new_playlist_ = QDir(info.filePath()).dirName();
+      }
+      else {
+        mimedata->name_for_new_playlist_ = info.completeBaseName();
+      }
+    }
+    else {
+      mimedata->name_for_new_playlist_ = path;
+    }
+  }
+
+  return mimedata;
+
 }
 
-std::vector<std::string> FileViewList::SelectedPaths() const {
-  std::vector<std::string> paths;
-  gtk_list_box_selected_foreach(
-      GTK_LIST_BOX(list_),
-      [](GtkListBox *, GtkListBoxRow *row, gpointer data) {
-        const char *path = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "file-path"));
-        if (path) {
-          static_cast<std::vector<std::string> *>(data)->emplace_back(path);
-        }
-      },
-      &paths);
-  return paths;
+QStringList FileViewList::FilenamesFromSelection() const {
+
+  QFileSystemModel *fs_model = qobject_cast<QFileSystemModel*>(model());
+  if (!fs_model) return QStringList();
+
+  QStringList filenames;
+  const QModelIndexList indexes = menu_selection_.indexes();
+  for (const QModelIndex &index : indexes) {
+    if (index.column() == 0) {
+      filenames << fs_model->filePath(index);
+    }
+  }
+
+  QCollator collator;
+  collator.setNumericMode(true);
+  std::sort(filenames.begin(), filenames.end(), collator);
+
+  return filenames;
+
 }
 
-void FileViewList::ResetTypeAhead() {
-  typeahead_.clear();
-  if (typeahead_timeout_) {
-    g_source_remove(typeahead_timeout_);
-    typeahead_timeout_ = 0;
-  }
+void FileViewList::LoadSlot() {
+
+  MimeData *mimedata = MimeDataFromSelection();
+  mimedata->clear_first_ = true;
+  Q_EMIT AddToPlaylist(mimedata);
+
 }
 
-std::vector<std::string> FileViewList::Labels() const {
-  std::vector<std::string> labels;
-  if (!list_) {
-    return labels;
-  }
-  for (GtkWidget *child = gtk_widget_get_first_child(list_); child; child = gtk_widget_get_next_sibling(child)) {
-    if (!GTK_IS_LIST_BOX_ROW(child)) {
-      continue;
-    }
-    const char *label = static_cast<const char *>(g_object_get_data(G_OBJECT(child), "file-label"));
-    labels.emplace_back(label ? label : "");
-  }
-  return labels;
+void FileViewList::AddToPlaylistSlot() {
+  Q_EMIT AddToPlaylist(MimeDataFromSelection());
 }
 
-gboolean FileViewList::OnKeyPressed(guint keyval, GdkModifierType mods) {
-  if (FileViewMenu::IsKeyboardTrigger(keyval, static_cast<unsigned>(mods))) {
-    if (menu_ && FileViewMenu::ListShouldShowMenu()) {
-      menu_(SelectedPaths());
+void FileViewList::OpenInNewPlaylistSlot() {
+
+  MimeData *mimedata = MimeDataFromSelection();
+  mimedata->open_in_new_playlist_ = true;
+  Q_EMIT AddToPlaylist(mimedata);
+
+}
+
+void FileViewList::CopyToCollectionSlot() {
+  Q_EMIT CopyToCollection(UrlListFromSelection());
+}
+
+void FileViewList::MoveToCollectionSlot() {
+  Q_EMIT MoveToCollection(UrlListFromSelection());
+}
+
+void FileViewList::CopyToDeviceSlot() {
+  Q_EMIT CopyToDevice(UrlListFromSelection());
+}
+
+void FileViewList::DeleteSlot() {
+  Q_EMIT Delete(FilenamesFromSelection());
+}
+
+void FileViewList::EditTagsSlot() {
+  Q_EMIT EditTags(UrlListFromSelection());
+}
+
+void FileViewList::mousePressEvent(QMouseEvent *e) {
+
+  switch (e->button()) {
+    case Qt::XButton1:
+      Q_EMIT Back();
+      break;
+    case Qt::XButton2:
+      Q_EMIT Forward();
+      break;
+    // Enqueue to playlist with middleClick
+    case Qt::MiddleButton:{
+      QListView::mousePressEvent(e);
+
+      // We need to update the menu selection
+      menu_selection_ = selectionModel()->selection();
+
+      MimeData *mimedata = new MimeData;
+      mimedata->setUrls(UrlListFromSelection());
+      mimedata->enqueue_now_ = true;
+      Q_EMIT AddToPlaylist(mimedata);
+      break;
     }
-    return TRUE;
+    default:
+      QListView::mousePressEvent(e);
+      break;
   }
-  const bool alt = (mods & GDK_ALT_MASK) != 0;
-  const FileViewKeyboard::Action action = FileViewKeyboard::FromKey(keyval, alt);
-  if (action == FileViewKeyboard::Action::Activate) {
-    ListBoxKeyboardGtk::ActivateSelected(list_);
-    return TRUE;
-  }
-  if (action == FileViewKeyboard::Action::MoveUp || action == FileViewKeyboard::Action::MoveDown ||
-      action == FileViewKeyboard::Action::First || action == FileViewKeyboard::Action::Last) {
-    const int count = ListBoxKeyboardGtk::Count(list_);
-    const int current = ListBoxKeyboardGtk::SelectedIndex(list_);
-    ListBoxKeyboard::Action move = ListBoxKeyboard::Action::None;
-    if (action == FileViewKeyboard::Action::MoveUp) {
-      move = ListBoxKeyboard::Action::MoveUp;
-    } else if (action == FileViewKeyboard::Action::MoveDown) {
-      move = ListBoxKeyboard::Action::MoveDown;
-    } else if (action == FileViewKeyboard::Action::First) {
-      move = ListBoxKeyboard::Action::Home;
-    } else {
-      move = ListBoxKeyboard::Action::End;
-    }
-    ListBoxKeyboardGtk::SelectIndex(list_, ListBoxKeyboard::NextIndex(current, count, move));
-    return TRUE;
-  }
-  if (action == FileViewKeyboard::Action::UpDir || action == FileViewKeyboard::Action::HistoryBack ||
-      action == FileViewKeyboard::Action::HistoryForward || action == FileViewKeyboard::Action::Home) {
-    if (navigate_) {
-      navigate_(action);
-    }
-    return TRUE;
-  }
-  if (keyval == ListBoxKeyboard::kEscape) {
-    ResetTypeAhead();
-    return TRUE;
-  }
-  const gunichar ch = gdk_keyval_to_unicode(keyval);
-  if (ch && g_unichar_isprint(ch) && !alt) {
-    gchar utf8[8] = {};
-    const gint len = g_unichar_to_utf8(ch, utf8);
-    typeahead_.append(utf8, static_cast<size_t>(len));
-    if (typeahead_timeout_) {
-      g_source_remove(typeahead_timeout_);
-    }
-    typeahead_timeout_ = g_timeout_add(1000, [](gpointer data) -> gboolean {
-      auto *self = static_cast<FileViewList *>(data);
-      self->typeahead_timeout_ = 0;
-      self->typeahead_.clear();
-      return G_SOURCE_REMOVE;
-    }, this);
-    const int index = ListBoxKeyboard::FirstPrefixIndex(Labels(), typeahead_);
-    if (index >= 0) {
-      ListBoxKeyboardGtk::SelectIndex(list_, index);
-    }
-    return TRUE;
-  }
-  return FALSE;
+
+}
+
+void FileViewList::ShowInBrowser() {
+  Utilities::OpenInFileBrowser(UrlListFromSelection());
 }

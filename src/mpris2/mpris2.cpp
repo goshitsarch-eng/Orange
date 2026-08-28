@@ -1,862 +1,918 @@
-#include "mpris2/mpris2.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2026, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
 #include "config.h"
-#include "core/application.h"
-#include "core/logging.h"
-#include "core/player.h"
-#include "core/playeritemoptions.h"
-#include "engine/enginebase.h"
-#include "mpris2/mpris2helpers.h"
-#include "mpris2/mpris2playlists.h"
-#include "playlist/playlist.h"
-#include "playlist/playlistmanager.h"
 
 #include <algorithm>
+#include <utility>
+#include <cmath>
 
-#ifdef HAVE_MPRIS2
-static const gchar *kMprisXml =
-    "<node>"
-    "  <interface name='org.mpris.MediaPlayer2'>"
-    "    <method name='Raise'/>"
-    "    <method name='Quit'/>"
-    "    <property name='CanQuit' type='b' access='read'/>"
-    "    <property name='CanRaise' type='b' access='read'/>"
-    "    <property name='HasTrackList' type='b' access='read'/>"
-    "    <property name='Identity' type='s' access='read'/>"
-    "    <property name='DesktopEntry' type='s' access='read'/>"
-    "    <property name='SupportedUriSchemes' type='as' access='read'/>"
-    "    <property name='SupportedMimeTypes' type='as' access='read'/>"
-    "  </interface>"
-    "  <interface name='org.mpris.MediaPlayer2.Player'>"
-    "    <method name='Next'/>"
-    "    <method name='Previous'/>"
-    "    <method name='Pause'/>"
-    "    <method name='PlayPause'/>"
-    "    <method name='Stop'/>"
-    "    <method name='Play'/>"
-    "    <method name='Seek'><arg type='x' name='Offset'/></method>"
-    "    <method name='SetPosition'><arg type='o' name='TrackId'/><arg type='x' name='Position'/></method>"
-    "    <method name='OpenUri'><arg type='s' name='Uri'/></method>"
-    "    <property name='PlaybackStatus' type='s' access='read'/>"
-    "    <property name='LoopStatus' type='s' access='readwrite'/>"
-    "    <property name='Rate' type='d' access='readwrite'/>"
-    "    <property name='Shuffle' type='b' access='readwrite'/>"
-    "    <property name='Metadata' type='a{sv}' access='read'/>"
-    "    <property name='Rating' type='d' access='readwrite'/>"
-    "    <property name='Volume' type='d' access='readwrite'/>"
-    "    <property name='Position' type='x' access='read'/>"
-    "    <property name='CanGoNext' type='b' access='read'/>"
-    "    <property name='CanGoPrevious' type='b' access='read'/>"
-    "    <property name='CanPlay' type='b' access='read'/>"
-    "    <property name='CanPause' type='b' access='read'/>"
-    "    <property name='CanSeek' type='b' access='read'/>"
-    "    <property name='CanControl' type='b' access='read'/>"
-    "  </interface>"
-    "  <interface name='org.mpris.MediaPlayer2.TrackList'>"
-    "    <method name='GetTracksMetadata'>"
-    "      <arg type='ao' name='TrackIds' direction='in'/>"
-    "      <arg type='aa{sv}' name='Metadata' direction='out'/>"
-    "    </method>"
-    "    <method name='AddTrack'>"
-    "      <arg type='s' name='Uri' direction='in'/>"
-    "      <arg type='o' name='AfterTrack' direction='in'/>"
-    "      <arg type='b' name='SetAsCurrent' direction='in'/>"
-    "    </method>"
-    "    <method name='RemoveTrack'>"
-    "      <arg type='o' name='TrackId' direction='in'/>"
-    "    </method>"
-    "    <method name='GoTo'>"
-    "      <arg type='o' name='TrackId' direction='in'/>"
-    "    </method>"
-    "    <property name='Tracks' type='ao' access='read'/>"
-    "    <property name='CanEditTracks' type='b' access='read'/>"
-    "    <signal name='TrackListReplaced'>"
-    "      <arg type='ao' name='Tracks'/>"
-    "      <arg type='o' name='CurrentTrack'/>"
-    "    </signal>"
-    "    <signal name='TrackAdded'>"
-    "      <arg type='a{sv}' name='Metadata'/>"
-    "      <arg type='o' name='AfterTrack'/>"
-    "    </signal>"
-    "    <signal name='TrackRemoved'>"
-    "      <arg type='o' name='TrackId'/>"
-    "    </signal>"
-    "    <signal name='TrackMetadataChanged'>"
-    "      <arg type='o' name='TrackId'/>"
-    "      <arg type='a{sv}' name='Metadata'/>"
-    "    </signal>"
-    "  </interface>"
-    "  <interface name='org.mpris.MediaPlayer2.Playlists'>"
-    "    <method name='ActivatePlaylist'><arg type='o' name='PlaylistId'/></method>"
-    "    <method name='GetPlaylists'>"
-    "      <arg type='u' name='Index' direction='in'/>"
-    "      <arg type='u' name='MaxCount' direction='in'/>"
-    "      <arg type='s' name='Order' direction='in'/>"
-    "      <arg type='b' name='ReverseOrder' direction='in'/>"
-    "      <arg type='a(oss)' name='Playlists' direction='out'/>"
-    "    </method>"
-    "    <property name='PlaylistCount' type='u' access='read'/>"
-    "    <property name='Orderings' type='as' access='read'/>"
-    "    <property name='ActivePlaylist' type='(b(oss))' access='read'/>"
-    "    <signal name='PlaylistChanged'><arg type='(oss)' name='Playlist'/></signal>"
-    "  </interface>"
-    "</node>";
+#include <QApplication>
+#include <QCoreApplication>
+#include <QGuiApplication>
+#include <QObject>
+#include <QFile>
+#include <QList>
+#include <QVariant>
+#include <QVariantMap>
+#include <QString>
+#include <QStringList>
+#include <QUrl>
+#include <QDBusConnection>
+#include <QDBusMessage>
+#include <QDBusArgument>
+#include <QDBusObjectPath>
 
-static GVariant *MetadataVariant(const Song &song, int row = -1, const std::string &art_override = {}) {
-  GVariantBuilder b;
-  g_variant_builder_init(&b, G_VARIANT_TYPE("a{sv}"));
-  const std::string track_id = row >= 0 ? Mpris2Helpers::TrackIdForRow(song, row) : Mpris2Helpers::TrackId(song);
-  g_variant_builder_add(&b, "{sv}", "mpris:trackid", g_variant_new_object_path(track_id.c_str()));
-  const std::string title = Mpris2Helpers::XesamTitle(song);
-  g_variant_builder_add(&b, "{sv}", "xesam:title", g_variant_new_string(title.c_str()));
-  g_variant_builder_add(&b, "{sv}", "xesam:album", g_variant_new_string(song.album().c_str()));
-  const gchar *artists[] = {song.artist().c_str(), nullptr};
-  g_variant_builder_add(&b, "{sv}", "xesam:artist", g_variant_new_strv(artists, -1));
-  const std::string url = Mpris2Helpers::XesamUrl(song);
-  g_variant_builder_add(&b, "{sv}", "xesam:url", g_variant_new_string(url.c_str()));
-  if (song.length_nanosec() > 0) {
-    g_variant_builder_add(&b, "{sv}", "mpris:length", g_variant_new_int64(song.length_nanosec() / 1000));
-  }
-  const std::string art = Mpris2Helpers::ArtUrlOrOverride(song, art_override);
-  if (!art.empty()) {
-    g_variant_builder_add(&b, "{sv}", "mpris:artUrl", g_variant_new_string(art.c_str()));
-  }
-  if (song.track() > 0) {
-    g_variant_builder_add(&b, "{sv}", "xesam:trackNumber", g_variant_new_int32(song.track()));
-  }
-  if (!song.albumartist().empty()) {
-    const gchar *albumartists[] = {song.albumartist().c_str(), nullptr};
-    g_variant_builder_add(&b, "{sv}", "xesam:albumArtist", g_variant_new_strv(albumartists, -1));
-  }
-  if (Mpris2Helpers::ShouldAddUserRating(song.rating())) {
-    g_variant_builder_add(&b, "{sv}", "xesam:userRating", g_variant_new_double(song.rating()));
-  }
-  if (Mpris2Helpers::ShouldAddBitrate(song.bitrate())) {
-    g_variant_builder_add(&b, "{sv}", "bitrate", g_variant_new_int32(song.bitrate()));
-  }
-  if (Mpris2Helpers::ShouldAddString(song.genre())) {
-    const gchar *genres[] = {song.genre().c_str(), nullptr};
-    g_variant_builder_add(&b, "{sv}", "xesam:genre", g_variant_new_strv(genres, -1));
-  }
-  if (Mpris2Helpers::ShouldAddPositiveInt(song.disc())) {
-    g_variant_builder_add(&b, "{sv}", "xesam:discNumber", g_variant_new_int32(song.disc()));
-  }
-  if (Mpris2Helpers::ShouldAddString(song.comment())) {
-    const gchar *comments[] = {song.comment().c_str(), nullptr};
-    g_variant_builder_add(&b, "{sv}", "xesam:comment", g_variant_new_strv(comments, -1));
-  }
-  const std::string created = Mpris2Helpers::AsMprisDateTime(song.ctime());
-  if (!created.empty()) {
-    g_variant_builder_add(&b, "{sv}", "xesam:contentCreated", g_variant_new_string(created.c_str()));
-  }
-  const std::string last_used = Mpris2Helpers::AsMprisDateTime(song.lastplayed());
-  if (!last_used.empty()) {
-    g_variant_builder_add(&b, "{sv}", "xesam:lastUsed", g_variant_new_string(last_used.c_str()));
-  }
-  if (Mpris2Helpers::ShouldAddString(song.composer())) {
-    const gchar *composers[] = {song.composer().c_str(), nullptr};
-    g_variant_builder_add(&b, "{sv}", "xesam:composer", g_variant_new_strv(composers, -1));
-  }
-  if (Mpris2Helpers::ShouldAddPlaycount(song.playcount())) {
-    g_variant_builder_add(&b, "{sv}", "xesam:useCount", g_variant_new_int32(static_cast<gint32>(song.playcount())));
-  }
-  if (Mpris2Helpers::ShouldAddYear(song.year())) {
-    g_variant_builder_add(&b, "{sv}", "year", g_variant_new_int32(song.year()));
-  }
-  return g_variant_builder_end(&b);
-}
+#include "core/logging.h"
 
-static int TrackListRow(Playlist *playlist, const char *track_id) {
-  if (!playlist || !track_id) {
-    return -1;
-  }
-  for (int i = 0; i < playlist->row_count(); ++i) {
-    if (Mpris2Helpers::TrackIdForRow(playlist->song(i), i) == track_id || Mpris2Helpers::TrackId(playlist->song(i)) == track_id) {
-      return i;
-    }
-  }
-  return -1;
-}
+#include "mpris_common.h"
+#include "mpris2.h"
 
-static GVariant *TrackListIds(Playlist *playlist) {
-  GVariantBuilder b;
-  g_variant_builder_init(&b, G_VARIANT_TYPE("ao"));
-  if (playlist) {
-    for (int i = 0; i < playlist->row_count(); ++i) {
-      const std::string id = Mpris2Helpers::TrackIdForRow(playlist->song(i), i);
-      g_variant_builder_add(&b, "o", id.c_str());
-    }
-  }
-  return g_variant_builder_end(&b);
-}
+#include "constants/timeconstants.h"
+#include "core/song.h"
+#include "core/player.h"
+#include "engine/enginebase.h"
+#include "playlist/playlist.h"
+#include "playlist/playlistitem.h"
+#include "playlist/playlistmanager.h"
+#include "playlist/playlistsequence.h"
+#include "covermanager/currentalbumcoverloader.h"
+#include "covermanager/albumcoverloaderresult.h"
 
-static void HandleMethod(GDBusConnection *, const gchar *, const gchar *, const gchar *, const gchar *method, GVariant *parameters,
-                         GDBusMethodInvocation *invocation, gpointer user_data) {
-  auto *self = static_cast<Mpris2 *>(user_data);
-  Application *app = self ? self->app() : nullptr;
-  if (app) {
-    if (g_strcmp0(method, "Raise") == 0) {
-      app->RaiseRequested.Emit();
-    } else if (g_strcmp0(method, "Quit") == 0) {
-      app->Exit();
-    } else if (app->player()) {
-      Playlist *playlist = app->playlist_manager() ? app->playlist_manager()->active() : nullptr;
-      const EngineBase::State state = app->player()->GetState();
-      const Song current = app->player()->current_song();
-      const int64_t position_ns = app->player()->engine() ? app->player()->engine()->position_nanosec() : 0;
-      if (g_strcmp0(method, "Play") == 0) {
-        if (Mpris2Helpers::CanPlay(playlist)) {
-          app->player()->Play();
-        }
-      } else if (g_strcmp0(method, "Pause") == 0) {
-        if (Mpris2Helpers::CanPause(state, PlayerItemOptions::PauseDisabled(current))) {
-          app->player()->Pause();
-        }
-      } else if (g_strcmp0(method, "PlayPause") == 0) {
-        app->player()->PlayPause();
-      } else if (g_strcmp0(method, "Stop") == 0) {
-        app->player()->Stop();
-      } else if (g_strcmp0(method, "Next") == 0) {
-        if (Mpris2Helpers::CanGoNext(playlist)) {
-          app->player()->Next();
-        }
-      } else if (g_strcmp0(method, "Previous") == 0) {
-        if (Mpris2Helpers::CanGoPrevious(playlist, position_ns)) {
-          app->player()->Previous();
-        }
-      } else if (g_strcmp0(method, "Seek") == 0) {
-        gint64 offset = 0;
-        g_variant_get(parameters, "(x)", &offset);
-        if (Mpris2Helpers::CanSeek(current, state)) {
-          app->player()->SeekTo(position_ns / 1000000000LL + offset / 1000000);
-          if (self) {
-            self->EmitSeeked(app->player()->engine()->position_nanosec() / 1000);
-          }
-        }
-      } else if (g_strcmp0(method, "SetPosition") == 0) {
-        const gchar *track_id = nullptr;
-        gint64 position = 0;
-        g_variant_get(parameters, "(&ox)", &track_id, &position);
-        const int row = playlist ? playlist->current_row() : -1;
-        const std::string current_id = Mpris2Helpers::TrackIdForRow(current, row);
-        if (Mpris2Helpers::SetPositionAllowed(track_id ? track_id : "", current_id, position, current.length_nanosec(),
-                                              Mpris2Helpers::CanSeek(current, state))) {
-          app->player()->Seek(position * 1000);
-          if (self) {
-            self->EmitSeeked(position);
-          }
-        }
-      } else if (g_strcmp0(method, "OpenUri") == 0) {
-        const gchar *uri = nullptr;
-        g_variant_get(parameters, "(&s)", &uri);
-        if (uri && app->playlist_manager()) {
-          app->playlist_manager()->InsertUrls({uri});
-          app->player()->Play();
-        }
-      } else if (g_strcmp0(method, "GetTracksMetadata") == 0) {
-        GVariantIter *iter = nullptr;
-        g_variant_get(parameters, "(ao)", &iter);
-        GVariantBuilder b;
-        g_variant_builder_init(&b, G_VARIANT_TYPE("aa{sv}"));
-        Playlist *playlist = app->playlist_manager() ? app->playlist_manager()->current() : nullptr;
-        const gchar *id = nullptr;
-        while (iter && g_variant_iter_loop(iter, "o", &id)) {
-          const int row = TrackListRow(playlist, id);
-          if (row >= 0) {
-            g_variant_builder_add_value(&b, MetadataVariant(playlist->song(row), row));
-          }
-        }
-        if (iter) {
-          g_variant_iter_free(iter);
-        }
-        g_dbus_method_invocation_return_value(invocation, g_variant_new("(aa{sv})", &b));
-        return;
-      } else if (g_strcmp0(method, "AddTrack") == 0) {
-        const gchar *uri = nullptr;
-        const gchar *after = nullptr;
-        gboolean current = FALSE;
-        g_variant_get(parameters, "(&s&ob)", &uri, &after, &current);
-        if (uri && app->playlist_manager()) {
-          Playlist *playlist = app->playlist_manager()->current();
-          int insert_row = -1;
-          if (after && std::string(after) != "/org/mpris/MediaPlayer2/TrackList/NoTrack") {
-            const int after_row = TrackListRow(playlist, after);
-            if (after_row >= 0) {
-              insert_row = after_row + 1;
-            }
-          }
-          app->playlist_manager()->InsertUrls({uri}, insert_row);
-          if (current) {
-            app->player()->Play();
-          }
-          if (self) {
-            self->EmitTrackListReplaced();
-          }
-        }
-      } else if (g_strcmp0(method, "RemoveTrack") == 0) {
-        const gchar *id = nullptr;
-        g_variant_get(parameters, "(&o)", &id);
-        Playlist *playlist = app->playlist_manager() ? app->playlist_manager()->current() : nullptr;
-        const int row = TrackListRow(playlist, id);
-        if (playlist && row >= 0) {
-          playlist->RemoveRows({row});
-          if (self) {
-            self->EmitTrackListReplaced();
-          }
-        }
-      } else if (g_strcmp0(method, "GoTo") == 0) {
-        const gchar *id = nullptr;
-        g_variant_get(parameters, "(&o)", &id);
-        Playlist *playlist = app->playlist_manager() ? app->playlist_manager()->current() : nullptr;
-        const int row = TrackListRow(playlist, id);
-        if (row >= 0) {
-          app->player()->PlayAt(row);
-        }
-      } else if (g_strcmp0(method, "ActivatePlaylist") == 0) {
-        const gchar *path = nullptr;
-        g_variant_get(parameters, "(&o)", &path);
-        const int id = Mpris2Playlists::IdFromPath(path ? path : "");
-        if (id >= 0 && app->playlist_manager() && app->playlist_manager()->playlist(id)) {
-          app->playlist_manager()->SetActivePlaylist(id);
-          app->player()->Next();
-          if (self) {
-            self->EmitTrackListReplaced();
-          }
-        }
-      } else if (g_strcmp0(method, "GetPlaylists") == 0) {
-        guint index = 0;
-        guint max_count = 0;
-        const gchar *order = nullptr;
-        gboolean reverse = FALSE;
-        g_variant_get(parameters, "(uu&sb)", &index, &max_count, &order, &reverse);
-        std::vector<Mpris2Playlists::Entry> entries;
-        if (app->playlist_manager()) {
-          for (Playlist *playlist : app->playlist_manager()->GetAllPlaylists()) {
-            entries.push_back({Mpris2Playlists::ObjectPath(playlist->id()), playlist->name(), {}});
-          }
-        }
-        entries = Mpris2Playlists::SortAndSlice(std::move(entries), order ? order : "", reverse != FALSE, index, max_count);
-        GVariantBuilder b;
-        g_variant_builder_init(&b, G_VARIANT_TYPE("a(oss)"));
-        for (const Mpris2Playlists::Entry &entry : entries) {
-          g_variant_builder_add(&b, "(oss)", entry.id.c_str(), entry.name.c_str(), entry.icon.c_str());
-        }
-        g_dbus_method_invocation_return_value(invocation, g_variant_new("(a(oss))", &b));
-        return;
-      }
-    }
-  }
-  g_dbus_method_invocation_return_value(invocation, nullptr);
-}
-
-static GVariant *HandleGet(GDBusConnection *, const gchar *, const gchar *, const gchar *interface, const gchar *property, GError **,
-                           gpointer user_data) {
-  auto *self = static_cast<Mpris2 *>(user_data);
-  Application *app = self ? self->app() : nullptr;
-  if (g_strcmp0(property, "Identity") == 0) {
-    return g_variant_new_string("Strawberry");
-  }
-  if (g_strcmp0(property, "DesktopEntry") == 0) {
-    return g_variant_new_string("org.strawberrymusicplayer.strawberry");
-  }
-  if (g_strcmp0(property, "CanQuit") == 0 || g_strcmp0(property, "CanRaise") == 0 || g_strcmp0(property, "CanControl") == 0) {
-    return g_variant_new_boolean(TRUE);
-  }
-  Playlist *playlist = app && app->playlist_manager() ? app->playlist_manager()->active() : nullptr;
-  const EngineBase::State state = app && app->player() ? app->player()->GetState() : EngineBase::State::Empty;
-  const Song current = app && app->player() ? app->player()->current_song() : Song();
-  const int64_t position_ns = app && app->player() && app->player()->engine() ? app->player()->engine()->position_nanosec() : 0;
-  if (g_strcmp0(property, "CanPlay") == 0) {
-    return g_variant_new_boolean(Mpris2Helpers::CanPlay(playlist));
-  }
-  if (g_strcmp0(property, "CanPause") == 0) {
-    return g_variant_new_boolean(Mpris2Helpers::CanPause(state, PlayerItemOptions::PauseDisabled(current)));
-  }
-  if (g_strcmp0(property, "CanGoNext") == 0) {
-    return g_variant_new_boolean(Mpris2Helpers::CanGoNext(playlist));
-  }
-  if (g_strcmp0(property, "CanGoPrevious") == 0) {
-    return g_variant_new_boolean(Mpris2Helpers::CanGoPrevious(playlist, position_ns));
-  }
-  if (g_strcmp0(property, "CanSeek") == 0) {
-    return g_variant_new_boolean(Mpris2Helpers::CanSeek(current, state));
-  }
-  if (g_strcmp0(property, "HasTrackList") == 0) {
-    return g_variant_new_boolean(TRUE);
-  }
-  if (g_strcmp0(property, "CanEditTracks") == 0) {
-    return g_variant_new_boolean(TRUE);
-  }
-  if (g_strcmp0(property, "Tracks") == 0) {
-    Playlist *tracks = app && app->playlist_manager() ? app->playlist_manager()->current() : nullptr;
-    return TrackListIds(tracks);
-  }
-  if (g_strcmp0(property, "PlaybackStatus") == 0) {
-    if (!app || !app->player()) {
-      return g_variant_new_string("Stopped");
-    }
-    switch (app->player()->GetState()) {
-      case GstEngine::State::Playing:
-        return g_variant_new_string("Playing");
-      case GstEngine::State::Paused:
-        return g_variant_new_string("Paused");
-      default:
-        return g_variant_new_string("Stopped");
-    }
-  }
-  if (g_strcmp0(property, "Rate") == 0) {
-    return g_variant_new_double(1.0);
-  }
-  if (g_strcmp0(property, "Rating") == 0) {
-    return g_variant_new_double(Mpris2Helpers::RatingProperty(current.rating()));
-  }
-  if (g_strcmp0(property, "Volume") == 0) {
-    return g_variant_new_double(app && app->player() ? app->player()->GetVolume() / 100.0 : 1.0);
-  }
-  if (g_strcmp0(property, "Position") == 0) {
-    const int64_t pos = app && app->player() ? app->player()->engine()->position_nanosec() / 1000 : 0;
-    return g_variant_new_int64(pos);
-  }
-  if (g_strcmp0(property, "LoopStatus") == 0) {
-    PlaylistSequence::RepeatMode mode = PlaylistSequence::RepeatMode::Off;
-    if (app && app->playlist_manager() && app->playlist_manager()->active()) {
-      mode = app->playlist_manager()->active()->repeat_mode();
-    }
-    return g_variant_new_string(Mpris2Helpers::LoopStatus(mode).c_str());
-  }
-  if (g_strcmp0(property, "Shuffle") == 0) {
-    bool shuffle = false;
-    if (app && app->playlist_manager() && app->playlist_manager()->active()) {
-      shuffle = app->playlist_manager()->active()->shuffle_mode() != PlaylistSequence::ShuffleMode::Off;
-    }
-    return g_variant_new_boolean(shuffle);
-  }
-  if (g_strcmp0(property, "SupportedUriSchemes") == 0) {
-    GVariantBuilder b;
-    g_variant_builder_init(&b, G_VARIANT_TYPE("as"));
-    for (const char *scheme : {"file", "http", "https", "cdda", "smb", "ftp"}) {
-      g_variant_builder_add(&b, "s", scheme);
-    }
-    return g_variant_builder_end(&b);
-  }
-  if (g_strcmp0(property, "SupportedMimeTypes") == 0) {
-    GVariantBuilder b;
-    g_variant_builder_init(&b, G_VARIANT_TYPE("as"));
-    for (const char *mime : {"audio/mpeg", "audio/flac", "audio/ogg", "audio/x-wav", "audio/mp4", "audio/x-ms-wma"}) {
-      g_variant_builder_add(&b, "s", mime);
-    }
-    return g_variant_builder_end(&b);
-  }
-  if (g_strcmp0(property, "Metadata") == 0) {
-    Song song;
-    int row = -1;
-    if (app && app->player()) {
-      song = app->player()->current_song();
-    }
-    if (app && app->playlist_manager() && app->playlist_manager()->active()) {
-      row = app->playlist_manager()->active()->current_row();
-    }
-    return MetadataVariant(song, row);
-  }
-  if (g_strcmp0(property, "PlaylistCount") == 0) {
-    const guint count = app && app->playlist_manager() ? static_cast<guint>(app->playlist_manager()->GetAllPlaylists().size()) : 0;
-    return g_variant_new_uint32(count);
-  }
-  if (g_strcmp0(property, "Orderings") == 0) {
-    const std::vector<const char *> orders = Mpris2Playlists::Orderings();
-    return g_variant_new_strv(orders.data(), static_cast<gssize>(orders.size()));
-  }
-  if (g_strcmp0(property, "ActivePlaylist") == 0) {
-    Playlist *current = app && app->playlist_manager() ? app->playlist_manager()->current() : nullptr;
-    if (!current) {
-      return g_variant_new("(b(oss))", FALSE, "/", "", "");
-    }
-    const std::string path = Mpris2Playlists::ObjectPath(current->id());
-    return g_variant_new("(b(oss))", TRUE, path.c_str(), current->name().c_str(), "");
-  }
-  (void)interface;
-  return nullptr;
-}
-
-static gboolean HandleSet(GDBusConnection *, const gchar *, const gchar *, const gchar *, const gchar *property, GVariant *value, GError **,
-                          gpointer user_data) {
-  auto *self = static_cast<Mpris2 *>(user_data);
-  Application *app = self ? self->app() : nullptr;
-  if (!app) {
-    return TRUE;
-  }
-  if (g_strcmp0(property, "Volume") == 0 && app->player()) {
-    app->player()->SetVolume(static_cast<unsigned>(std::clamp(g_variant_get_double(value) * 100.0, 0.0, 100.0)));
-  } else if (g_strcmp0(property, "Rating") == 0 && app->playlist_manager()) {
-    app->playlist_manager()->RateCurrentSong(Mpris2Helpers::RatingFromProperty(g_variant_get_double(value)));
-  } else if (g_strcmp0(property, "Shuffle") == 0 && app->playlist_manager() && app->playlist_manager()->active()) {
-    app->playlist_manager()->active()->SetShuffleMode(g_variant_get_boolean(value) ? PlaylistSequence::ShuffleMode::All
-                                                                                   : PlaylistSequence::ShuffleMode::Off);
-  } else if (g_strcmp0(property, "LoopStatus") == 0 && app->playlist_manager() && app->playlist_manager()->active()) {
-    const gchar *status = g_variant_get_string(value, nullptr);
-    app->playlist_manager()->active()->SetRepeatMode(Mpris2Helpers::RepeatFromLoopStatus(status ? status : "None"));
-  }
-  return TRUE;
-}
-
-static const GDBusInterfaceVTable kVtable = {HandleMethod, HandleGet, HandleSet, {nullptr}};
+#ifdef __GNUC__
+#  pragma GCC diagnostic push
+#  pragma GCC diagnostic ignored "-Warray-bounds"
 #endif
 
-Mpris2::Mpris2(Application *app) : app_(app) {
-#ifdef HAVE_MPRIS2
-  if (app_ && app_->player()) {
-    app_->player()->StateChanged.Connect([this](EngineBase::State) { EmitPlaybackStatus(); });
-    app_->player()->SongChanged.Connect([this](const Song &) {
-      EmitMetadata();
-      if (Mpris2Helpers::ShouldRefreshCapabilitiesOnSongChanged()) {
-        EmitPlayerCapabilities();
-      }
-    });
-    app_->player()->VolumeChanged.Connect([this](unsigned) { EmitVolume(); });
-  }
-  if (app_ && app_->current_albumcover_loader()) {
-    app_->current_albumcover_loader()->AlbumCoverReady.Connect([this](const Song &, const std::vector<unsigned char> &) { EmitMetadata(); });
-  }
-  if (app_ && app_->playlist_manager()) {
-    app_->playlist_manager()->CurrentChanged.Connect([this](Playlist *) {
-      WatchCurrentPlaylist();
-      EmitTrackListReplaced();
-      if (Mpris2Playlists::ShouldNotifyActiveOnCurrentChange()) {
-        EmitActivePlaylist();
-      }
-      if (Mpris2Playlists::ShouldNotifyCountOnCollectionChange()) {
-        EmitPlaylistCount();
-      }
-    });
-    app_->playlist_manager()->PlaylistChanged.Connect([this](Playlist *playlist) {
-      if (playlist) {
-        EmitPlaylistChanged(playlist->id(), playlist->name());
-      }
-    });
-    app_->playlist_manager()->PlaylistAdded.Connect([this](Playlist *) { EmitPlaylistCount(); });
-    app_->playlist_manager()->PlaylistDeleted.Connect([this](int) { EmitPlaylistCount(); });
-    app_->playlist_manager()->PlaylistsLoaded.Connect([this]() { WatchCurrentPlaylist(); });
-    WatchCurrentPlaylist();
-  }
-  owner_id_ = g_bus_own_name(G_BUS_TYPE_SESSION, "org.mpris.MediaPlayer2.strawberry", G_BUS_NAME_OWNER_FLAGS_NONE, OnBusAcquired, nullptr,
-                             nullptr, this, nullptr);
+#include "mpris2_player.h"
+#include "mpris2_playlists.h"
+#include "mpris2_root.h"
+#include "mpris2_tracklist.h"
+
+#ifdef __GNUC__
+#  pragma GCC diagnostic pop
 #endif
+
+using namespace Qt::Literals::StringLiterals;
+
+QDBusArgument &operator<<(QDBusArgument &arg, const MprisPlaylist &playlist) {
+  arg.beginStructure();
+  arg << playlist.id << playlist.name << playlist.icon;
+  arg.endStructure();
+  return arg;
 }
 
-Mpris2::~Mpris2() {
-#ifdef HAVE_MPRIS2
-  if (owner_id_) {
-    g_bus_unown_name(owner_id_);
-  }
-#endif
+const QDBusArgument &operator>>(const QDBusArgument &arg, MprisPlaylist &playlist) {
+  arg.beginStructure();
+  arg >> playlist.id >> playlist.name >> playlist.icon;
+  arg.endStructure();
+  return arg;
 }
 
-void Mpris2::OnBusAcquired(GDBusConnection *connection, const gchar *, gpointer user_data) {
-#ifdef HAVE_MPRIS2
-  auto *self = static_cast<Mpris2 *>(user_data);
-  self->connection_ = connection;
-  GError *error = nullptr;
-  GDBusNodeInfo *info = g_dbus_node_info_new_for_xml(kMprisXml, &error);
-  if (!info) {
-    if (error) {
-      g_error_free(error);
-    }
+QDBusArgument &operator<<(QDBusArgument &arg, const MaybePlaylist &playlist) {
+  arg.beginStructure();
+  arg << playlist.valid;
+  arg << playlist.playlist;
+  arg.endStructure();
+  return arg;
+}
+
+const QDBusArgument &operator>>(const QDBusArgument &arg, MaybePlaylist &playlist) {
+  arg.beginStructure();
+  arg >> playlist.valid >> playlist.playlist;
+  arg.endStructure();
+  return arg;
+}
+
+namespace mpris {
+
+constexpr char kMprisObjectPath[] = "/org/mpris/MediaPlayer2";
+constexpr char kServiceName[] = "org.mpris.MediaPlayer2.orange";
+constexpr char kFreedesktopPath[] = "org.freedesktop.DBus.Properties";
+constexpr char kTrackPrefix[] = "/org/orangemusicplayer/orange/Track/";
+constexpr char kNoTrack[] = "/org/mpris/MediaPlayer2/TrackList/NoTrack";
+constexpr int kTracksSubsetCount = 20;
+
+Mpris2::Mpris2(const SharedPtr<Player> player,
+               const SharedPtr<PlaylistManager> playlist_manager,
+               const SharedPtr<CurrentAlbumCoverLoader> current_albumcover_loader,
+               QObject *parent)
+    : QObject(parent),
+      player_(player),
+      playlist_manager_(playlist_manager),
+      current_albumcover_loader_(current_albumcover_loader) {
+
+  new Mpris2Root(this);
+  new Mpris2TrackList(this);
+  new Mpris2Player(this);
+  new Mpris2Playlists(this);
+
+  if (!QDBusConnection::sessionBus().registerService(QLatin1String(kServiceName))) {
+    qLog(Warning) << "Failed to register" << kServiceName << "on the session bus";
     return;
   }
-  g_dbus_connection_register_object(connection, "/org/mpris/MediaPlayer2", info->interfaces[0], &kVtable, self, nullptr, nullptr);
-  g_dbus_connection_register_object(connection, "/org/mpris/MediaPlayer2", info->interfaces[1], &kVtable, self, nullptr, nullptr);
-  if (info->interfaces[2]) {
-    g_dbus_connection_register_object(connection, "/org/mpris/MediaPlayer2", info->interfaces[2], &kVtable, self, nullptr, nullptr);
-  }
-  if (info->interfaces[3]) {
-    g_dbus_connection_register_object(connection, "/org/mpris/MediaPlayer2", info->interfaces[3], &kVtable, self, nullptr, nullptr);
-  }
-  g_dbus_node_info_unref(info);
-#else
-  (void)connection;
-  (void)user_data;
-#endif
-}
 
-void Mpris2::EmitPropertiesChanged(const char *interface_name, const char *property, GVariant *value) {
-#ifdef HAVE_MPRIS2
-  if (!connection_ || !value) {
-    if (value) {
-      g_variant_unref(g_variant_ref_sink(value));
-    }
+  if (!QDBusConnection::sessionBus().registerObject(QLatin1String(kMprisObjectPath), this)) {
+    qLog(Warning) << "Failed to register" << kMprisObjectPath << "on the session bus";
     return;
   }
-  GVariantBuilder changed;
-  g_variant_builder_init(&changed, G_VARIANT_TYPE("a{sv}"));
-  g_variant_builder_add(&changed, "{sv}", property, value);
-  GVariantBuilder invalidated;
-  g_variant_builder_init(&invalidated, G_VARIANT_TYPE("as"));
-  g_dbus_connection_emit_signal(connection_, nullptr, "/org/mpris/MediaPlayer2", "org.freedesktop.DBus.Properties", "PropertiesChanged",
-                                g_variant_new("(sa{sv}as)", interface_name, &changed, &invalidated), nullptr);
-#else
-  (void)interface_name;
-  (void)property;
-  (void)value;
-#endif
-}
 
-void Mpris2::EmitPosition() {
-#ifdef HAVE_MPRIS2
-  if (!app_ || !app_->player() || !app_->player()->engine()) {
-    return;
+  QObject::connect(&*current_albumcover_loader_, &CurrentAlbumCoverLoader::AlbumCoverLoaded, this, &Mpris2::AlbumCoverLoaded);
+
+  QObject::connect(&*player_->engine(), &EngineBase::StateChanged, this, &Mpris2::EngineStateChanged);
+  QObject::connect(&*player_, &Player::VolumeChanged, this, &Mpris2::VolumeChanged);
+  QObject::connect(&*player_, &Player::Seeked, this, &Mpris2::Seeked);
+
+  QObject::connect(&*playlist_manager_, &PlaylistManager::PlaylistManagerInitialized, this, &Mpris2::PlaylistManagerInitialized);
+  QObject::connect(&*playlist_manager_, &PlaylistManager::AllPlaylistsLoaded, this, &Mpris2::AllPlaylistsLoaded);
+  QObject::connect(&*playlist_manager_, &PlaylistManager::CurrentSongChanged, this, &Mpris2::CurrentSongChanged);
+  QObject::connect(&*playlist_manager_, &PlaylistManager::PlaylistChanged, this, &Mpris2::PlaylistChangedSlot);
+  QObject::connect(&*playlist_manager_, &PlaylistManager::CurrentChanged, this, &Mpris2::PlaylistCollectionChanged);
+  QObject::connect(&*playlist_manager_, &PlaylistManager::PlaylistItemsAdded, this, &Mpris2::PlaylistItemsAdded);
+  QObject::connect(&*playlist_manager_, &PlaylistManager::PlaylistItemsRemoved, this, &Mpris2::PlaylistItemsRemoved);
+  QObject::connect(&*playlist_manager_, &PlaylistManager::PlaylistItemMetadataChanged, this, &Mpris2::PlaylistItemMetadataChanged);
+
+  QStringList data_dirs = QString::fromUtf8(qgetenv("XDG_DATA_DIRS")).split(u':');
+
+  if (!data_dirs.contains("/usr/local/share"_L1)) {
+    data_dirs.append(u"/usr/local/share"_s);
   }
-  EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "Position",
-                        g_variant_new_int64(Mpris2Helpers::PositionUsec(app_->player()->engine()->position_nanosec())));
-#endif
-}
 
-void Mpris2::EmitSeeked(int64_t position_us) {
-#ifdef HAVE_MPRIS2
-  if (!connection_) {
-    return;
+  if (!data_dirs.contains("/usr/share"_L1)) {
+    data_dirs.append(u"/usr/share"_s);
   }
-  g_dbus_connection_emit_signal(connection_, nullptr, "/org/mpris/MediaPlayer2", "org.mpris.MediaPlayer2.Player", "Seeked",
-                                g_variant_new("(x)", position_us), nullptr);
-#else
-  (void)position_us;
-#endif
-}
 
-void Mpris2::EmitPlaybackStatus() {
-#ifdef HAVE_MPRIS2
-  const char *status = "Stopped";
-  if (app_ && app_->player()) {
-    switch (app_->player()->GetState()) {
-      case GstEngine::State::Playing:
-        status = "Playing";
-        break;
-      case GstEngine::State::Paused:
-        status = "Paused";
-        break;
-      default:
-        break;
+  for (const QString &data_dir : std::as_const(data_dirs)) {
+    const QString desktopfilepath = QStringLiteral("%1/applications/%2.desktop").arg(data_dir, QGuiApplication::desktopFileName());
+    if (QFile::exists(desktopfilepath)) {
+      desktopfilepath_ = desktopfilepath;
+      break;
     }
   }
-  EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "PlaybackStatus", g_variant_new_string(status));
-  EmitPlayerCapabilities();
-#endif
+
+  if (desktopfilepath_.isEmpty()) {
+    desktopfilepath_ = QGuiApplication::desktopFileName() + u".desktop"_s;
+  }
+
 }
 
-void Mpris2::EmitPlayerCapabilities() {
-#ifdef HAVE_MPRIS2
-  Playlist *playlist = app_ && app_->playlist_manager() ? app_->playlist_manager()->active() : nullptr;
-  const EngineBase::State state = app_ && app_->player() ? app_->player()->GetState() : EngineBase::State::Empty;
-  const Song current = app_ && app_->player() ? app_->player()->current_song() : Song();
-  const int64_t position_ns = app_ && app_->player() && app_->player()->engine() ? app_->player()->engine()->position_nanosec() : 0;
-  EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "CanPlay", g_variant_new_boolean(Mpris2Helpers::CanPlay(playlist)));
-  EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "CanPause",
-                        g_variant_new_boolean(Mpris2Helpers::CanPause(state, PlayerItemOptions::PauseDisabled(current))));
-  EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "CanGoNext", g_variant_new_boolean(Mpris2Helpers::CanGoNext(playlist)));
-  EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "CanGoPrevious",
-                        g_variant_new_boolean(Mpris2Helpers::CanGoPrevious(playlist, position_ns)));
-  EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "CanSeek", g_variant_new_boolean(Mpris2Helpers::CanSeek(current, state)));
-#endif
+// when PlaylistManager gets it ready, we connect PlaylistSequence with this
+void Mpris2::PlaylistManagerInitialized() {
+
+  QObject::connect(playlist_manager_->sequence(), &PlaylistSequence::ShuffleModeChanged, this, &Mpris2::ShuffleModeChanged);
+  QObject::connect(playlist_manager_->sequence(), &PlaylistSequence::RepeatModeChanged, this, &Mpris2::RepeatModeChanged);
+
 }
 
-void Mpris2::EmitLoopAndShuffle() {
-#ifdef HAVE_MPRIS2
+void Mpris2::AllPlaylistsLoaded() {
+
+  qLog(Debug) << "MPRIS2: All playlists loaded, emitting MPRIS2 notifications";
+
+  EmitNotification(u"CanPlay"_s);
+  EmitNotification(u"CanPause"_s);
+  EmitNotification(u"CanGoNext"_s, CanGoNext());
+  EmitNotification(u"CanGoPrevious"_s, CanGoPrevious());
+  EmitNotification(u"CanSeek"_s, CanSeek());
+
+}
+
+void Mpris2::EngineStateChanged(EngineBase::State newState) {
+
+  if (newState != EngineBase::State::Playing && newState != EngineBase::State::Paused) {
+    last_metadata_ = QVariantMap();
+    EmitNotification(u"Metadata"_s);
+  }
+
+  EmitNotification(u"CanPlay"_s);
+  EmitNotification(u"CanPause"_s);
+  EmitNotification(u"PlaybackStatus"_s, PlaybackStatus(newState));
+  if (newState == EngineBase::State::Playing) EmitNotification(u"CanSeek"_s, CanSeek(newState));
+
+}
+
+void Mpris2::VolumeChanged() {
+  EmitNotification(u"Volume"_s);
+}
+
+void Mpris2::ShuffleModeChanged() { EmitNotification(u"Shuffle"_s); }
+
+void Mpris2::RepeatModeChanged() {
+
+  EmitNotification(u"LoopStatus"_s);
+  EmitNotification(u"CanGoNext"_s, CanGoNext());
+  EmitNotification(u"CanGoPrevious"_s, CanGoPrevious());
+
+}
+
+void Mpris2::EmitNotification(const QString &name, const QVariant &value) {
+  EmitNotification(name, value, u"org.mpris.MediaPlayer2.Player"_s);
+}
+
+void Mpris2::EmitNotification(const QString &name, const QVariant &value, const QString &mprisEntity) {
+
+  QDBusMessage msg = QDBusMessage::createSignal(QLatin1String(kMprisObjectPath), QLatin1String(kFreedesktopPath), u"PropertiesChanged"_s);
+  QVariantMap map;
+  map.insert(name, value);
+  const QVariantList args = QVariantList() << mprisEntity << map << QStringList();
+  msg.setArguments(args);
+  QDBusConnection::sessionBus().send(msg);
+
+}
+
+void Mpris2::EmitNotification(const QString &name) {
+
+  QVariant value;
+  if (name == "PlaybackStatus"_L1) value = PlaybackStatus();
+  else if (name == "LoopStatus"_L1) value = LoopStatus();
+  else if (name == "Shuffle"_L1) value = Shuffle();
+  else if (name == "Metadata"_L1) value = Metadata();
+  else if (name == "Rating"_L1) value = Rating();
+  else if (name == "Volume"_L1) value = Volume();
+  else if (name == "Position"_L1) value = Position();
+  else if (name == "CanPlay"_L1) value = CanPlay();
+  else if (name == "CanPause"_L1) value = CanPause();
+  else if (name == "CanSeek"_L1) value = CanSeek();
+  else if (name == "CanGoNext"_L1) value = CanGoNext();
+  else if (name == "CanGoPrevious"_L1) value = CanGoPrevious();
+
+  if (value.isValid()) EmitNotification(name, value);
+
+}
+
+// ------------------Root Interface--------------------------//
+
+bool Mpris2::CanQuit() const { return true; }
+
+bool Mpris2::CanRaise() const { return true; }
+
+bool Mpris2::HasTrackList() const { return true; }
+
+QString Mpris2::Identity() const { return QCoreApplication::applicationName(); }
+
+QString Mpris2::DesktopEntryAbsolutePath() const {
+
+  return desktopfilepath_;
+
+}
+
+QString Mpris2::DesktopEntry() const { return QGuiApplication::desktopFileName(); }
+
+QStringList Mpris2::SupportedUriSchemes() const {
+
+  static QStringList res = QStringList() << u"file"_s
+                                         << u"http"_s
+                                         << u"cdda"_s
+                                         << u"smb"_s
+                                         << u"sftp"_s;
+  return res;
+
+}
+
+QStringList Mpris2::SupportedMimeTypes() const {
+
+  static QStringList res = QStringList() << u"x-content/audio-player"_s
+                                         << u"application/ogg"_s
+                                         << u"application/x-ogg"_s
+                                         << u"application/x-ogm-audio"_s
+                                         << u"audio/flac"_s
+                                         << u"audio/ogg"_s
+                                         << u"audio/vorbis"_s
+                                         << u"audio/aac"_s
+                                         << u"audio/mp4"_s
+                                         << u"audio/mpeg"_s
+                                         << u"audio/mpegurl"_s
+                                         << u"audio/vnd.rn-realaudio"_s
+                                         << u"audio/x-flac"_s
+                                         << u"audio/x-oggflac"_s
+                                         << u"audio/x-vorbis"_s
+                                         << u"audio/x-vorbis+ogg"_s
+                                         << u"audio/x-speex"_s
+                                         << u"audio/x-wav"_s
+                                         << u"audio/x-wavpack"_s
+                                         << u"audio/x-ape"_s
+                                         << u"audio/x-mp3"_s
+                                         << u"audio/x-mpeg"_s
+                                         << u"audio/x-mpegurl"_s
+                                         << u"audio/x-ms-wma"_s
+                                         << u"audio/x-musepack"_s
+                                         << u"audio/x-pn-realaudio"_s
+                                         << u"audio/x-scpls"_s
+                                         << u"video/x-ms-asf"_s;
+
+  return res;
+
+}
+
+void Mpris2::Raise() { Q_EMIT RaiseMainWindow(); }
+
+void Mpris2::Quit() { Q_EMIT ExitApplication(); }
+
+QString Mpris2::PlaybackStatus() const {
+  return PlaybackStatus(player_->GetState());
+}
+
+QString Mpris2::PlaybackStatus(EngineBase::State state) const {
+
+  switch (state) {
+    case EngineBase::State::Playing: return u"Playing"_s;
+    case EngineBase::State::Paused: return u"Paused"_s;
+    default: return u"Stopped"_s;
+  }
+
+}
+
+QString Mpris2::LoopStatus() const {
+
+  if (!playlist_manager_->sequence()) {
+    return u"None"_s;
+  }
+
+  switch (playlist_manager_->active() ? playlist_manager_->active()->RepeatMode() : playlist_manager_->sequence()->repeat_mode()) {
+    case PlaylistSequence::RepeatMode::Off: return u"None"_s;
+    case PlaylistSequence::RepeatMode::Album:
+    case PlaylistSequence::RepeatMode::Playlist: return u"Playlist"_s;
+    case PlaylistSequence::RepeatMode::Track: return u"Track"_s;
+    default: return u"None"_s;
+  }
+
+}
+
+void Mpris2::SetLoopStatus(const QString &value) {
+
+  if (!playlist_manager_->sequence()) {
+    return;
+  }
+
   PlaylistSequence::RepeatMode mode = PlaylistSequence::RepeatMode::Off;
-  bool shuffle = false;
-  if (app_ && app_->playlist_manager() && app_->playlist_manager()->active()) {
-    mode = app_->playlist_manager()->active()->repeat_mode();
-    shuffle = app_->playlist_manager()->active()->shuffle_mode() != PlaylistSequence::ShuffleMode::Off;
+  if (value == "None"_L1) {
+    mode = PlaylistSequence::RepeatMode::Off;
   }
-  EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "LoopStatus", g_variant_new_string(Mpris2Helpers::LoopStatus(mode).c_str()));
-  EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "Shuffle", g_variant_new_boolean(shuffle));
-#endif
-}
-
-void Mpris2::EmitMetadata() {
-#ifdef HAVE_MPRIS2
-  Song song;
-  int row = -1;
-  if (app_ && app_->player()) {
-    song = app_->player()->current_song();
+  else if (value == "Track"_L1) {
+    mode = PlaylistSequence::RepeatMode::Track;
   }
-  if (app_ && app_->playlist_manager() && app_->playlist_manager()->active()) {
-    row = app_->playlist_manager()->active()->current_row();
+  else if (value == "Playlist"_L1) {
+    mode = PlaylistSequence::RepeatMode::Playlist;
   }
-  const std::string art = app_ && app_->current_albumcover_loader() ? app_->current_albumcover_loader()->current_url() : std::string();
-  EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "Metadata", MetadataVariant(song, row, art));
-  EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "Rating", g_variant_new_double(Mpris2Helpers::RatingProperty(song.rating())));
-#endif
-}
-
-void Mpris2::EmitVolume() {
-#ifdef HAVE_MPRIS2
-  const double volume = app_ && app_->player() ? app_->player()->GetVolume() / 100.0 : 1.0;
-  EmitPropertiesChanged("org.mpris.MediaPlayer2.Player", "Volume", g_variant_new_double(volume));
-#endif
-}
-
-void Mpris2::WatchCurrentPlaylist() {
-#ifdef HAVE_MPRIS2
-  ++playlist_watch_gen_;
-  const int gen = playlist_watch_gen_;
-  SnapshotTrackList();
-  Playlist *playlist = app_ && app_->playlist_manager() ? app_->playlist_manager()->current() : nullptr;
-  if (!playlist) {
+  else {
+    // Ignore unrecognized values rather than silently resetting the loop status.
     return;
   }
-  playlist->Changed.Connect([this, gen]() {
-    if (gen != playlist_watch_gen_) {
-      return;
-    }
-    OnPlaylistContentsChanged();
-    EmitPlayerCapabilities();
-  });
-  playlist->CurrentChanged.Connect([this, gen](int) {
-    if (gen != playlist_watch_gen_) {
-      return;
-    }
-    EmitPlayerCapabilities();
-  });
-  playlist->RepeatModeChanged.Connect([this, gen]() {
-    if (gen != playlist_watch_gen_) {
-      return;
-    }
-    EmitLoopAndShuffle();
-    EmitPlayerCapabilities();
-  });
-  playlist->ShuffleModeChanged.Connect([this, gen]() {
-    if (gen != playlist_watch_gen_) {
-      return;
-    }
-    EmitLoopAndShuffle();
-    EmitPlayerCapabilities();
-  });
-  if (Mpris2Helpers::ShouldRefreshCapabilitiesOnWatch()) {
-    EmitPlayerCapabilities();
+
+  if (playlist_manager_->active()) {
+    playlist_manager_->active()->sequence()->SetRepeatMode(mode);
   }
-#endif
+  else {
+    playlist_manager_->sequence()->SetRepeatMode(mode);
+  }
+
 }
 
-void Mpris2::SnapshotTrackList() {
-  last_track_ids_ = CurrentTrackIds();
-  last_songs_ = CurrentSongs();
+double Mpris2::Rate() const { return 1.0; }
+
+void Mpris2::SetRate(double rate) {
+
+  if (rate == 0) {
+    player_->Pause();
+  }
+
 }
 
-std::vector<std::string> Mpris2::CurrentTrackIds() const {
-  std::vector<std::string> ids;
-  Playlist *playlist = app_ && app_->playlist_manager() ? app_->playlist_manager()->current() : nullptr;
-  if (!playlist) {
-    return ids;
+bool Mpris2::Shuffle() const {
+
+  if (!playlist_manager_->active() && !playlist_manager_->sequence()) {
+    return false;
   }
-  for (int i = 0; i < playlist->row_count(); ++i) {
-    ids.push_back(Mpris2Helpers::TrackIdForRow(playlist->song(i), i));
-  }
-  return ids;
+
+  const PlaylistSequence::ShuffleMode shuffle_mode = playlist_manager_->active() ? playlist_manager_->active()->ShuffleMode() : playlist_manager_->sequence()->shuffle_mode();
+  return shuffle_mode != PlaylistSequence::ShuffleMode::Off;
+
 }
 
-SongList Mpris2::CurrentSongs() const {
-  SongList songs;
-  Playlist *playlist = app_ && app_->playlist_manager() ? app_->playlist_manager()->current() : nullptr;
-  if (!playlist) {
-    return songs;
-  }
-  for (int i = 0; i < playlist->row_count(); ++i) {
-    songs.push_back(playlist->song(i));
-  }
-  return songs;
-}
+void Mpris2::SetShuffle(bool enable) {
 
-void Mpris2::OnPlaylistContentsChanged() {
-#ifdef HAVE_MPRIS2
-  const std::vector<std::string> now = CurrentTrackIds();
-  const SongList songs = CurrentSongs();
-  const Mpris2Helpers::TrackListDiff diff = Mpris2Helpers::DiffTrackIds(last_track_ids_, now);
-  if (diff.kind == Mpris2Helpers::TrackListDiff::Kind::Replaced || !connection_) {
-    last_track_ids_ = now;
-    last_songs_ = songs;
-    EmitTrackListReplaced();
+  if (!playlist_manager_->sequence()) {
     return;
   }
-  Playlist *playlist = app_ && app_->playlist_manager() ? app_->playlist_manager()->current() : nullptr;
-  if (diff.kind == Mpris2Helpers::TrackListDiff::Kind::Incremental) {
-    for (const std::string &id : diff.removed) {
-      g_dbus_connection_emit_signal(connection_, nullptr, "/org/mpris/MediaPlayer2", "org.mpris.MediaPlayer2.TrackList", "TrackRemoved",
-                                    g_variant_new("(o)", id.c_str()), nullptr);
-    }
-    for (size_t i = 0; i < diff.added.size(); ++i) {
-      const int row = playlist ? TrackListRow(playlist, diff.added[i].c_str()) : -1;
-      Song song;
-      if (playlist && row >= 0) {
-        song = playlist->song(row);
-      }
-      g_dbus_connection_emit_signal(connection_, nullptr, "/org/mpris/MediaPlayer2", "org.mpris.MediaPlayer2.TrackList", "TrackAdded",
-                                    g_variant_new("(@a{sv}o)", MetadataVariant(song, row), diff.after_track[i].c_str()), nullptr);
-    }
-    EmitPropertiesChanged("org.mpris.MediaPlayer2.TrackList", "Tracks", TrackListIds(playlist));
+
+  const PlaylistSequence::ShuffleMode mode = enable ? PlaylistSequence::ShuffleMode::All : PlaylistSequence::ShuffleMode::Off;
+  if (playlist_manager_->active()) {
+    playlist_manager_->active()->sequence()->SetShuffleMode(mode);
   }
-  if (now.size() == last_track_ids_.size() && now == last_track_ids_) {
-    for (size_t i = 0; i < now.size() && i < last_songs_.size() && i < songs.size(); ++i) {
-      if (Mpris2Helpers::MetadataNeedsUpdate(last_songs_[i], songs[i])) {
-        g_dbus_connection_emit_signal(connection_, nullptr, "/org/mpris/MediaPlayer2", "org.mpris.MediaPlayer2.TrackList",
-                                      "TrackMetadataChanged",
-                                      g_variant_new("(o@a{sv})", now[i].c_str(), MetadataVariant(songs[i], static_cast<int>(i))), nullptr);
-      }
-    }
+  else {
+    playlist_manager_->sequence()->SetShuffleMode(mode);
   }
-  last_track_ids_ = now;
-  last_songs_ = songs;
-#endif
+
+}
+
+QVariantMap Mpris2::Metadata() const { return last_metadata_; }
+
+double Mpris2::Rating() const {
+
+  const float rating = playlist_manager_->active() ? playlist_manager_->active()->current_item_metadata().rating() : .0F;
+  return (rating <= 0) ? 0 : rating;
+
+}
+
+void Mpris2::SetRating(double rating) {
+
+  if (rating > 1.0) {
+    rating = 1.0;
+  }
+  else if (rating <= 0.0) {
+    rating = -1.0;
+  }
+
+  playlist_manager_->RateCurrentSong(static_cast<float>(rating));
+
+}
+
+PlaylistItemPtr Mpris2::current_playlist_item() const {
+  return playlist_manager_->active() ? playlist_manager_->active()->current_item() : PlaylistItemPtr();
+}
+
+QUuid Mpris2::current_playlist_item_uuid() const {
+  return playlist_manager_->active() ? playlist_manager_->active()->current_uuid() : QUuid();
+}
+
+QDBusObjectPath Mpris2::current_track_id(const QUuid &current_row) const {
+  return QDBusObjectPath(QLatin1String(kTrackPrefix) + current_row.toString(QUuid::WithoutBraces).replace(u'-', u'_'));
+}
+
+// We send Metadata change notification as soon as the process of changing song starts...
+void Mpris2::CurrentSongChanged(const Song &song) {
+
+  AlbumCoverLoaded(song);
+  EmitNotification(u"CanPlay"_s);
+  EmitNotification(u"CanPause"_s);
+  EmitNotification(u"CanGoNext"_s, CanGoNext());
+  EmitNotification(u"CanGoPrevious"_s, CanGoPrevious());
+  EmitNotification(u"CanSeek"_s, CanSeek());
+
+}
+
+void Mpris2::PlaylistItemsAdded(const int playlist_id, const QList<QUuid> &track_ids, const QUuid &after_track_id) {
+
+  if (track_ids.isEmpty() || !playlist_manager_->active() || playlist_manager_->active_id() != playlist_id) {
+    return;
+  }
+
+  // The items were inserted contiguously after after_track_id, so chain the AfterTrack:
+  // the first track follows after_track_id, and each subsequent track follows the previous one.
+  QDBusObjectPath after_track_path = after_track_id.isNull() ? QDBusObjectPath(kNoTrack) : current_track_id(after_track_id);
+  for (const QUuid &track_id : track_ids) {
+    const QDBusObjectPath track_path = current_track_id(track_id);
+    const TrackMetadata metadata = GetTracksMetadata(Track_Ids() << track_path);
+    if (!metadata.isEmpty() && !metadata.first().isEmpty()) {
+      Q_EMIT TrackAdded(metadata.first(), after_track_path);
+    }
+    after_track_path = track_path;
+  }
+
+}
+
+void Mpris2::PlaylistItemsRemoved(const int playlist_id, const QList<QUuid> &track_ids) {
+
+  if (track_ids.isEmpty() || !playlist_manager_->active() || playlist_manager_->active_id() != playlist_id) {
+    return;
+  }
+
+  for (const QUuid &track_id : track_ids) {
+    Q_EMIT TrackRemoved(current_track_id(track_id));
+  }
+
+}
+
+void Mpris2::PlaylistItemMetadataChanged(const int playlist_id, const QUuid &track_id) {
+
+  if (track_id.isNull() || !playlist_manager_->active() || playlist_manager_->active_id() != playlist_id) {
+    return;
+  }
+
+  const QDBusObjectPath track_path = current_track_id(track_id);
+  const TrackMetadata metadata = GetTracksMetadata(Track_Ids() << track_path);
+  if (metadata.isEmpty() || metadata.first().isEmpty()) {
+    return;
+  }
+
+  Q_EMIT TrackMetadataChanged(track_path, metadata.first());
+
 }
 
 void Mpris2::EmitTrackListReplaced() {
-#ifdef HAVE_MPRIS2
-  SnapshotTrackList();
-  if (!connection_) {
-    return;
+
+  const Track_Ids track_ids = Tracks();
+  const QUuid playlist_item_uuid = current_playlist_item_uuid();
+  QDBusObjectPath current_track_path(kNoTrack);
+  if (!playlist_item_uuid.isNull()) {
+    current_track_path = current_track_id(playlist_item_uuid);
   }
-  Playlist *playlist = app_ && app_->playlist_manager() ? app_->playlist_manager()->current() : nullptr;
-  std::string current = Mpris2Helpers::kNoTrack;
-  if (playlist && playlist->current_row() >= 0) {
-    current = Mpris2Helpers::TrackIdForRow(playlist->current_song(), playlist->current_row());
-  }
-  g_dbus_connection_emit_signal(connection_, nullptr, "/org/mpris/MediaPlayer2", "org.mpris.MediaPlayer2.TrackList", "TrackListReplaced",
-                                g_variant_new("(@aoo)", TrackListIds(playlist), current.c_str()), nullptr);
-  EmitPropertiesChanged("org.mpris.MediaPlayer2.TrackList", "Tracks", TrackListIds(playlist));
-#endif
+
+  Q_EMIT TrackListReplaced(track_ids, current_track_path);
+
 }
 
-void Mpris2::EmitPlaylistChanged(int id, const std::string &name) {
-#ifdef HAVE_MPRIS2
-  if (!connection_) {
-    return;
+// ... and we add the cover information later, when it's available.
+void Mpris2::AlbumCoverLoaded(const Song &song, const AlbumCoverLoaderResult &result) {
+
+  const QUuid playlist_item_uuid = current_playlist_item_uuid();
+  if (playlist_item_uuid.isNull()) return;
+
+  last_metadata_ = QVariantMap();
+  song.ToXesam(&last_metadata_);
+
+  using mpris::AddMetadata;
+  AddMetadata(u"mpris:trackid"_s, current_track_id(playlist_item_uuid), &last_metadata_);
+
+  QUrl cover_url;
+  if (result.album_cover.cover_url.isValid() && result.album_cover.cover_url.isLocalFile() && QFile(result.album_cover.cover_url.toLocalFile()).exists()) {
+    cover_url = result.album_cover.cover_url;
   }
-  const Mpris2Playlists::Entry entry = Mpris2Playlists::ChangedEntry(id, name);
-  g_dbus_connection_emit_signal(connection_, nullptr, "/org/mpris/MediaPlayer2", Mpris2Playlists::kInterface,
-                                Mpris2Playlists::kPlaylistChangedSignal,
-                                g_variant_new("((oss))", entry.id.c_str(), entry.name.c_str(), entry.icon.c_str()), nullptr);
-  Playlist *current = app_ && app_->playlist_manager() ? app_->playlist_manager()->current() : nullptr;
-  if (current && current->id() == id) {
-    EmitActivePlaylist();
+  else if (result.temp_cover_url.isValid() && result.temp_cover_url.isLocalFile()) {
+    cover_url = result.temp_cover_url;
   }
-#endif
+  else if (song.art_manual().isValid() && song.art_manual().isLocalFile()) {
+    cover_url = song.art_manual();
+  }
+  else if (song.art_automatic().isValid() && song.art_automatic().isLocalFile()) {
+    cover_url = song.art_automatic();
+  }
+
+  if (cover_url.isValid()) {
+    AddMetadata(u"mpris:artUrl"_s, cover_url.toString(), &last_metadata_);
+  }
+
+  AddMetadata(u"year"_s, song.year(), &last_metadata_);
+  AddMetadata(u"bitrate"_s, song.bitrate(), &last_metadata_);
+
+  EmitNotification(u"Metadata"_s, last_metadata_);
+
 }
 
-void Mpris2::EmitPlaylistCount() {
-#ifdef HAVE_MPRIS2
-  const guint count = app_ && app_->playlist_manager() ? static_cast<guint>(app_->playlist_manager()->GetAllPlaylists().size()) : 0;
-  EmitPropertiesChanged(Mpris2Playlists::kInterface, Mpris2Playlists::kPlaylistCountProperty, g_variant_new_uint32(count));
-#endif
+double Mpris2::Volume() const {
+  return player_->GetVolume() / 100.0;
 }
 
-void Mpris2::EmitActivePlaylist() {
-#ifdef HAVE_MPRIS2
-  Playlist *current = app_ && app_->playlist_manager() ? app_->playlist_manager()->current() : nullptr;
-  if (!current) {
-    EmitPropertiesChanged(Mpris2Playlists::kInterface, Mpris2Playlists::kActivePlaylistProperty,
-                          g_variant_new("(b(oss))", FALSE, Mpris2Playlists::kInactivePlaylistPath, "", ""));
+void Mpris2::SetVolume(const double volume) {
+  player_->SetVolume(static_cast<uint>(qBound(0L, lround(volume * 100.0), 100L)));
+}
+
+qint64 Mpris2::Position() const {
+  return player_->engine()->position_nanosec() / kNsecPerUsec;
+}
+
+double Mpris2::MaximumRate() const { return 1.0; }
+
+double Mpris2::MinimumRate() const { return 1.0; }
+
+bool Mpris2::CanGoNext() const {
+
+  const bool can_go_next = playlist_manager_->active() && playlist_manager_->active()->next_row() != -1;
+  qLog(Debug) << "MPRIS2: Can go next" << can_go_next;
+  return can_go_next;
+
+}
+
+bool Mpris2::CanGoPrevious() const {
+
+  const bool can_go_previous = playlist_manager_->active() && (playlist_manager_->active()->previous_row() != -1 || player_->PreviousWouldRestartTrack());
+  qLog(Debug) << "MPRIS2: Can go previous" << can_go_previous;
+  return can_go_previous;
+
+}
+
+bool Mpris2::CanPlay() const {
+
+  const bool can_play = playlist_manager_->active() && playlist_manager_->active()->rowCount() != 0;
+  qLog(Debug) << "MPRIS2: Can play" << can_play;
+  return can_play;
+
+}
+
+// This one's a bit different than MPRIS 1 - we want this to be true even when the song is already paused or stopped.
+bool Mpris2::CanPause() const {
+
+  const bool can_pause = (player_->GetCurrentItem() && player_->GetState() == EngineBase::State::Playing && !(player_->GetCurrentItem()->options() & PlaylistItem::Option::PauseDisabled)) || PlaybackStatus() == "Paused"_L1 || PlaybackStatus() == "Stopped"_L1;
+  qLog(Debug) << "MPRIS2: Can pause" << can_pause;
+  return can_pause;
+
+}
+
+bool Mpris2::CanSeek() const {
+
+  const bool can_seek = CanSeek(player_->GetState());
+  qLog(Debug) << "MPRIS2: Can can seek" << can_seek;
+  return can_seek;
+
+}
+
+bool Mpris2::CanSeek(EngineBase::State state) const {
+  return player_->GetCurrentItem() && state != EngineBase::State::Empty && !player_->GetCurrentItem()->EffectiveMetadata().is_stream();
+}
+
+bool Mpris2::CanControl() const { return true; }
+
+void Mpris2::Next() {
+
+  if (CanGoNext()) {
+    player_->Next();
+  }
+
+}
+
+void Mpris2::Previous() {
+
+  if (CanGoPrevious()) {
+    player_->Previous();
+  }
+
+}
+
+void Mpris2::Pause() {
+
+  if (CanPause() && player_->GetState() != EngineBase::State::Paused) {
+    player_->Pause();
+  }
+
+}
+
+void Mpris2::PlayPause() {
+
+  if (CanPause()) {
+    player_->PlayPause();
+  }
+
+}
+
+void Mpris2::Stop() { player_->Stop(); }
+
+void Mpris2::Play() {
+
+  if (CanPlay() && player_->GetState() != EngineBase::State::Playing) {
+    player_->Play();
+  }
+
+}
+
+void Mpris2::Seek(qint64 offset) {
+
+  if (CanSeek()) {
+    player_->SeekTo(player_->engine()->position_nanosec() / kNsecPerSec + offset / kUsecPerSec);
+  }
+
+}
+
+void Mpris2::SetPosition(const QDBusObjectPath &trackId, qint64 offset) {
+
+  const QUuid playlist_item_uuid = current_playlist_item_uuid();
+  if (playlist_item_uuid.isNull()) return;
+
+  if (CanSeek() && trackId == current_track_id(playlist_item_uuid) && offset >= 0) {
+    offset *= kNsecPerUsec;
+    if (offset < player_->GetCurrentItem()->EffectiveMetadata().length_nanosec()) {
+      player_->SeekTo(offset / kNsecPerSec);
+    }
+  }
+
+}
+
+void Mpris2::OpenUri(const QString &uri) {
+
+  if (playlist_manager_->active()) {
+    playlist_manager_->active()->InsertUrls(QList<QUrl>() << QUrl(uri), -1, true);
+  }
+
+}
+
+Track_Ids Mpris2::Tracks() const {
+
+  if (!playlist_manager_->active() || playlist_manager_->active()->rowCount() == 0) {
+    return Track_Ids();
+  }
+
+  Track_Ids track_ids;
+  int current_row = playlist_manager_->active()->current_row() - kTracksSubsetCount;
+  int last_row = playlist_manager_->active()->current_row() + kTracksSubsetCount;
+
+  if (current_row < 0) {
+    current_row = 0;
+  }
+  if (last_row >= playlist_manager_->active()->rowCount()) {
+    last_row = playlist_manager_->active()->rowCount();
+  }
+  for (; current_row < last_row; ++current_row) {
+    const PlaylistItemPtr playlist_item = playlist_manager_->active()->item_at(current_row);
+    track_ids << current_track_id(playlist_item->uuid());
+  }
+
+  return track_ids;
+
+}
+
+bool Mpris2::CanEditTracks() const { return playlist_manager_->active() != nullptr; }
+
+QUuid Mpris2::GetTrackObjectPathUuid(const QDBusObjectPath &track_object_path) {
+
+  const QString path = track_object_path.path();
+  static const QString track_prefix = QLatin1String(kTrackPrefix);
+  if (!path.startsWith(track_prefix)) {
+    return QUuid();
+  }
+  QString id_part = path.mid(track_prefix.length());
+  if (id_part.isEmpty()) {
+    return QUuid();
+  }
+  return QUuid::fromString(id_part.replace(u'_', u'-'));
+
+}
+
+TrackMetadata Mpris2::GetTracksMetadata(const Track_Ids &tracks) const {
+
+  if (!playlist_manager_->active()) {
+    return TrackMetadata();
+  }
+
+  TrackMetadata track_metadata;
+  track_metadata.reserve(tracks.count());
+  for (const QDBusObjectPath &track_object_path : tracks) {
+    const QUuid playlist_item_uuid = GetTrackObjectPathUuid(track_object_path);
+    if (playlist_item_uuid.isNull()) {
+      track_metadata << QVariantMap();
+      continue;
+    }
+    PlaylistItemPtr playlist_item = playlist_manager_->active()->ItemByUuId(playlist_item_uuid);
+    if (!playlist_item) {
+      track_metadata << QVariantMap();
+      continue;
+    }
+    QVariantMap track_map;
+    playlist_item->EffectiveMetadata().ToXesam(&track_map);
+    track_map.insert(u"mpris:trackid"_s, QVariant::fromValue(track_object_path));
+    track_metadata << track_map;
+  }
+
+  return track_metadata;
+
+}
+
+void Mpris2::AddTrack(const QString &uri, const QDBusObjectPath &afterTrack, bool setAsCurrent) {
+
+  if (!playlist_manager_->active() || playlist_manager_->active_id() < 0) {
     return;
   }
-  const std::string path = Mpris2Playlists::ObjectPath(current->id());
-  EmitPropertiesChanged(Mpris2Playlists::kInterface, Mpris2Playlists::kActivePlaylistProperty,
-                        g_variant_new("(b(oss))", TRUE, path.c_str(), current->name().c_str(), ""));
-#endif
+  int after_track_pos = playlist_manager_->active()->rowCount() - 1;
+  const QString path = afterTrack.path();
+  if (path == u"/"_s || path == QLatin1String(kNoTrack)) {
+    after_track_pos = -1;
+  }
+  else {
+    const QUuid playlist_item_uuid = GetTrackObjectPathUuid(afterTrack);
+    if (!playlist_item_uuid.isNull()) {
+      after_track_pos = playlist_manager_->active()->IndexByUuId(playlist_item_uuid);
+    }
+  }
+  const int insert_row = after_track_pos + 1;
+  playlist_manager_->InsertUrls(playlist_manager_->active_id(), QList<QUrl>() << QUrl(uri), insert_row, setAsCurrent, false, true);
+
 }
+
+void Mpris2::RemoveTrack(const QDBusObjectPath &trackId) {
+
+  if (!playlist_manager_->active()) {
+    return;
+  }
+  const QUuid playlist_item_uuid = GetTrackObjectPathUuid(trackId);
+  const PlaylistItemPtr playlist_item = playlist_manager_->active()->ItemByUuId(playlist_item_uuid);
+  if (playlist_item) {
+    playlist_manager_->active()->RemoveItemWithSignal(playlist_item);
+  }
+
+}
+
+void Mpris2::GoTo(const QDBusObjectPath &trackId) {
+
+  if (!playlist_manager_->active()) {
+    return;
+  }
+  const QUuid playlist_item_uuid = GetTrackObjectPathUuid(trackId);
+  const int playlist_item_index = playlist_manager_->active()->IndexByUuId(playlist_item_uuid);
+  if (playlist_item_index >= 0) {
+    // GoTo on the root object only changes the current track; it does not replace the track list.
+    // Clients learn of the new current track via the Player Metadata mpris:trackid change.
+    player_->PlayAt(playlist_item_index, false, 0, EngineBase::TrackChangeType::Auto, Playlist::AutoScroll::Always, false);
+  }
+
+}
+
+quint32 Mpris2::PlaylistCount() const {
+  return playlist_manager_->GetAllPlaylists().size();
+}
+
+QStringList Mpris2::Orderings() const { return QStringList() << u"UserDefined"_s << u"Alphabetical"_s; }
+
+QDBusObjectPath Mpris2::MakePlaylistPath(const int id) const {
+  return QDBusObjectPath(QStringLiteral("/org/orangemusicplayer/orange/PlaylistId/%1").arg(id));
+}
+
+MaybePlaylist Mpris2::ActivePlaylist() const {
+
+  MaybePlaylist maybe_playlist;
+  Playlist *current_playlist = playlist_manager_->current();
+  maybe_playlist.valid = current_playlist != nullptr;
+  if (!current_playlist) {
+    return maybe_playlist;
+  }
+
+  maybe_playlist.playlist.id = MakePlaylistPath(current_playlist->id());
+  maybe_playlist.playlist.name = playlist_manager_->GetPlaylistName(current_playlist->id());
+
+  return maybe_playlist;
+
+}
+
+void Mpris2::ActivatePlaylist(const QDBusObjectPath &mpris2_playlist_id) {
+
+  const QStringList split_path = mpris2_playlist_id.path().split(u'/');
+  if (split_path.isEmpty()) {
+    return;
+  }
+  bool ok = false;
+  const int playlist_id = split_path.last().toInt(&ok);
+  if (!ok) {
+    return;
+  }
+  if (!playlist_manager_->IsPlaylistOpen(playlist_id)) {
+    qLog(Error) << "Playlist isn't opened!";
+    return;
+  }
+  playlist_manager_->SetActivePlaylist(playlist_id);
+  player_->Next();
+
+  EmitTrackListReplaced();
+
+}
+
+MprisPlaylistList Mpris2::GetPlaylists(quint32 index, quint32 max_count, const QString &order, bool reverse_order) {
+
+  const QList<Playlist*> playlists = playlist_manager_->GetAllPlaylists();
+  MprisPlaylistList ret;
+  ret.reserve(playlists.count());
+  for (Playlist *playlist : playlists) {
+    MprisPlaylist mpris_playlist;
+    mpris_playlist.id = MakePlaylistPath(playlist->id());
+    mpris_playlist.name = playlist_manager_->GetPlaylistName(playlist->id());
+    ret << mpris_playlist;
+  }
+
+  if (!order.isEmpty()) {
+    // Only the orderings advertised by Orderings() are handled here.
+    // CreationDate, ModifiedDate and LastPlayDate are not supported as we don't track such values.
+    if (order == "Alphabetical"_L1) {
+      std::sort(ret.begin(), ret.end(), [](const MprisPlaylist &a, const MprisPlaylist &b) { return a.name < b.name; });
+    }
+    // Let's say user defined will sort by the ID
+    else if (order == "UserDefined"_L1) {
+      std::sort(ret.begin(), ret.end(), [](const MprisPlaylist &a, const MprisPlaylist &b) { return a.id < b.id; });
+    }
+  }
+  if (reverse_order) {
+    std::reverse(ret.begin(), ret.end());
+  }
+
+  return ret.mid(index, max_count);
+
+}
+
+void Mpris2::PlaylistChangedSlot(Playlist *playlist) {
+
+  MprisPlaylist mpris_playlist;
+  mpris_playlist.id = MakePlaylistPath(playlist->id());
+  mpris_playlist.name = playlist_manager_->GetPlaylistName(playlist->id());
+
+  Q_EMIT PlaylistChanged(mpris_playlist);
+
+}
+
+void Mpris2::PlaylistCollectionChanged(Playlist *playlist) {
+  Q_UNUSED(playlist);
+  EmitNotification(u"PlaylistCount"_s, ""_L1, u"org.mpris.MediaPlayer2.Playlists"_s);
+}
+
+}  // namespace mpris

@@ -1,14 +1,33 @@
-#ifndef STRAWBERRY_DISKUTILS_H
-#define STRAWBERRY_DISKUTILS_H
+/*
+ * Strawberry Music Player
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include <cstdint>
-#include <string>
+#ifndef DISKUTILS_H
+#define DISKUTILS_H
 
-namespace DiskUtils {
+#include <QString>
 
-int64_t FreeSpaceBytes(const std::string &path);
-int64_t TotalSpaceBytes(const std::string &path);
+namespace Utilities {
 
-}  // namespace DiskUtils
+quint64 FileSystemCapacity(const QString &path);
+quint64 FileSystemFreeSpace(const QString &path);
 
-#endif
+}  // namespace Utilities
+
+#endif  // DISKUTILS_H

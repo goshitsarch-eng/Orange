@@ -1,0 +1,66 @@
+#playlist {
+  background-color: %palette-base;
+  alternate-background-color: %palette-alternate-base;
+}
+
+#playlist[default_background_enabled = "true"] {
+  background-image: url(:pictures/strawberry-faded.png);
+  background-attachment: fixed;
+  background-position: bottom right;
+  background-repeat: none;
+  background-clip: content;
+}
+
+#playlist[strawbs_background_enabled = "true"] {
+  background-image: url(:pictures/strawbs.png);
+  background-attachment: fixed;
+  background-position: bottom right;
+  background-repeat: none;
+  background-clip: content;
+}
+
+#context-layout-container {
+  background-color: %palette-base;
+}
+
+#context-widget-scrollarea {
+  background-color: %palette-base;
+}
+
+#context-layout-scrollarea {
+  background-color: %palette-base;
+}
+
+#context-scrollarea {
+  background-color: %palette-base;
+}
+
+QToolButton[accessibleName="MenuPopupToolButton"] {
+  border: 2px solid transparent;
+  border-radius: 3px;
+  padding: 1px;
+}
+
+QToolButton:hover[accessibleName="MenuPopupToolButton"] {
+  border: 2px solid %palette-highlight;
+  background-color: %palette-highlight-lighter;
+}
+
+QToolButton:pressed[accessibleName="MenuPopupToolButton"] {
+  border: 2px solid %palette-highlight-darker;
+  background-color: %palette-highlight-lighter;
+}
+
+QToolButton[popupMode="MenuButtonPopup"][accessibleName="MenuPopupToolButton"], QToolButton:hover[popupMode="MenuButtonPopup"][accessibleName="MenuPopupToolButton"], QToolButton:pressed[popupMode="MenuButtonPopup"][accessibleName="MenuPopupToolButton"] {
+  padding-right: 16px;
+}
+
+/* For backwards compatibility with Qt 5 as it does not support property name */
+QToolButton[popupMode="1"][accessibleName="MenuPopupToolButton"], QToolButton:hover[popupMode="1"][accessibleName="MenuPopupToolButton"], QToolButton:pressed[popupMode="1"][accessibleName="MenuPopupToolButton"] {
+  padding-right: 16px;
+}
+
+QToolButton::menu-button[accessibleName="MenuPopupToolButton"] {
+  width: 16px;
+  border: none;
+}

@@ -1,23 +1,52 @@
-#ifndef STRAWBERRY_TRANSCODEROPTIONSMP3_H
-#define STRAWBERRY_TRANSCODEROPTIONSMP3_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "transcoder/transcoderoptionsfields.h"
-#include "transcoder/transcoderoptionsinterface.h"
+#ifndef TRANSCODEROPTIONSMP3_H
+#define TRANSCODEROPTIONSMP3_H
 
-class TranscoderOptionsMp3 : public TranscoderOptionsInterface {
+#include "config.h"
+
+#include <QObject>
+#include <QWidget>
+#include <QString>
+
+#include "transcoderoptionsinterface.h"
+
+class Ui_TranscoderOptionsMP3;
+
+class TranscoderOptionsMP3 : public TranscoderOptionsInterface {
+  Q_OBJECT
+
  public:
-  Transcoder::Format format() const override { return Transcoder::Format::MP3; }
-  std::string EncoderElement() const override { return "lamemp3enc"; }
-  std::string MuxerElement() const override { return "id3v2mux"; }
-  void ApplyQuality(int quality) override { options_.ApplyQuality(quality); }
-  void Load() override { options_.Load(); }
-  void Save() const { options_.Save(); }
-  std::string PipelineFragment() const override { return options_.Pipeline(); }
-  int quality() const { return options_.quality; }
-  TranscoderOptionsFields::Mp3 *options() { return &options_; }
+  explicit TranscoderOptionsMP3(QWidget *parent = nullptr);
+  ~TranscoderOptionsMP3() override;
+
+  void Load() override;
+  void Save() override;
+
+ private Q_SLOTS:
+  void QualitySliderChanged(const int value);
+  void QualitySpinboxChanged(const double value);
 
  private:
-  TranscoderOptionsFields::Mp3 options_;
+  Ui_TranscoderOptionsMP3 *ui_;
 };
 
-#endif
+#endif  // TRANSCODEROPTIONSMP3_H

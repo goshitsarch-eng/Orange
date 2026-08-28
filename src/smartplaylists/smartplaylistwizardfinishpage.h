@@ -1,26 +1,41 @@
-#ifndef STRAWBERRY_SMARTPLAYLISTWIZARDFINISHPAGE_H
-#define STRAWBERRY_SMARTPLAYLISTWIZARDFINISHPAGE_H
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include <gtk/gtk.h>
+#ifndef SMARTPLAYLISTWIZARDFINISHPAGE_H
+#define SMARTPLAYLISTWIZARDFINISHPAGE_H
 
-#include <string>
+#include <QWizardPage>
 
-class SmartPlaylistWizardFinishPage {
+class Ui_SmartPlaylistWizardFinishPage;
+
+class SmartPlaylistWizardFinishPage : public QWizardPage {
+  Q_OBJECT
+
  public:
-  SmartPlaylistWizardFinishPage();
+  explicit SmartPlaylistWizardFinishPage(QWidget *parent);
+  ~SmartPlaylistWizardFinishPage() override;
 
-  GtkWidget *widget() const { return widget_; }
-  void SetSummary(const std::string &text);
+  int nextId() const override;
+  bool isComplete() const override;
 
-  // Qt SmartPlaylistWizardFinishPage::isComplete: Finish/Create stays off until the name is non-empty.
-  static bool IsComplete(const std::string &name) { return !name.empty(); }
-
-  // Qt Next/Finish also requires the search page to be complete.
-  static bool CanCreate(const std::string &name, bool search_complete) { return IsComplete(name) && search_complete; }
-
- private:
-  GtkWidget *widget_ = nullptr;
-  GtkWidget *summary_ = nullptr;
+  Ui_SmartPlaylistWizardFinishPage *ui_;
 };
 
-#endif
+#endif  // SMARTPLAYLISTWIZARDFINISHPAGE_H

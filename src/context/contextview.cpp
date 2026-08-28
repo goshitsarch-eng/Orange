@@ -1,497 +1,693 @@
-#include "context/contextview.h"
+/*
+ * Strawberry Music Player
+ * Copyright 2013-2025, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "constants/contextsettings.h"
-#include "context/contextcover.h"
-#include "context/contextfont.h"
-#include "context/contextidle.h"
-#include "context/contextplayingtext.h"
-#include "context/contextreload.h"
-#include "context/contextlyrics.h"
-#include "context/contextsongupdate.h"
-#include "context/contextoptions.h"
-#include "context/contexttechnical.h"
-#include "core/settings.h"
+#include "config.h"
+
+#include <utility>
+
+#include <QtGlobal>
+#include <QObject>
+#include <QWidget>
+#include <QList>
+#include <QVariant>
+#include <QString>
+#include <QUrl>
+#include <QImage>
+#include <QIcon>
+#include <QFont>
+#include <QSize>
+#include <QSizePolicy>
+#include <QMenu>
+#include <QAction>
+#include <QFontDatabase>
+#include <QLayoutItem>
+#include <QVBoxLayout>
+#include <QGridLayout>
+#include <QStackedWidget>
+#include <QScrollArea>
+#include <QSpacerItem>
+#include <QLabel>
+#include <QTextEdit>
+#include <QSettings>
+#include <QResizeEvent>
+#include <QContextMenuEvent>
+#include <QDragEnterEvent>
+#include <QDropEvent>
+
 #include "core/song.h"
-#include "lyrics/lrcparser.h"
+#include "core/settings.h"
+#include "utilities/strutils.h"
+#include "utilities/timeutils.h"
+#include "widgets/resizabletextedit.h"
+#include "collection/collectionview.h"
+#include "covermanager/albumcoverchoicecontroller.h"
 #include "lyrics/lyricsfetcher.h"
-#include "lyrics/lyricsproviders.h"
-#include "translations/translations.h"
-#include "utilities/styleutils.h"
+#include "constants/contextsettings.h"
+#include "constants/timeconstants.h"
 
-#include <pango/pango.h>
+#include "contextview.h"
+#include "contextalbum.h"
 
-ContextView::ContextView(LyricsProviders *lyrics_providers, LyricsFetcher *lyrics_fetcher)
-    : lyrics_providers_(lyrics_providers), lyrics_fetcher_(lyrics_fetcher), album_(std::make_unique<ContextAlbum>()) {
-  if (lyrics_fetcher_) {
-    lyrics_fetcher_->LyricsFetched.Connect([this](uint64_t id, const std::string &provider, const std::string &lyrics) {
-      if (id == current_search_id_) {
-        SetLyrics(lyrics, provider);
-      }
-    });
-  }
-  GtkWidget *scroll = gtk_scrolled_window_new();
-  gtk_widget_set_vexpand(scroll, TRUE);
-  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
-  gtk_widget_set_margin_start(box, 12);
-  gtk_widget_set_margin_end(box, 12);
-  gtk_widget_set_margin_top(box, 12);
-  gtk_widget_set_margin_bottom(box, 12);
+using namespace Qt::Literals::StringLiterals;
 
-  GtkWidget *toggles = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
-  show_album_btn_ = gtk_toggle_button_new_with_label(Translations::CStr("Album"));
-  show_data_btn_ = gtk_toggle_button_new_with_label(Translations::CStr("Details"));
-  show_lyrics_btn_ = gtk_toggle_button_new_with_label(Translations::CStr("Lyrics"));
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_album_btn_), TRUE);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_data_btn_), FALSE);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_lyrics_btn_), TRUE);
-  gtk_box_append(GTK_BOX(toggles), show_album_btn_);
-  gtk_box_append(GTK_BOX(toggles), show_data_btn_);
-  gtk_box_append(GTK_BOX(toggles), show_lyrics_btn_);
+namespace {
+constexpr int kWidgetSpacing = 50;
+}  // namespace
 
-  title_ = gtk_label_new(Translations::CStr(ContextIdle::Headline()));
-  gtk_widget_add_css_class(title_, "title-2");
-  gtk_label_set_wrap(GTK_LABEL(title_), TRUE);
-  gtk_label_set_use_markup(GTK_LABEL(title_), TRUE);
-  artist_ = gtk_label_new("");
-  gtk_widget_add_css_class(artist_, "heading");
-  album_label_ = gtk_label_new("");
-  gtk_widget_add_css_class(album_label_, "dim-label");
-  totals_ = gtk_label_new("");
-  gtk_widget_add_css_class(totals_, "dim-label");
-  gtk_label_set_wrap(GTK_LABEL(totals_), TRUE);
-  gtk_label_set_justify(GTK_LABEL(totals_), GTK_JUSTIFY_CENTER);
-  gtk_widget_set_visible(totals_, FALSE);
-  data_box_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 4);
-  data_grid_ = gtk_grid_new();
-  gtk_grid_set_row_spacing(GTK_GRID(data_grid_), 4);
-  gtk_grid_set_column_spacing(GTK_GRID(data_grid_), 12);
-  gtk_box_append(GTK_BOX(data_box_), data_grid_);
+ContextView::ContextView(QWidget *parent)
+    : QWidget(parent),
+      collectionview_(nullptr),
+      album_cover_choice_controller_(nullptr),
+      lyrics_fetcher_(nullptr),
+      menu_options_(new QMenu(this)),
+      action_show_album_(nullptr),
+      action_show_data_(nullptr),
+      action_show_lyrics_(nullptr),
+      action_search_lyrics_(nullptr),
+      layout_container_(new QVBoxLayout()),
+      widget_scrollarea_(new QWidget(this)),
+      layout_scrollarea_(new QVBoxLayout()),
+      scrollarea_(new QScrollArea(this)),
+      textedit_top_(new ResizableTextEdit(this)),
+      widget_album_(new ContextAlbum(this)),
+      widget_stacked_(new QStackedWidget(this)),
+      widget_stop_(new QWidget(this)),
+      widget_play_(new QWidget(this)),
+      layout_stop_(new QVBoxLayout()),
+      layout_play_(new QVBoxLayout()),
+      label_stop_summary_(new QLabel(this)),
+      widget_play_data_(new QWidget(this)),
+      layout_play_data_(new QGridLayout()),
+      textedit_play_lyrics_(new ResizableTextEdit(this)),
+      spacer_play_data_(new QSpacerItem(20, 20, QSizePolicy::Fixed, QSizePolicy::Fixed)),
+      label_filetype_title_(new QLabel(this)),
+      label_length_title_(new QLabel(this)),
+      label_samplerate_title_(new QLabel(this)),
+      label_bitdepth_title_(new QLabel(this)),
+      label_bitrate_title_(new QLabel(this)),
+      label_filetype_(new QLabel(this)),
+      label_length_(new QLabel(this)),
+      label_samplerate_(new QLabel(this)),
+      label_bitdepth_(new QLabel(this)),
+      label_bitrate_(new QLabel(this)),
+      lyrics_tried_(false),
+      lyrics_id_(-1) {
 
-  lyrics_view_ = gtk_text_view_new();
-  gtk_text_view_set_wrap_mode(GTK_TEXT_VIEW(lyrics_view_), GTK_WRAP_WORD);
-  gtk_text_view_set_editable(GTK_TEXT_VIEW(lyrics_view_), FALSE);
-  gtk_widget_set_vexpand(lyrics_view_, TRUE);
-  GtkWidget *lyrics_actions = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 6);
-  search_lyrics_btn_ = gtk_button_new_with_label(Translations::CStr("Search lyrics"));
-  auto_lyrics_btn_ = gtk_check_button_new_with_label(Translations::CStr("Search automatically"));
-  gtk_check_button_set_active(GTK_CHECK_BUTTON(auto_lyrics_btn_), TRUE);
-  auto_cover_btn_ = gtk_check_button_new_with_label(Translations::CStr("Search automatically"));
-  gtk_check_button_set_active(GTK_CHECK_BUTTON(auto_cover_btn_), TRUE);
-  GtkWidget *save = gtk_button_new_with_label(Translations::CStr("Save lyrics to tag"));
-  gtk_box_append(GTK_BOX(lyrics_actions), search_lyrics_btn_);
-  gtk_box_append(GTK_BOX(lyrics_actions), auto_lyrics_btn_);
-  gtk_box_append(GTK_BOX(lyrics_actions), save);
-  g_signal_connect(search_lyrics_btn_, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
-                     static_cast<ContextView *>(data)->SearchLyrics(true);
-                   }),
-                   this);
-  g_signal_connect(auto_lyrics_btn_, "toggled", G_CALLBACK(+[](GtkCheckButton *button, gpointer data) {
-                     auto *self = static_cast<ContextView *>(data);
-                     self->search_lyrics_ = gtk_check_button_get_active(button);
-                     self->PersistVisibility();
-                   }),
-                   this);
-  g_signal_connect(auto_cover_btn_, "toggled", G_CALLBACK(+[](GtkCheckButton *button, gpointer data) {
-                     auto *self = static_cast<ContextView *>(data);
-                     self->search_cover_ = gtk_check_button_get_active(button);
-                     self->PersistVisibility();
-                   }),
-                   this);
-  g_signal_connect(save, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
-                     auto *self = static_cast<ContextView *>(data);
-                     if (!self->save_lyrics_) {
-                       return;
-                     }
-                     GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(self->lyrics_view_));
-                     GtkTextIter start;
-                     GtkTextIter end;
-                     gtk_text_buffer_get_bounds(buffer, &start, &end);
-                     gchar *text = gtk_text_buffer_get_text(buffer, &start, &end, FALSE);
-                     self->save_lyrics_(ContextLyrics::WithoutFooter(text ? text : ""));
-                     g_free(text);
-                   }),
-                   this);
+  setLayout(layout_container_);
 
-  album_->SetDropCallback([this](const std::vector<unsigned char> &data) {
-    if (cover_drop_) {
-      cover_drop_(data);
-    }
-    AlbumCoverLoaded(data);
-  });
-  album_->SetFadeFinishedCallback([this]() { FadeStopFinished(); });
+  layout_container_->setObjectName(u"context-layout-container"_s);
+  layout_container_->setContentsMargins(0, 0, 0, 0);
+  layout_container_->addWidget(scrollarea_);
 
-  gtk_box_append(GTK_BOX(box), toggles);
-  gtk_box_append(GTK_BOX(box), album_->widget());
-  gtk_box_append(GTK_BOX(box), auto_cover_btn_);
-  gtk_box_append(GTK_BOX(box), title_);
-  gtk_box_append(GTK_BOX(box), artist_);
-  gtk_box_append(GTK_BOX(box), album_label_);
-  gtk_box_append(GTK_BOX(box), totals_);
-  gtk_box_append(GTK_BOX(box), data_box_);
-  lyrics_source_ = gtk_label_new("");
-  gtk_widget_add_css_class(lyrics_source_, "dim-label");
-  gtk_label_set_xalign(GTK_LABEL(lyrics_source_), 0.0f);
-  gtk_box_append(GTK_BOX(box), lyrics_view_);
-  gtk_box_append(GTK_BOX(box), lyrics_source_);
-  gtk_box_append(GTK_BOX(box), lyrics_actions);
-  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(scroll), box);
-  widget_ = scroll;
+  scrollarea_->setObjectName(u"context-scrollarea"_s);
+  scrollarea_->setWidgetResizable(true);
+  scrollarea_->setWidget(widget_scrollarea_);
+  scrollarea_->setContentsMargins(0, 0, 0, 0);
+  scrollarea_->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  scrollarea_->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
 
-  auto notify = +[](GtkToggleButton *, gpointer data) { static_cast<ContextView *>(data)->ApplyVisibility(); };
-  g_signal_connect(show_album_btn_, "toggled", G_CALLBACK(notify), this);
-  g_signal_connect(show_data_btn_, "toggled", G_CALLBACK(notify), this);
-  g_signal_connect(show_lyrics_btn_, "toggled", G_CALLBACK(notify), this);
+  widget_scrollarea_->setObjectName(u"context-widget-scrollarea"_s);
+  widget_scrollarea_->setLayout(layout_scrollarea_);
+  widget_scrollarea_->setContentsMargins(0, 0, 0, 0);
 
-  gtk_widget_set_focusable(widget_, TRUE);
-  GtkGesture *idle_menu = gtk_gesture_click_new();
-  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(idle_menu), GDK_BUTTON_SECONDARY);
-  gtk_widget_add_controller(widget_, GTK_EVENT_CONTROLLER(idle_menu));
-  g_signal_connect(idle_menu, "pressed", G_CALLBACK(+[](GtkGestureClick *click, gint, gdouble, gdouble, gpointer data) {
-                     auto *self = static_cast<ContextView *>(data);
-                     if (!ContextOptions::ShowIdleMenu(self->Idle())) {
-                       return;
-                     }
-                     self->ShowIdleMenu();
-                     gtk_gesture_set_state(GTK_GESTURE(click), GTK_EVENT_SEQUENCE_CLAIMED);
-                   }),
-                   this);
-  GtkEventController *keys = gtk_event_controller_key_new();
-  gtk_widget_add_controller(widget_, keys);
-  g_signal_connect(keys, "key-pressed",
-                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
-                     return static_cast<ContextView *>(data)->OnKeyPressed(keyval, state);
-                   })),
-                   this);
+  textedit_top_->setReadOnly(true);
+  textedit_top_->setFrameShape(QFrame::NoFrame);
+
+  layout_scrollarea_->setObjectName(u"context-layout-scrollarea"_s);
+  layout_scrollarea_->setContentsMargins(15, 15, 15, 15);
+  layout_scrollarea_->addWidget(textedit_top_);
+  layout_scrollarea_->addWidget(widget_album_);
+  layout_scrollarea_->addWidget(widget_stacked_);
+  layout_scrollarea_->addSpacerItem(new QSpacerItem(20, 20, QSizePolicy::Expanding, QSizePolicy::Expanding));
+
+  widget_stacked_->setContentsMargins(0, 0, 0, 0);
+  widget_stacked_->addWidget(widget_stop_);
+  widget_stacked_->addWidget(widget_play_);
+  widget_stacked_->setCurrentWidget(widget_stop_);
+
+  widget_stop_->setLayout(layout_stop_);
+  widget_stop_->setContentsMargins(0, 0, 0, 0);
+  widget_play_->setLayout(layout_play_);
+  widget_play_->setContentsMargins(0, 0, 0, 0);
+
+  layout_stop_->setContentsMargins(0, 0, 0, 0);
+  layout_play_->setContentsMargins(0, 0, 0, 0);
+
+  // Stopped
+
+  label_stop_summary_->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+
+  layout_stop_->setContentsMargins(0, 0, 0, 0);
+  layout_stop_->addWidget(label_stop_summary_);
+
+  // Playing
+
+  label_filetype_title_->setText(tr("Filetype"));
+  label_length_title_->setText(tr("Length"));
+  label_samplerate_title_->setText(tr("Samplerate"));
+  label_bitdepth_title_->setText(tr("Bit depth"));
+  label_bitrate_title_->setText(tr("Bitrate"));
+
+  label_filetype_title_->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+  label_length_title_->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+  label_samplerate_title_->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+  label_bitdepth_title_->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+  label_bitrate_title_->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+
+  label_filetype_->setWordWrap(true);
+  label_length_->setWordWrap(true);
+  label_samplerate_->setWordWrap(true);
+  label_bitdepth_->setWordWrap(true);
+  label_bitrate_->setWordWrap(true);
+
+  layout_play_data_->setContentsMargins(0, 0, 0, 0);
+  layout_play_data_->addWidget(label_filetype_title_, 0, 0);
+  layout_play_data_->addWidget(label_filetype_, 0, 1);
+  layout_play_data_->addWidget(label_length_title_, 1, 0);
+  layout_play_data_->addWidget(label_length_, 1, 1);
+  layout_play_data_->addWidget(label_samplerate_title_, 2, 0);
+  layout_play_data_->addWidget(label_samplerate_, 2, 1);
+  layout_play_data_->addWidget(label_bitdepth_title_, 3, 0);
+  layout_play_data_->addWidget(label_bitdepth_, 3, 1);
+  layout_play_data_->addWidget(label_bitrate_title_, 4, 0);
+  layout_play_data_->addWidget(label_bitrate_, 4, 1);
+
+  widget_play_data_->setLayout(layout_play_data_);
+
+  textedit_play_lyrics_->setReadOnly(true);
+  textedit_play_lyrics_->setFrameShape(QFrame::NoFrame);
+  textedit_play_lyrics_->hide();
+
+  layout_play_->setContentsMargins(0, 0, 0, 0);
+  layout_play_->addWidget(widget_play_data_);
+  layout_play_->addSpacerItem(spacer_play_data_);
+  layout_play_->addWidget(textedit_play_lyrics_);
+  layout_play_->addSpacerItem(new QSpacerItem(20, 20, QSizePolicy::Expanding, QSizePolicy::Expanding));
+
+  labels_play_ << label_filetype_title_
+               << label_length_title_
+               << label_samplerate_title_
+               << label_bitdepth_title_
+               << label_bitrate_title_;
+
+  labels_play_data_ << label_filetype_
+                    << label_length_
+                    << label_samplerate_
+                    << label_bitdepth_
+                    << label_bitrate_;
+
+  labels_play_all_ = labels_play_ << labels_play_data_;
+
+  textedit_play_ << textedit_play_lyrics_;
+
+  QObject::connect(widget_album_, &ContextAlbum::FadeStopFinished, this, &ContextView::FadeStopFinished);
+
 }
 
-void ContextView::SetSaveLyricsCallback(SaveLyricsCallback callback) { save_lyrics_ = std::move(callback); }
+void ContextView::Init(CollectionView *collectionview, AlbumCoverChoiceController *album_cover_choice_controller, SharedPtr<LyricsProviders> lyrics_providers) {
 
-void ContextView::SetCoverDropCallback(CoverDropCallback callback) { cover_drop_ = std::move(callback); }
+  collectionview_ = collectionview;
+  album_cover_choice_controller_ = album_cover_choice_controller;
 
-void ContextView::SetCollectionTotals(int songs, int artists, int albums) {
-  totals_songs_ = songs;
-  totals_artists_ = artists;
-  totals_albums_ = albums;
-  UpdateTotalsLabel();
+  widget_album_->Init(this, album_cover_choice_controller_);
+  lyrics_fetcher_ = new LyricsFetcher(lyrics_providers, this);
+
+  QObject::connect(collectionview_, &CollectionView::TotalSongCountUpdated_, this, &ContextView::UpdateNoSong);
+  QObject::connect(collectionview_, &CollectionView::TotalArtistCountUpdated_, this, &ContextView::UpdateNoSong);
+  QObject::connect(collectionview_, &CollectionView::TotalAlbumCountUpdated_, this, &ContextView::UpdateNoSong);
+  QObject::connect(lyrics_fetcher_, &LyricsFetcher::LyricsFetched, this, &ContextView::UpdateLyrics);
+
+  AddActions();
+
 }
 
-void ContextView::UpdateTotalsLabel() {
-  gtk_label_set_text(GTK_LABEL(totals_), ContextIdle::TotalsMarkup(totals_songs_, totals_artists_, totals_albums_).c_str());
+void ContextView::AddActions() {
+
+  action_show_album_ = new QAction(tr("Show album cover"), this);
+  action_show_album_->setCheckable(true);
+  action_show_album_->setChecked(true);
+
+  action_show_data_ = new QAction(tr("Show song technical data"), this);
+  action_show_data_->setCheckable(true);
+  action_show_data_->setChecked(true);
+
+  action_show_lyrics_ = new QAction(tr("Show song lyrics"), this);
+  action_show_lyrics_->setCheckable(true);
+  action_show_lyrics_->setChecked(true);
+
+  action_search_lyrics_ = new QAction(tr("Automatically search for song lyrics"), this);
+  action_search_lyrics_->setCheckable(true);
+  action_search_lyrics_->setChecked(true);
+
+  menu_options_->addAction(action_show_album_);
+  menu_options_->addAction(action_show_data_);
+  menu_options_->addAction(action_show_lyrics_);
+  menu_options_->addAction(action_search_lyrics_);
+  menu_options_->addSeparator();
+
+  ReloadSettings();
+
+  QObject::connect(action_show_album_, &QAction::triggered, this, &ContextView::ActionShowAlbum);
+  QObject::connect(action_show_data_, &QAction::triggered, this, &ContextView::ActionShowData);
+  QObject::connect(action_show_lyrics_, &QAction::triggered, this, &ContextView::ActionShowLyrics);
+  QObject::connect(action_search_lyrics_, &QAction::triggered, this, &ContextView::ActionSearchLyrics);
+
 }
 
 void ContextView::ReloadSettings() {
-  Settings settings;
-  settings.BeginGroup(ContextSettings::kSettingsGroup);
-  show_album_ = settings.BoolValue(ContextSettings::kAlbum, ContextSettings::kDefaultAlbum);
-  show_data_ = settings.BoolValue(ContextSettings::kTechnicalData, ContextSettings::kDefaultTechnicalData);
-  show_lyrics_ = settings.BoolValue(ContextSettings::kSongLyrics, ContextSettings::kDefaultSongLyrics);
-  search_lyrics_ = settings.BoolValue(ContextSettings::kSearchLyrics, ContextSettings::kDefaultSearchLyrics);
-  search_cover_ = ContextCover::LoadEnabled(settings);
-  settings.BeginGroup(ContextSettings::kSettingsGroup);
-  title_fmt_ = settings.Value(ContextSettings::kSettingsTitleFmt, ContextSettings::kDefaultTitleFmt);
-  summary_fmt_ = settings.Value(ContextSettings::kSettingsSummaryFmt, ContextSettings::kDefaultSummaryFmt);
-  const FontUtils::Font headline = ContextFont::Load(settings.Value(ContextSettings::kFontHeadline, ContextSettings::kDefaultFontFamily),
-                                                     static_cast<int>(settings.DoubleValue(ContextSettings::kFontSizeHeadline,
-                                                                                           ContextSettings::kDefaultFontSizeHeadline)));
-  const FontUtils::Font normal = ContextFont::Load(settings.Value(ContextSettings::kFontNormal, ContextSettings::kDefaultFontFamily),
-                                                   static_cast<int>(settings.DoubleValue(ContextSettings::kFontSizeNormal,
-                                                                                         ContextSettings::kDefaultFontSizeNormal)));
-  if (title_) {
-    gtk_widget_set_name(title_, Idle() ? "context-idle" : "context-headline");
-    StyleUtils::LoadCss(ContextFont::CssRule("#context-headline", headline), StyleUtils::Slot::kContextHeadline);
-    FontUtils::Font idle_font = headline;
-    idle_font.size_pt = ContextIdle::IdleFontSizePt(headline.size_pt);
-    StyleUtils::LoadCss(ContextFont::CssRule("#context-idle", idle_font), StyleUtils::Slot::kContextIdle);
+
+  QString default_font;
+  if (QFontDatabase::families().contains(QLatin1String(ContextSettings::kDefaultFontFamily))) {
+    default_font = QLatin1String(ContextSettings::kDefaultFontFamily);
   }
-  if (artist_ && album_label_) {
-    gtk_widget_set_name(artist_, "context-normal");
-    gtk_widget_set_name(album_label_, "context-summary");
-    StyleUtils::LoadCss(ContextFont::CssRule("#context-normal, #context-summary", normal), StyleUtils::Slot::kContextNormal);
+  else {
+    default_font = font().family();
   }
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_album_btn_), show_album_);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_data_btn_), show_data_);
-  gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_lyrics_btn_), show_lyrics_);
-  gtk_check_button_set_active(GTK_CHECK_BUTTON(auto_lyrics_btn_), search_lyrics_);
-  gtk_check_button_set_active(GTK_CHECK_BUTTON(auto_cover_btn_), search_cover_);
-  if (ContextReload::ShouldRefreshDisplayOnReload()) {
-    if (ContextReload::ShouldRefreshIdle(Idle())) {
-      NoSong();
-    } else {
-      SetSong();
-    }
-    return;
+
+  Settings s;
+  s.beginGroup(ContextSettings::kSettingsGroup);
+  title_fmt_ = s.value(ContextSettings::kSettingsTitleFmt, QLatin1String(ContextSettings::kDefaultTitleFmt)).toString();
+  summary_fmt_ = s.value(ContextSettings::kSettingsSummaryFmt, QLatin1String(ContextSettings::kDefaultSummaryFmt)).toString();
+  action_show_album_->setChecked(s.value(ContextSettings::kAlbum, ContextSettings::kDefaultAlbum).toBool());
+  action_show_data_->setChecked(s.value(ContextSettings::kTechnicalData, ContextSettings::kDefaultTechnicalData).toBool());
+  action_show_lyrics_->setChecked(s.value(ContextSettings::kSongLyrics, ContextSettings::kDefaultSongLyrics).toBool());
+  action_search_lyrics_->setChecked(s.value(ContextSettings::kSearchLyrics, ContextSettings::kDefaultSearchLyrics).toBool());
+  font_headline_.setFamily(s.value(ContextSettings::kFontHeadline, default_font).toString());
+  font_headline_.setPointSizeF(s.value(ContextSettings::kFontSizeHeadline, ContextSettings::kDefaultFontSizeHeadline).toReal());
+  font_nosong_.setFamily(font_headline_.family());
+  font_nosong_.setPointSizeF(font_headline_.pointSizeF() * 1.6F);
+  font_normal_.setFamily(s.value(ContextSettings::kFontNormal, default_font).toString());
+  font_normal_.setPointSizeF(s.value(ContextSettings::kFontSizeNormal, font().pointSizeF()).toReal());
+  s.endGroup();
+
+  UpdateFonts();
+
+  if (widget_stacked_->currentWidget() == widget_stop_) {
+    NoSong();
   }
-  ApplyVisibility();
+  else {
+    SetSong();
+  }
+
 }
 
-void ContextView::Playing() { SetSong(); }
+void ContextView::resizeEvent(QResizeEvent *e) {
+
+  if (e->size().width() != e->oldSize().width()) {
+    widget_album_->UpdateWidth(width() - kWidgetSpacing);
+  }
+
+  QWidget::resizeEvent(e);
+
+}
+
+void ContextView::Playing() {}
 
 void ContextView::Stopped() {
+
   song_playing_ = Song();
-  lyrics_tried_ = false;
+  song_prev_ = Song();
   lyrics_.clear();
-  album_->SetImage({});
+  image_original_ = QImage();
+  widget_album_->SetImage();
+
+}
+
+void ContextView::Error() {}
+
+void ContextView::SongChanged(const Song &song) {
+
+  if (widget_stacked_->currentWidget() == widget_play_ && song_playing_.is_valid() && song == song_playing_ && song.title() == song_playing_.title() && song.album() == song_playing_.album() && song.artist() == song_playing_.artist()) {
+    UpdateSong(song);
+  }
+  else {
+    song_prev_ = song_playing_;
+    song_playing_ = song;
+    lyrics_ = song.lyrics();
+    lyrics_id_ = -1;
+    lyrics_tried_ = false;
+    SetSong();
+  }
+
+  SearchLyrics();
+
+}
+
+void ContextView::SearchLyrics() {
+
+  if (lyrics_.isEmpty() && action_show_lyrics_->isChecked() && action_search_lyrics_->isChecked() && !song_playing_.artist().isEmpty() && !song_playing_.title().isEmpty() && !lyrics_tried_ && lyrics_id_ == -1) {
+    lyrics_fetcher_->Clear();
+    lyrics_tried_ = true;
+    lyrics_id_ = static_cast<qint64>(lyrics_fetcher_->Search(song_playing_.effective_albumartist(), song_playing_.artist(), song_playing_.album(), song_playing_.title(), song_playing_.length_nanosec() / kNsecPerSec));
+  }
+
 }
 
 void ContextView::FadeStopFinished() {
-  if (!song_playing_.is_valid() && song_playing_.url().empty()) {
-    NoSong();
-  }
+
+  widget_stacked_->setCurrentWidget(widget_stop_);
+  NoSong();
+  ResetSong();
+  widget_stacked_->updateGeometry();
+
 }
 
-void ContextView::Error() { gtk_label_set_text(GTK_LABEL(title_), Translations::CStr("Error")); }
+void ContextView::SetLabelText(QLabel *label, int value, const QString &suffix, const QString &def) {
+  label->setText(value <= 0 ? def : (QString::number(value) + QLatin1Char(' ') + suffix));
+}
+
+void ContextView::UpdateNoSong() {
+  if (widget_stacked_->currentWidget() == widget_stop_) NoSong();
+}
 
 void ContextView::NoSong() {
-  song_playing_ = Song();
-  lyrics_tried_ = false;
-  lyrics_.clear();
-  gtk_widget_set_name(title_, "context-idle");
-  gtk_label_set_text(GTK_LABEL(title_), Translations::CStr(ContextIdle::Headline()));
-  gtk_label_set_text(GTK_LABEL(artist_), "");
-  gtk_label_set_text(GTK_LABEL(album_label_), "");
-  UpdateTotalsLabel();
-  SetLyrics({});
-  RebuildTechnicalData();
-  ApplyVisibility();
+
+  if (!widget_album_->isVisibleTo(this)) {
+    widget_album_->show();
+  }
+
+  textedit_top_->setFont(font_nosong_);
+  textedit_top_->SetText(tr("No song playing"));
+
+  QString html;
+  if (collectionview_->TotalSongs() == 1) html += tr("%1 song").arg(collectionview_->TotalSongs());
+  else html += tr("%1 songs").arg(collectionview_->TotalSongs());
+  html += "<br />"_L1;
+
+  if (collectionview_->TotalArtists() == 1) html += tr("%1 artist").arg(collectionview_->TotalArtists());
+  else html += tr("%1 artists").arg(collectionview_->TotalArtists());
+  html += "<br />"_L1;
+
+  if (collectionview_->TotalAlbums() == 1) html += tr("%1 album").arg(collectionview_->TotalAlbums());
+  else html += tr("%1 albums").arg(collectionview_->TotalAlbums());
+  html += "<br />"_L1;
+
+  label_stop_summary_->setFont(font_normal_);
+  label_stop_summary_->setText(html);
+
 }
 
-void ContextView::SongChanged(const Song &song) {
-  const bool minor = ContextSongUpdate::IsMinorMetadataUpdate(song_playing_, song, !Idle());
-  if (minor) {
-    UpdateSong(song);
-  } else {
-    if (ContextSongUpdate::ShouldResetSearch(minor)) {
-      current_search_id_ = 0;
-    }
-    lyrics_ = ContextLyrics::InitialLyricsFromSong(song);
-    lyrics_tried_ = false;
-    song_playing_ = song;
-    SetSong();
-    if (!lyrics_.empty()) {
-      SetLyrics(lyrics_);
-    }
-  }
-  SearchLyrics(false);
-}
+void ContextView::UpdateFonts() {
 
-void ContextView::UpdateSong(const Song &song) {
-  song_playing_ = song;
-  const std::string headline = ContextTechnical::Headline(song_playing_, title_fmt_);
-  const std::string summary = ContextTechnical::Summary(song_playing_, summary_fmt_);
-  if (headline.empty() && summary.empty()) {
-    gtk_label_set_text(GTK_LABEL(title_), Translations::CStr(ContextIdle::Headline()));
-  } else {
-    gtk_label_set_markup(GTK_LABEL(title_), ContextPlayingText::TopMarkup(headline, summary).c_str());
+  for (QLabel *l : std::as_const(labels_play_all_)) {
+    l->setFont(font_normal_);
   }
-  RebuildTechnicalData();
+  for (QTextEdit *e : std::as_const(textedit_play_)) {
+    e->setFont(font_normal_);
+  }
+
 }
 
 void ContextView::SetSong() {
-  const std::string headline = ContextTechnical::Headline(song_playing_, title_fmt_);
-  const std::string summary = ContextTechnical::Summary(song_playing_, summary_fmt_);
-  gtk_widget_set_name(title_, "context-headline");
-  if (headline.empty() && summary.empty()) {
-    gtk_label_set_text(GTK_LABEL(title_), Translations::CStr(ContextIdle::Headline()));
-  } else {
-    gtk_label_set_markup(GTK_LABEL(title_), ContextPlayingText::TopMarkup(headline, summary).c_str());
-  }
-  gtk_label_set_text(GTK_LABEL(artist_), "");
-  gtk_label_set_text(GTK_LABEL(album_label_), "");
-  RebuildTechnicalData();
-  ApplyVisibility();
-}
 
-void ContextView::RebuildTechnicalData() {
-  GtkWidget *child = gtk_widget_get_first_child(data_grid_);
-  while (child) {
-    GtkWidget *next = gtk_widget_get_next_sibling(child);
-    gtk_widget_unparent(child);
-    child = next;
-  }
-  const auto rows = ContextTechnical::Rows(song_playing_);
-  int row = 0;
-  for (const auto &entry : rows) {
-    GtkWidget *key = gtk_label_new(entry.first.c_str());
-    gtk_widget_add_css_class(key, "dim-label");
-    gtk_label_set_xalign(GTK_LABEL(key), 0.0f);
-    GtkWidget *value = gtk_label_new(entry.second.c_str());
-    gtk_label_set_xalign(GTK_LABEL(value), 0.0f);
-    gtk_label_set_wrap(GTK_LABEL(value), TRUE);
-    gtk_grid_attach(GTK_GRID(data_grid_), key, 0, row, 1, 1);
-    gtk_grid_attach(GTK_GRID(data_grid_), value, 1, row, 1, 1);
-    ++row;
-  }
-}
+  textedit_top_->setFont(font_headline_);
+  textedit_top_->SetText(QStringLiteral("<b>%1</b><br />%2").arg(Utilities::ReplaceMessage(title_fmt_, song_playing_, u"<br />"_s, true), Utilities::ReplaceMessage(summary_fmt_, song_playing_, u"<br />"_s, true)));
 
-void ContextView::AlbumCoverLoaded(const std::vector<unsigned char> &data) { album_->SetImage(data); }
+  label_stop_summary_->clear();
 
-void ContextView::SetLyrics(const std::string &lyrics, const std::string &provider) {
-  const bool show_source = ContextLyrics::ShouldShowSource(provider, show_lyrics_);
-  lyrics_ = ContextLyrics::FormatFetched(lyrics, provider, !show_source);
-  lrc_lines_ = LrcParser::Parse(lyrics);
-  lrc_active_ = -1;
-  const std::string display = !lrc_lines_.empty()
-                                  ? LrcParser::PlainText(lrc_lines_) + (show_source ? std::string() : ContextLyrics::Footer(provider))
-                                  : lyrics_;
-  GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(lyrics_view_));
-  gtk_text_buffer_set_text(buffer, display.c_str(), -1);
-  if (!lrc_tag_) {
-    lrc_tag_ = gtk_text_buffer_create_tag(buffer, "lrc-current", "weight", PANGO_WEIGHT_BOLD, nullptr);
+  bool widget_album_changed = !song_prev_.is_valid();
+  if (action_show_album_->isChecked() && !widget_album_->isVisibleTo(this)) {
+    widget_album_->show();
+    widget_album_changed = true;
   }
-  gtk_label_set_text(GTK_LABEL(lyrics_source_), ContextLyrics::Attribution(provider).c_str());
-  gtk_widget_set_visible(lyrics_source_, show_source);
-}
+  else if (!action_show_album_->isChecked() && widget_album_->isVisibleTo(this)) {
+    widget_album_->hide();
+    widget_album_changed = true;
+  }
+  if (widget_album_changed) Q_EMIT AlbumEnabledChanged();
 
-void ContextView::SetPlaybackPosition(int64_t position_nanosec) {
-  if (lrc_lines_.empty()) {
-    return;
-  }
-  const int index = LrcParser::ActiveLineIndex(lrc_lines_, position_nanosec / 1000000);
-  if (index == lrc_active_) {
-    return;
-  }
-  lrc_active_ = index;
-  HighlightLrcLine(index);
-}
-
-void ContextView::HighlightLrcLine(int index) {
-  if (!lyrics_view_ || !lrc_tag_) {
-    return;
-  }
-  GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(lyrics_view_));
-  GtkTextIter start;
-  GtkTextIter end;
-  gtk_text_buffer_get_start_iter(buffer, &start);
-  gtk_text_buffer_get_end_iter(buffer, &end);
-  gtk_text_buffer_remove_tag(buffer, lrc_tag_, &start, &end);
-  if (index < 0) {
-    return;
-  }
-  GtkTextIter line_start;
-  GtkTextIter line_end;
-  gtk_text_buffer_get_iter_at_line(buffer, &line_start, index);
-  line_end = line_start;
-  gtk_text_iter_forward_to_line_end(&line_end);
-  gtk_text_buffer_apply_tag(buffer, lrc_tag_, &line_start, &line_end);
-  gtk_text_view_scroll_to_iter(GTK_TEXT_VIEW(lyrics_view_), &line_start, 0.2, FALSE, 0.0, 0.0);
-}
-
-void ContextView::SearchLyrics(bool force) {
-  if (!force && !ContextLyrics::ShouldFetchOnline(lyrics_, show_lyrics_, search_lyrics_, song_playing_, lyrics_tried_)) {
-    return;
-  }
-  if (song_playing_.artist().empty() || song_playing_.title().empty()) {
-    if (force) {
-      SetLyrics({});
+  if (action_show_data_->isChecked()) {
+    widget_play_data_->show();
+    label_filetype_->setText(song_playing_.TextForFiletype());
+    if (song_playing_.length_nanosec() <= 0) {
+      label_length_title_->hide();
+      label_length_->hide();
+      label_length_->clear();
     }
-    return;
+    else {
+      label_length_title_->show();
+      label_length_->show();
+      label_length_->setText(Utilities::PrettyTimeNanosec(song_playing_.length_nanosec()));
+    }
+    if (song_playing_.samplerate() <= 0) {
+      label_samplerate_title_->hide();
+      label_samplerate_->hide();
+      label_samplerate_->clear();
+    }
+    else {
+      label_samplerate_title_->show();
+      label_samplerate_->show();
+      SetLabelText(label_samplerate_, song_playing_.samplerate(), u"Hz"_s);
+    }
+    if (song_playing_.bitdepth() <= 0) {
+      label_bitdepth_title_->hide();
+      label_bitdepth_->hide();
+      label_bitdepth_->clear();
+    }
+    else {
+      label_bitdepth_title_->show();
+      label_bitdepth_->show();
+      SetLabelText(label_bitdepth_, song_playing_.bitdepth(), u"Bit"_s);
+    }
+    if (song_playing_.bitrate() <= 0) {
+      label_bitrate_title_->hide();
+      label_bitrate_->hide();
+      label_bitrate_->clear();
+    }
+    else {
+      label_bitrate_title_->show();
+      label_bitrate_->show();
+      SetLabelText(label_bitrate_, song_playing_.bitrate(), tr("kbps"));
+    }
+    spacer_play_data_->changeSize(20, 20, QSizePolicy::Fixed);
   }
-  lyrics_tried_ = true;
-  if (lyrics_fetcher_) {
-    current_search_id_ = lyrics_fetcher_->Search(song_playing_.EffectiveAlbumartist(), song_playing_.artist(), song_playing_.album(),
-                                                 song_playing_.title(), song_playing_.length_nanosec());
-    return;
+  else {
+    widget_play_data_->hide();
+    label_filetype_->clear();
+    label_length_->clear();
+    label_samplerate_->clear();
+    label_bitdepth_->clear();
+    label_bitrate_->clear();
+    spacer_play_data_->changeSize(0, 0, QSizePolicy::Fixed);
   }
-  if (!lyrics_providers_) {
-    SetLyrics({});
-    return;
+
+  if (action_show_lyrics_->isChecked() && !lyrics_.isEmpty()) {
+    textedit_play_lyrics_->SetText(lyrics_);
+    textedit_play_lyrics_->show();
   }
-  lyrics_providers_->Fetch(song_playing_, [this](const std::string &lyrics, const std::string &) { SetLyrics(lyrics); });
+  else {
+    textedit_play_lyrics_->clear();
+    textedit_play_lyrics_->hide();
+  }
+
+  widget_stacked_->setCurrentWidget(widget_play_);
+  widget_stacked_->updateGeometry();
+
 }
 
-bool ContextView::Idle() const { return ContextOptions::IsIdle(song_playing_.is_valid(), !song_playing_.url().empty()); }
+void ContextView::UpdateSong(const Song &song) {
 
-void ContextView::ApplyOption(ContextOptions::Action action, bool enabled) {
-  switch (action) {
-    case ContextOptions::Action::ShowAlbum:
-      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_album_btn_), enabled);
-      break;
-    case ContextOptions::Action::ShowData:
-      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_data_btn_), enabled);
-      break;
-    case ContextOptions::Action::ShowLyrics:
-      gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(show_lyrics_btn_), enabled);
-      break;
-    case ContextOptions::Action::SearchLyrics:
-      search_lyrics_ = enabled;
-      gtk_check_button_set_active(GTK_CHECK_BUTTON(auto_lyrics_btn_), enabled);
-      break;
+  const QString top_text = QStringLiteral("<b>%1</b><br />%2").arg(Utilities::ReplaceMessage(title_fmt_, song, u"<br />"_s, true), Utilities::ReplaceMessage(summary_fmt_, song, u"<br />"_s, true));
+  if (top_text != textedit_top_->Text()) {
+    textedit_top_->SetText(top_text);
   }
-  ApplyVisibility();
-  if (ContextOptions::TriggersLyricsSearch(action)) {
-    SearchLyrics();
+
+  if (action_show_data_->isChecked()) {
+    if (song.filetype() != song_playing_.filetype()) label_filetype_->setText(song.TextForFiletype());
+    if (song.length_nanosec() != song_playing_.length_nanosec()) {
+      if (song.length_nanosec() <= 0) {
+        label_length_title_->hide();
+        label_length_->hide();
+        label_length_->clear();
+      }
+      else {
+        label_length_title_->show();
+        label_length_->show();
+        label_length_->setText(Utilities::PrettyTimeNanosec(song.length_nanosec()));
+      }
+    }
+    if (song.samplerate() != song_playing_.samplerate()) {
+      if (song.samplerate() <= 0) {
+        label_samplerate_title_->hide();
+        label_samplerate_->hide();
+        label_samplerate_->clear();
+      }
+      else {
+        label_samplerate_title_->show();
+        label_samplerate_->show();
+        SetLabelText(label_samplerate_, song.samplerate(), u"Hz"_s);
+      }
+    }
+    if (song.bitdepth() != song_playing_.bitdepth()) {
+      if (song.bitdepth() <= 0) {
+        label_bitdepth_title_->hide();
+        label_bitdepth_->hide();
+        label_bitdepth_->clear();
+      }
+      else {
+        label_bitdepth_title_->show();
+        label_bitdepth_->show();
+        SetLabelText(label_bitdepth_, song.bitdepth(), u"Bit"_s);
+      }
+    }
+    if (song.bitrate() != song_playing_.bitrate()) {
+      if (song.bitrate() <= 0) {
+        label_bitrate_title_->hide();
+        label_bitrate_->hide();
+        label_bitrate_->clear();
+      }
+      else {
+        label_bitrate_title_->show();
+        label_bitrate_->show();
+        SetLabelText(label_bitrate_, song.bitrate(), tr("kbps"));
+      }
+    }
   }
+
+  song_playing_ = song;
+
+  widget_stacked_->updateGeometry();
+
 }
 
-gboolean ContextView::OnKeyPressed(guint keyval, GdkModifierType state) {
-  if (!ContextOptions::IsKeyboardTrigger(keyval, static_cast<unsigned>(state))) {
-    return FALSE;
+void ContextView::ResetSong() {
+
+  for (QLabel *l : std::as_const(labels_play_data_)) {
+    l->clear();
   }
-  if (ContextOptions::ShowIdleMenu(Idle())) {
-    ShowIdleMenu();
+
+  for (QTextEdit *l : std::as_const(textedit_play_)) {
+    l->clear();
   }
-  return TRUE;
+
+  widget_play_data_->hide();
+  textedit_play_lyrics_->hide();
+
 }
 
-void ContextView::ShowIdleMenu() {
-  GMenu *menu = g_menu_new();
-  for (const ContextOptions::Item &item : ContextOptions::Items()) {
-    g_menu_append(menu, Translations::CStr(item.label), (std::string("context.") + item.id).c_str());
+void ContextView::UpdateLyrics(const quint64 id, const QString &provider, const QString &lyrics) {
+
+  if (static_cast<qint64>(id) != lyrics_id_) return;
+
+  if (lyrics.isEmpty()) {
+    lyrics_ = "No lyrics found.\n"_L1;
   }
-  GtkWidget *popover = gtk_popover_menu_new_from_model(G_MENU_MODEL(menu));
-  gtk_widget_set_parent(popover, widget_);
-  GSimpleActionGroup *group = g_simple_action_group_new();
-  for (const ContextOptions::Item &item : ContextOptions::Items()) {
-    const bool checked = ContextOptions::Checked(item.action, show_album_, show_data_, show_lyrics_, search_lyrics_);
-    GSimpleAction *action = g_simple_action_new_stateful(item.id, nullptr, g_variant_new_boolean(checked));
-    g_signal_connect(action, "activate", G_CALLBACK(+[](GSimpleAction *act, GVariant *, gpointer data) {
-                       auto *self = static_cast<ContextView *>(data);
-                       const ContextOptions::Action option = ContextOptions::FromId(g_action_get_name(G_ACTION(act)));
-                       GVariant *state = g_action_get_state(G_ACTION(act));
-                       const bool current = state && g_variant_get_boolean(state);
-                       if (state) {
-                         g_variant_unref(state);
-                       }
-                       const bool next = !current;
-                       g_simple_action_set_state(act, g_variant_new_boolean(next));
-                       self->ApplyOption(option, next);
-                     }),
-                     this);
-    g_action_map_add_action(G_ACTION_MAP(group), G_ACTION(action));
+  else {
+    lyrics_ = lyrics + "\n\n(Lyrics from "_L1 + provider + ")\n"_L1;
   }
-  gtk_widget_insert_action_group(widget_, "context", G_ACTION_GROUP(group));
-  gtk_popover_popup(GTK_POPOVER(popover));
+  lyrics_id_ = -1;
+
+  if (action_show_lyrics_->isChecked() && !lyrics_.isEmpty()) {
+    textedit_play_lyrics_->SetText(lyrics_);
+    textedit_play_lyrics_->show();
+  }
+  else {
+    textedit_play_lyrics_->clear();
+    textedit_play_lyrics_->hide();
+  }
+
 }
 
-void ContextView::PersistVisibility() {
-  Settings settings;
-  settings.BeginGroup(ContextSettings::kSettingsGroup);
-  settings.SetBoolValue(ContextSettings::kAlbum, show_album_);
-  settings.SetBoolValue(ContextSettings::kTechnicalData, show_data_);
-  settings.SetBoolValue(ContextSettings::kSongLyrics, show_lyrics_);
-  settings.SetBoolValue(ContextSettings::kSearchLyrics, search_lyrics_);
-  ContextCover::PersistEnabled(settings, search_cover_);
+void ContextView::contextMenuEvent(QContextMenuEvent *e) {
+
+  if (menu_options_ && widget_stacked_->currentWidget() == widget_stop_) {
+    menu_options_->popup(mapToGlobal(e->pos()));
+  }
+  else {
+    QWidget::contextMenuEvent(e);
+  }
+
 }
 
-void ContextView::ApplyVisibility() {
-  const bool was_album = show_album_;
-  show_album_ = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_album_btn_));
-  show_data_ = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_data_btn_));
-  show_lyrics_ = gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(show_lyrics_btn_));
-  const bool playing = !Idle();
-  gtk_widget_set_visible(album_->widget(), show_album_);
-  gtk_widget_set_visible(auto_cover_btn_, show_album_);
-  gtk_widget_set_visible(totals_, !playing);
-  gtk_widget_set_visible(data_box_, show_data_ && playing && gtk_widget_get_first_child(data_grid_) != nullptr);
-  gtk_widget_set_visible(lyrics_view_, show_lyrics_);
-  gtk_widget_set_visible(search_lyrics_btn_, show_lyrics_);
-  gtk_widget_set_visible(auto_lyrics_btn_, show_lyrics_);
-  if (lyrics_source_) {
-    const char *source = gtk_label_get_text(GTK_LABEL(lyrics_source_));
-    gtk_widget_set_visible(lyrics_source_, show_lyrics_ && source && source[0] != '\0');
+void ContextView::dragEnterEvent(QDragEnterEvent *e) {
+
+  if (song_playing_.is_valid() && AlbumCoverChoiceController::CanAcceptDrag(e)) {
+    e->acceptProposedAction();
   }
-  PersistVisibility();
-  if (was_album != show_album_) {
-    AlbumEnabledChanged.Emit();
+
+  QWidget::dragEnterEvent(e);
+
+}
+
+void ContextView::dropEvent(QDropEvent *e) {
+
+  if (song_playing_.is_valid()) {
+    album_cover_choice_controller_->SaveCover(&song_playing_, e);
   }
+
+  QWidget::dropEvent(e);
+
+}
+
+void ContextView::AlbumCoverLoaded(const Song &song, const QImage &image) {
+
+  if (song != song_playing_ || image == image_original_) return;
+
+  widget_album_->SetImage(image);
+  image_original_ = image;
+
+}
+
+void ContextView::ActionShowAlbum() {
+
+  Settings s;
+  s.beginGroup(ContextSettings::kSettingsGroup);
+  s.setValue(ContextSettings::kAlbum, action_show_album_->isChecked());
+  s.endGroup();
+
+  if (song_playing_.is_valid()) SetSong();
+
+}
+
+void ContextView::ActionShowData() {
+
+  Settings s;
+  s.beginGroup(ContextSettings::kSettingsGroup);
+  s.setValue(ContextSettings::kTechnicalData, action_show_data_->isChecked());
+  s.endGroup();
+
+  if (song_playing_.is_valid()) SetSong();
+
+}
+
+void ContextView::ActionShowLyrics() {
+
+  Settings s;
+  s.beginGroup(ContextSettings::kSettingsGroup);
+  s.setValue(ContextSettings::kSongLyrics, action_show_lyrics_->isChecked());
+  s.endGroup();
+
+  if (song_playing_.is_valid()) SetSong();
+
+  SearchLyrics();
+
+}
+
+void ContextView::ActionSearchLyrics() {
+
+  Settings s;
+  s.beginGroup(ContextSettings::kSettingsGroup);
+  s.setValue(ContextSettings::kSearchLyrics, action_search_lyrics_->isChecked());
+  s.endGroup();
+
+  if (song_playing_.is_valid()) SetSong();
+
+  SearchLyrics();
+
 }

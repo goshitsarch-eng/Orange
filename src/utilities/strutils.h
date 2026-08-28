@@ -1,34 +1,56 @@
-#ifndef STRAWBERRY_STRUTILS_H
-#define STRAWBERRY_STRUTILS_H
+/*
+ * Strawberry Music Player
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+#ifndef STRUTILS_H
+#define STRUTILS_H
+
+#include <QString>
+#include <QStringList>
+#include <QMetaObject>
 
 #include "core/song.h"
 
-#include <string>
-#include <vector>
+namespace Utilities {
 
-namespace StrUtils {
+QString PrettySize(const quint64 bytes);
+QString PrettySize(const QSize size);
 
-std::string ToLower(const std::string &value);
-std::string ToUpper(const std::string &value);
-std::string Trim(const std::string &value);
-std::vector<std::string> Split(const std::string &value, char delimiter);
-std::string Join(const std::vector<std::string> &parts, const std::string &delimiter);
-bool StartsWith(const std::string &value, const std::string &prefix);
-bool EndsWith(const std::string &value, const std::string &suffix);
-bool ContainsInsensitive(const std::string &haystack, const std::string &needle);
-std::string Replace(const std::string &value, const std::string &from, const std::string &to);
-std::string SqlLikeEscape(const std::string &value);
-std::string SqlQuote(const std::string &value);
-// Parses a complete decimal number, rejecting anything with trailing characters.
-// Used to keep user-supplied filter values out of SQL unless they really are numbers.
-bool ParseNumber(const std::string &value, double *out);
-// Renders a number as a SQL numeric literal, never in exponent form and never locale-dependent.
-std::string FormatNumberForSql(double value);
-std::string UriEscape(const std::string &value);
-std::string JsonEscape(const std::string &value);
-std::string Transliterate(const std::string &value);
-std::string ReplaceMessage(const std::string &message, const Song &song, const std::string &newline = "\n");
+// Get the path without the filename extension
+QString PathWithoutFilenameExtension(const QString &filename);
+QString FiddleFileExtension(const QString &filename, const QString &new_extension);
 
-}  // namespace StrUtils
+// Replaces some HTML entities with their normal characters.
+QString DecodeHtmlEntities(const QString &text);
 
-#endif
+// Shortcut for getting a Qt-aware enum value as a string.
+// Pass in the QMetaObject of the class that owns the enum, the string name of the enum and a valid value from that enum.
+const char *EnumToString(const QMetaObject &meta, const char *name, int value);
+
+QStringList Prepend(const QString &text, const QStringList &list);
+QStringList Updateify(const QStringList &list);
+
+QString ReplaceMessage(const QString &message, const Song &song, const QString &newline, const bool html_escaped = false);
+QString ReplaceVariable(const QString &variable, const Song &song, const QString &newline, const bool html_escaped = false);
+
+QString StringListToHTML(const QStringList &string_list);
+
+}  // namespace Utilities
+
+#endif  // STRUTILS_H

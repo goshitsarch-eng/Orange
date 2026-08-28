@@ -1,14 +1,58 @@
-#include "transcoder/transcoderoptionswavpack.h"
+/*
+ * Strawberry Music Player
+ * Copyright 2018, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "transcoder/transcoderoptionsfields.h"
+#include "config.h"
 
-void TranscoderOptionsWavPack::Load() {
-  TranscoderOptionsFields::QualityEncoder encoder;
-  encoder.Load(Transcoder::Format::WavPack);
-  quality_ = encoder.quality;
+#include <QWidget>
+#include <QString>
+#include <QSettings>
+
+#include "transcoderoptionsinterface.h"
+#include "transcoderoptionswavpack.h"
+#include "ui_transcoderoptionswavpack.h"
+
+#include "core/settings.h"
+
+namespace {
+constexpr char kSettingsGroup[] = "Transcoder/wavpackenc";
 }
 
-std::string TranscoderOptionsWavPack::PipelineFragment() const {
-  const int mode = quality_ >= 8 ? 2 : (quality_ >= 4 ? 1 : 0);
-  return "wavpackenc mode=" + std::to_string(mode);
+TranscoderOptionsWavPack::TranscoderOptionsWavPack(QWidget *parent) : TranscoderOptionsInterface(parent), ui_(new Ui_TranscoderOptionsWavPack) {
+  ui_->setupUi(this);
+}
+
+TranscoderOptionsWavPack::~TranscoderOptionsWavPack() {
+  delete ui_;
+}
+
+void TranscoderOptionsWavPack::Load() {
+
+  Settings s;
+  s.beginGroup(QLatin1String(kSettingsGroup) + settings_postfix_);
+  s.endGroup();
+
+}
+
+void TranscoderOptionsWavPack::Save() {
+
+  Settings s;
+  s.beginGroup(QLatin1String(kSettingsGroup) + settings_postfix_);
+  s.endGroup();
+
 }

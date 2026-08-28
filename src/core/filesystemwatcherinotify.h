@@ -1,31 +1,53 @@
-#ifndef STRAWBERRY_FILESYSTEMWATCHERINOTIFY_H
-#define STRAWBERRY_FILESYSTEMWATCHERINOTIFY_H
+/*
+ * Strawberry Music Player
+ * Copyright 2026, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "core/filesystemwatcherinterface.h"
+#ifndef FILESYSTEMWATCHERINOTIFY_H
+#define FILESYSTEMWATCHERINOTIFY_H
 
-#include <glib.h>
+#include <QMap>
+#include <QString>
+#include <QStringList>
+#include <QSocketNotifier>
 
-#include <map>
-#include <string>
-#include <vector>
+#include "filesystemwatcherinterface.h"
 
 class FileSystemWatcherInotify : public FileSystemWatcherInterface {
+  Q_OBJECT
+
  public:
-  FileSystemWatcherInotify();
+  explicit FileSystemWatcherInotify(QObject *parent = nullptr);
   ~FileSystemWatcherInotify() override;
 
-  void AddPath(const std::string &path) override;
-  void RemovePath(const std::string &path) override;
+  void AddPaths(const QStringList &paths) override;
+  void RemovePaths(const QStringList &paths) override;
+  void AddPath(const QString &path) override;
+  void RemovePath(const QString &path) override;
   void Clear() override;
 
- private:
-  void OnReadable();
-  static gboolean OnFd(gint fd, GIOCondition condition, gpointer data);
+ private Q_SLOTS:
+  void InotifyRead();
 
-  int inotify_fd_ = -1;
-  unsigned watch_id_ = 0;
-  std::map<std::string, int> wd_from_path_;
-  std::map<int, std::string> path_from_wd_;
+ private:
+  int inotify_fd_;
+  QSocketNotifier *socket_notifier_;
+  QMap<QString, int> wd_from_path_;
+  QMap<int, QString> path_from_wd_;
 };
 
-#endif
+#endif  // FILESYSTEMWATCHERINOTIFY_H

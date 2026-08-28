@@ -1,103 +1,124 @@
-#include "globalshortcuts/globalshortcutgrabber.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "globalshortcuts/globalshortcutgrab.h"
+#include "config.h"
 
-#include <adwaita.h>
+#include <QDialog>
+#include <QWidget>
+#include <QString>
+#include <QLabel>
+#include <QKeySequence>
+#include <QDialogButtonBox>
+#include <QEvent>
+#include <QShowEvent>
+#include <QHideEvent>
+#include <QKeyEvent>
 
-namespace {
+#include "globalshortcutgrabber.h"
+#include "ui_globalshortcutgrabber.h"
 
-void StoreAccel(AdwAlertDialog *alert, const std::string &accel) {
-  g_object_set_data_full(G_OBJECT(alert), "accel", g_strdup(accel.c_str()), g_free);
+using namespace Qt::Literals::StringLiterals;
+
+GlobalShortcutGrabber::GlobalShortcutGrabber(QWidget *parent)
+    : QDialog(parent),
+      ui_(new Ui::GlobalShortcutGrabber),
+      wrapper_(nullptr) {
+
+  ui_->setupUi(this);
+
+  modifier_keys_ << Qt::Key_Shift << Qt::Key_Control << Qt::Key_Meta << Qt::Key_Alt << Qt::Key_AltGr;
+
+  QObject::connect(ui_->buttonBox, &QDialogButtonBox::accepted, this, &GlobalShortcutGrabber::Accepted);
+  QObject::connect(ui_->buttonBox, &QDialogButtonBox::rejected, this, &GlobalShortcutGrabber::Rejected);
+
 }
 
-const char *StoredAccel(AdwAlertDialog *alert) {
-  const char *accel = static_cast<const char *>(g_object_get_data(G_OBJECT(alert), "accel"));
-  return accel ? accel : "";
+GlobalShortcutGrabber::~GlobalShortcutGrabber() {
+  delete ui_;
 }
 
-void UpdatePreview(AdwAlertDialog *alert) {
-  GtkWidget *lab = GTK_WIDGET(g_object_get_data(G_OBJECT(alert), "label"));
-  if (!lab) {
-    return;
+QKeySequence GlobalShortcutGrabber::GetKey(const QString &name) {
+
+  ui_->label_shortcut->setText(tr("Press a key combination to use for %1...").arg(name));
+  ui_->label_key->clear();
+
+  ret_ = QKeySequence();
+
+  if (exec() == QDialog::Rejected) return QKeySequence();
+  return ret_;
+
+}
+
+void GlobalShortcutGrabber::showEvent(QShowEvent *e) {
+  grabKeyboard();
+  QDialog::showEvent(e);
+}
+
+void GlobalShortcutGrabber::hideEvent(QHideEvent *e) {
+  releaseKeyboard();
+  QDialog::hideEvent(e);
+}
+
+void GlobalShortcutGrabber::grabKeyboard() {
+#ifdef Q_OS_MACOS
+  SetupMacEventHandler();
+#endif
+  QDialog::grabKeyboard();
+}
+
+void GlobalShortcutGrabber::releaseKeyboard() {
+#ifdef Q_OS_MACOS
+  TeardownMacEventHandler();
+#endif
+  QDialog::releaseKeyboard();
+}
+
+bool GlobalShortcutGrabber::event(QEvent *e) {
+
+  if (e->type() == QEvent::ShortcutOverride) {
+    QKeyEvent *ke = static_cast<QKeyEvent*>(e);
+
+    if (modifier_keys_.contains(ke->key())) {
+      ret_ = QKeySequence(static_cast<int>(ke->modifiers()));
+    }
+    else {
+      ret_ = QKeySequence(static_cast<int>(ke->modifiers() | ke->key()));
+    }
+
+    UpdateText();
+
+    if (!modifier_keys_.contains(ke->key())) accept();
+    return true;
   }
-  const std::string markup = GlobalShortcutGrab::PreviewMarkup(StoredAccel(alert));
-  gtk_label_set_markup(GTK_LABEL(lab), markup.empty() ? GlobalShortcutGrab::WaitingLabel() : markup.c_str());
+  return QDialog::event(e);
+
 }
 
-void TryDismiss(AdwAlertDialog *alert, bool accepted) {
-  if (!accepted && !GlobalShortcutGrab::ShouldDismissOnCancel(StoredAccel(alert))) {
-    return;
-  }
-  g_object_set_data(G_OBJECT(alert), "accepted", GINT_TO_POINTER(accepted ? 1 : 0));
-  adw_dialog_force_close(ADW_DIALOG(alert));
+void GlobalShortcutGrabber::UpdateText() {
+  ui_->label_key->setText("<b>"_L1 + ret_.toString(QKeySequence::NativeText) + "</b>"_L1);
 }
 
-}  // namespace
+void GlobalShortcutGrabber::Accepted() {
+  accept();
+}
 
-void GlobalShortcutGrabber::Show(GtkWindow *parent, const std::function<void(const std::string &)> &callback, const std::string &action) {
-  AdwAlertDialog *dialog = ADW_ALERT_DIALOG(adw_alert_dialog_new(GlobalShortcutGrab::WindowTitle(), GlobalShortcutGrab::Prompt(action).c_str()));
-  adw_dialog_set_can_close(ADW_DIALOG(dialog), FALSE);
-  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
-  GtkWidget *label = gtk_label_new(GlobalShortcutGrab::WaitingLabel());
-  gtk_label_set_use_markup(GTK_LABEL(label), TRUE);
-  gtk_label_set_justify(GTK_LABEL(label), GTK_JUSTIFY_CENTER);
-  GtkWidget *cancel = gtk_button_new_with_label("Cancel");
-  gtk_widget_set_halign(cancel, GTK_ALIGN_CENTER);
-  gtk_box_append(GTK_BOX(box), label);
-  gtk_box_append(GTK_BOX(box), cancel);
-  adw_alert_dialog_set_extra_child(dialog, box);
-  auto *cb = new std::function<void(const std::string &)>(callback);
-  g_object_set_data(G_OBJECT(dialog), "label", label);
-  g_object_set_data(G_OBJECT(dialog), "callback", cb);
-  g_object_set_data(G_OBJECT(dialog), "accepted", GINT_TO_POINTER(0));
-  StoreAccel(dialog, {});
-  g_signal_connect(cancel, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) { TryDismiss(ADW_ALERT_DIALOG(data), false); }), dialog);
-  GtkEventController *keys = gtk_event_controller_key_new();
-  g_signal_connect(keys, "key-pressed",
-                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
-                     AdwAlertDialog *alert = ADW_ALERT_DIALOG(data);
-                     if (keyval == GDK_KEY_Escape) {
-                       TryDismiss(alert, false);
-                       return TRUE;
-                     }
-                     gchar *name = gtk_accelerator_name(keyval, state);
-                     StoreAccel(alert, name ? name : "");
-                     g_free(name);
-                     UpdatePreview(alert);
-                     if (!GlobalShortcutGrab::ShouldAccept(keyval)) {
-                       return TRUE;
-                     }
-                     TryDismiss(alert, true);
-                     return TRUE;
-                   })),
-                   dialog);
-  gtk_event_controller_set_propagation_phase(keys, GTK_PHASE_CAPTURE);
-  gtk_widget_set_can_focus(GTK_WIDGET(dialog), TRUE);
-  gtk_widget_add_controller(GTK_WIDGET(dialog), keys);
-  g_signal_connect(dialog, "map", G_CALLBACK(+[](GtkWidget *widget, gpointer) {
-                     if (GlobalShortcutGrab::ShouldGrabOnShow()) {
-                       GlobalShortcutGrab::GrabKeyboard(widget);
-                     }
-                   }),
-                   nullptr);
-  g_signal_connect(dialog, "unmap", G_CALLBACK(+[](GtkWidget *widget, gpointer) {
-                     if (GlobalShortcutGrab::ShouldUngrabOnHide()) {
-                       GlobalShortcutGrab::UngrabKeyboard(widget);
-                     }
-                   }),
-                   nullptr);
-  g_signal_connect(dialog, "closed", G_CALLBACK(+[](AdwDialog *closed, gpointer data) {
-                     if (GlobalShortcutGrab::ShouldUngrabOnHide()) {
-                       GlobalShortcutGrab::UngrabKeyboard(GTK_WIDGET(closed));
-                     }
-                     auto *fn = static_cast<std::function<void(const std::string &)> *>(data);
-                     AdwAlertDialog *alert = ADW_ALERT_DIALOG(closed);
-                     const bool accepted = GPOINTER_TO_INT(g_object_get_data(G_OBJECT(alert), "accepted")) != 0;
-                     if (accepted && fn) {
-                       (*fn)(StoredAccel(alert));
-                     }
-                     delete fn;
-                   }),
-                   cb);
-  adw_dialog_present(ADW_DIALOG(dialog), GTK_WIDGET(parent));
+void GlobalShortcutGrabber::Rejected() {
+  if (ui_->label_key->text().isEmpty()) reject();
 }

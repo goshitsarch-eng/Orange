@@ -1,38 +1,57 @@
-#include "utilities/winutils.h"
+/*
+ * Strawberry Music Player
+ * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#ifdef _WIN32
-#include <dwmapi.h>
+#include <QtGlobal>
+
 #include <windows.h>
-#ifdef GDK_WINDOWING_WIN32
-#include <gdk/win32/gdkwin32.h>
-#endif
+#include <dwmapi.h>
 
-void *WinUtils::NativeHandle(GtkWidget *window) {
-  if (!window) {
-    return nullptr;
-  }
-  GtkNative *native = gtk_widget_get_native(window);
-  if (!native) {
-    return nullptr;
-  }
-  GdkSurface *surface = gtk_native_get_surface(native);
-#ifdef GDK_WINDOWING_WIN32
-  if (surface && GDK_IS_WIN32_SURFACE(surface)) {
-    return gdk_win32_surface_get_handle(surface);
-  }
-#endif
-  (void)surface;
-  return nullptr;
+#include <QWindow>
+#include <QRegion>
+
+#include "winutils.h"
+
+namespace Utilities {
+
+HRGN qt_RectToHRGN(const QRect &rc);
+HRGN qt_RectToHRGN(const QRect &rc) {
+  return CreateRectRgn(rc.left(), rc.top(), rc.right() + 1, rc.bottom() + 1);
 }
 
-void WinUtils::EnableBlurBehindWindow(GtkWidget *window) {
-  HWND hwnd = static_cast<HWND>(NativeHandle(window));
-  if (!hwnd) {
-    return;
-  }
-  DWM_BLURBEHIND dwmbb{};
+void enableBlurBehindWindow(QWindow *window, const QRegion &region) {
+
+  DWM_BLURBEHIND dwmbb = { 0, 0, nullptr, 0 };
   dwmbb.dwFlags = DWM_BB_ENABLE;
   dwmbb.fEnable = TRUE;
-  DwmEnableBlurBehindWindow(hwnd, &dwmbb);
+  HRGN rgn = nullptr;
+  if (!region.isNull()) {
+    rgn = region.toHRGN();
+    if (rgn) {
+      dwmbb.hRgnBlur = rgn;
+      dwmbb.dwFlags |= DWM_BB_BLURREGION;
+    }
+  }
+  DwmEnableBlurBehindWindow(reinterpret_cast<HWND>(window->winId()), &dwmbb);
+  if (rgn) {
+    DeleteObject(rgn);
+  }
+
 }
-#endif
+
+}  // namespace Utilities

@@ -1,233 +1,294 @@
-#include "context/contextalbum.h"
+/*
+ * Strawberry Music Player
+ * Copyright 2020-2022, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "translations/translations.h"
-#include "utilities/fileutils.h"
-#include "utilities/jsonutils.h"
-#include "utilities/strutils.h"
+#include "config.h"
 
-#include <cstring>
+#include <utility>
+#include <memory>
 
-ContextAlbum::ContextAlbum() {
-  widget_ = gtk_box_new(GTK_ORIENTATION_VERTICAL, 8);
-  previous_image_ = gtk_image_new_from_icon_name("audio-x-generic-symbolic");
-  gtk_image_set_pixel_size(GTK_IMAGE(previous_image_), 220);
-  gtk_widget_set_halign(previous_image_, GTK_ALIGN_CENTER);
-  gtk_widget_set_visible(previous_image_, FALSE);
-  image_ = gtk_image_new_from_icon_name("audio-x-generic-symbolic");
-  gtk_image_set_pixel_size(GTK_IMAGE(image_), 220);
-  gtk_widget_set_halign(image_, GTK_ALIGN_CENTER);
-  GtkWidget *overlay = gtk_overlay_new();
-  gtk_overlay_set_child(GTK_OVERLAY(overlay), previous_image_);
-  gtk_overlay_add_overlay(GTK_OVERLAY(overlay), image_);
-  gtk_widget_set_halign(overlay, GTK_ALIGN_CENTER);
-  spinner_ = gtk_spinner_new();
-  gtk_widget_set_halign(spinner_, GTK_ALIGN_CENTER);
-  gtk_widget_set_visible(spinner_, FALSE);
-  GtkWidget *search = gtk_button_new_with_label(Translations::CStr("Search cover"));
-  gtk_widget_add_css_class(search, "flat");
-  gtk_widget_set_halign(search, GTK_ALIGN_CENTER);
-  g_signal_connect(search, "clicked", G_CALLBACK(+[](GtkButton *, gpointer data) {
-                     auto *self = static_cast<ContextAlbum *>(data);
-                     if (self->search_) {
-                       self->search_();
-                     }
-                   }),
-                   this);
-  GtkWidget *sensor = gtk_drawing_area_new();
-  gtk_widget_set_hexpand(sensor, TRUE);
-  gtk_drawing_area_set_content_height(GTK_DRAWING_AREA(sensor), 1);
-  gtk_drawing_area_set_draw_func(GTK_DRAWING_AREA(sensor), +[](GtkDrawingArea *, cairo_t *, int, int, gpointer) {}, nullptr, nullptr);
-  g_signal_connect(sensor, "resize", G_CALLBACK(+[](GtkDrawingArea *, gint width, gint, gpointer data) {
-                     static_cast<ContextAlbum *>(data)->UpdateWidth(width);
-                   }),
-                   this);
-  gtk_box_append(GTK_BOX(widget_), sensor);
-  gtk_box_append(GTK_BOX(widget_), overlay);
-  gtk_box_append(GTK_BOX(widget_), spinner_);
-  gtk_box_append(GTK_BOX(widget_), search);
+#include <QtGlobal>
+#include <QObject>
+#include <QWidget>
+#include <QByteArray>
+#include <QImage>
+#include <QPixmap>
+#include <QPalette>
+#include <QBrush>
+#include <QMovie>
+#include <QTimeLine>
+#include <QPainter>
+#include <QSizePolicy>
+#include <QMenu>
+#include <QContextMenuEvent>
+#include <QPaintEvent>
 
-  GtkDropTarget *target = gtk_drop_target_new(G_TYPE_STRING, GDK_ACTION_COPY);
-#ifdef GDK_TYPE_FILE_LIST
-  GType types[] = {G_TYPE_STRING, GDK_TYPE_FILE_LIST};
-  gtk_drop_target_set_gtypes(target, types, 2);
-#endif
-  gtk_widget_add_controller(widget_, GTK_EVENT_CONTROLLER(target));
-  g_signal_connect(target, "drop", G_CALLBACK(+[](GtkDropTarget *, const GValue *value, gdouble, gdouble, gpointer data) -> gboolean {
-                     return static_cast<ContextAlbum *>(data)->OnDrop(value);
-                   }),
-                   this);
+#include "includes/shared_ptr.h"
+#include "utilities/imageutils.h"
+#include "covermanager/albumcoverchoicecontroller.h"
 
-  GtkGesture *activate = gtk_gesture_click_new();
-  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(activate), GDK_BUTTON_PRIMARY);
-  gtk_widget_add_controller(widget_, GTK_EVENT_CONTROLLER(activate));
-  g_signal_connect(activate, "pressed", G_CALLBACK(+[](GtkGestureClick *, gint n_press, gdouble, gdouble, gpointer data) {
-                     auto *self = static_cast<ContextAlbum *>(data);
-                     if (n_press == 2 && self->has_cover_ && self->activate_) {
-                       self->activate_();
-                     }
-                   }),
-                   this);
+#include "contextview.h"
+#include "contextalbum.h"
+
+using std::make_unique;
+using std::make_shared;
+
+using namespace Qt::Literals::StringLiterals;
+
+namespace {
+constexpr int kFadeTimeLineMs = 1000;
 }
 
-ContextAlbum::~ContextAlbum() { StopFade(); }
+ContextAlbum::ContextAlbum(QWidget *parent)
+    : QWidget(parent),
+      menu_(new QMenu(this)),
+      context_view_(nullptr),
+      album_cover_choice_controller_(nullptr),
+      downloading_covers_(false),
+      timeline_fade_(new QTimeLine(kFadeTimeLineMs, this)),
+      image_strawberry_(u":/pictures/strawberry.png"_s),
+      image_original_(image_strawberry_),
+      pixmap_current_opacity_(1.0),
+      desired_height_(width()) {
 
-gboolean ContextAlbum::OnDrop(const GValue *value) {
-  std::vector<std::string> paths;
-  if (G_VALUE_HOLDS_STRING(value)) {
-    const char *text = g_value_get_string(value);
-    for (const std::string &part : StrUtils::Split(text ? text : "", '\n')) {
-      std::string url = part;
-      if (!url.empty() && url.back() == '\r') {
-        url.pop_back();
-      }
-      if (!url.empty()) {
-        paths.push_back(url);
-      }
-    }
+  setObjectName(u"context-widget-album"_s);
+
+  setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+
+  QImage image = ImageUtils::ScaleImage(image_strawberry_, QSize(desired_height_, desired_height_), devicePixelRatioF(), true);
+  if (!image.isNull()) {
+    pixmap_current_ = QPixmap::fromImage(image);
   }
-#ifdef GDK_TYPE_FILE_LIST
-  if (G_VALUE_HOLDS(value, GDK_TYPE_FILE_LIST)) {
-    auto *list = static_cast<GdkFileList *>(g_value_get_boxed(value));
-    GSList *files = gdk_file_list_get_files(list);
-    for (GSList *item = files; item; item = item->next) {
-      gchar *uri = g_file_get_uri(G_FILE(item->data));
-      if (uri) {
-        paths.emplace_back(uri);
-        g_free(uri);
-      }
-    }
-  }
-#endif
-  for (const std::string &url : paths) {
-    const std::string path = FileUtils::PathFromUri(url);
-    if (!IsImagePath(path) && !IsImagePath(url)) {
-      continue;
-    }
-    const std::string data = FileUtils::ReadFile(path);
-    if (data.empty() || !JsonUtils::LooksLikeImage(data)) {
-      continue;
-    }
-    if (drop_) {
-      drop_(std::vector<unsigned char>(data.begin(), data.end()));
-    }
-    return TRUE;
-  }
-  return FALSE;
+
+  timeline_fade_->setDirection(QTimeLine::Direction::Forward);
+  QObject::connect(timeline_fade_, &QTimeLine::valueChanged, this, &ContextAlbum::FadeCurrentCover);
+  QObject::connect(timeline_fade_, &QTimeLine::finished, this, &ContextAlbum::FadeCurrentCoverFinished);
+
 }
 
-void ContextAlbum::Clear() {
-  downloading_ = false;
-  has_cover_ = false;
-  fading_to_placeholder_ = false;
-  StopFade();
-  gtk_spinner_stop(GTK_SPINNER(spinner_));
-  gtk_widget_set_visible(spinner_, FALSE);
-  gtk_widget_set_opacity(image_, 1.0);
-  gtk_widget_set_visible(previous_image_, FALSE);
-  gtk_image_set_from_icon_name(GTK_IMAGE(previous_image_), "audio-x-generic-symbolic");
-  gtk_image_set_from_icon_name(GTK_IMAGE(image_), "audio-x-generic-symbolic");
+void ContextAlbum::Init(ContextView *context_view, AlbumCoverChoiceController *album_cover_choice_controller) {
+
+  context_view_ = context_view;
+
+  album_cover_choice_controller_ = album_cover_choice_controller;
+  QObject::connect(album_cover_choice_controller_, &AlbumCoverChoiceController::AutomaticCoverSearchDone, this, &ContextAlbum::AutomaticCoverSearchDone);
+
+  QList<QAction*> cover_actions = album_cover_choice_controller_->GetAllActions();
+  menu_->addActions(cover_actions);
+  menu_->addSeparator();
+  menu_->addAction(album_cover_choice_controller_->search_cover_auto_action());
+  menu_->addSeparator();
+
 }
 
-void ContextAlbum::SetSearchCallback(SearchCallback callback) { search_ = std::move(callback); }
+QSize ContextAlbum::sizeHint() const {
 
-void ContextAlbum::SetDropCallback(DropCallback callback) { drop_ = std::move(callback); }
+  return QSize(static_cast<int>(pixmap_current_.width() / devicePixelRatioF()), static_cast<int>(pixmap_current_.height() / devicePixelRatioF()));
 
-void ContextAlbum::SetFadeFinishedCallback(FadeFinishedCallback callback) { fade_finished_ = std::move(callback); }
+}
 
-void ContextAlbum::SetActivateCallback(ActivateCallback callback) { activate_ = std::move(callback); }
+void ContextAlbum::paintEvent(QPaintEvent *paint_event) {
 
-void ContextAlbum::UpdateWidth(int allocated_width) {
-  const int size = CoverPixelSize(allocated_width);
-  if (image_) {
-    gtk_image_set_pixel_size(GTK_IMAGE(image_), size);
+  Q_UNUSED(paint_event)
+
+  QPainter p(this);
+  p.setRenderHint(QPainter::SmoothPixmapTransform);
+  DrawPreviousCovers(&p);
+  DrawImage(&p, pixmap_current_, pixmap_current_opacity_);
+  DrawSpinner(&p);
+  p.end();
+
+}
+
+void ContextAlbum::mouseDoubleClickEvent(QMouseEvent *e) {
+
+  // Same behaviour as right-click > Show Fullsize
+  if (image_original_ != image_strawberry_ && e->button() == Qt::LeftButton && context_view_->song_playing().is_valid()) {
+    album_cover_choice_controller_->ShowCover(context_view_->song_playing(), image_original_);
   }
-  if (previous_image_) {
-    gtk_image_set_pixel_size(GTK_IMAGE(previous_image_), size);
+
+}
+
+void ContextAlbum::contextMenuEvent(QContextMenuEvent *e) {
+
+  if (menu_ && image_original_ != image_strawberry_) {
+    menu_->popup(mapToGlobal(e->pos()));
   }
+  else {
+    QWidget::contextMenuEvent(e);
+  }
+
+}
+
+void ContextAlbum::UpdateWidth(const int new_width) {
+
+  if (new_width != desired_height_) {
+    desired_height_ = new_width;
+    ScaleCover();
+    ScalePreviousCovers();
+    updateGeometry();
+  }
+
+}
+
+void ContextAlbum::SetImage(const QImage &image) {
+
+  if (downloading_covers_) {
+    downloading_covers_ = false;
+    spinner_animation_.reset();
+  }
+
+  QImage image_previous = image_original_;
+  QPixmap pixmap_previous = pixmap_current_;
+  qreal opacity_previous = pixmap_current_opacity_;
+
+  if (image.isNull()) {
+    image_original_ = image_strawberry_;
+  }
+  else {
+    image_original_ = image;
+  }
+
+  pixmap_current_opacity_ = 0.0;
+  ScaleCover();
+
+  if (!pixmap_previous.isNull()) {
+    SharedPtr<PreviousCover> previous_cover = make_shared<PreviousCover>();
+    previous_cover->image = image_previous;
+    previous_cover->pixmap = pixmap_previous;
+    previous_cover->opacity = opacity_previous;
+    previous_cover->timeline.reset(new QTimeLine(kFadeTimeLineMs), [](QTimeLine *timeline) { timeline->deleteLater(); });
+    previous_cover->timeline->setDirection(QTimeLine::Direction::Backward);
+    previous_cover->timeline->setCurrentTime(timeline_fade_->state() == QTimeLine::State::Running ? timeline_fade_->currentTime() : kFadeTimeLineMs);
+    QObject::connect(&*previous_cover->timeline, &QTimeLine::valueChanged, this, [this, previous_cover]() { FadePreviousCover(previous_cover); });
+    QObject::connect(&*previous_cover->timeline, &QTimeLine::finished, this, [this, previous_cover]() { FadePreviousCoverFinished(previous_cover); });
+    previous_covers_ << previous_cover;
+    previous_cover->timeline->start();
+  }
+
+  if (timeline_fade_->state() != QTimeLine::State::NotRunning) {
+    timeline_fade_->stop();
+  }
+  timeline_fade_->start();
+
+}
+
+void ContextAlbum::DrawImage(QPainter *p, const QPixmap &pixmap, const qreal opacity) {
+
+  if (qFuzzyCompare(opacity, static_cast<qreal>(0.0))) return;
+
+  p->setOpacity(opacity);
+  p->drawPixmap(0, 0, static_cast<int>(pixmap.width() / pixmap.devicePixelRatioF()), static_cast<int>(pixmap.height() / pixmap.devicePixelRatioF()), pixmap);
+
+}
+
+void ContextAlbum::DrawSpinner(QPainter *p) {
+
+  if (downloading_covers_) {
+    p->drawPixmap(50, 50, 16, 16, spinner_animation_->currentPixmap());
+  }
+
+}
+
+void ContextAlbum::DrawPreviousCovers(QPainter *p) {
+
+  for (int i = 0; i < previous_covers_.count(); i++) {
+    SharedPtr<PreviousCover> previous_cover = previous_covers_.at(i);
+    DrawImage(p, previous_cover->pixmap, previous_cover->opacity);
+  }
+
+}
+
+void ContextAlbum::FadeCurrentCover(const qreal value) {
+
+  if (value <= pixmap_current_opacity_) return;
+
+  pixmap_current_opacity_ = value;
+  update();
+
+}
+
+void ContextAlbum::FadeCurrentCoverFinished() {
+
+  if (image_original_ == image_strawberry_) {
+    Q_EMIT FadeStopFinished();
+  }
+
+}
+
+void ContextAlbum::FadePreviousCover(SharedPtr<PreviousCover> previous_cover) {
+
+  if (previous_cover->timeline->currentValue() >= previous_cover->opacity) return;
+
+  previous_cover->opacity = previous_cover->timeline->currentValue();
+
+}
+
+void ContextAlbum::FadePreviousCoverFinished(SharedPtr<PreviousCover> previous_cover) {
+
+  previous_cover->timeline.reset();
+  previous_covers_.removeAll(previous_cover);
+
+}
+
+void ContextAlbum::ScaleCover() {
+
+  const QImage image = ImageUtils::ScaleImage(image_original_, QSize(desired_height_, desired_height_), devicePixelRatioF(), true);
+  if (image.isNull()) {
+    pixmap_current_ = QPixmap();
+  }
+  else {
+    pixmap_current_ = QPixmap::fromImage(image);
+  }
+
+}
+
+void ContextAlbum::ScalePreviousCovers() {
+
+  for (int i = 0; i < previous_covers_.count(); i++) {
+    SharedPtr<PreviousCover> previous_cover = previous_covers_.at(i);
+    QImage image = ImageUtils::ScaleImage(previous_cover->image, QSize(desired_height_, desired_height_), devicePixelRatioF(), true);
+    if (image.isNull()) {
+      previous_cover->pixmap = QPixmap();
+    }
+    else {
+      previous_cover->pixmap = QPixmap::fromImage(image);
+    }
+  }
+
 }
 
 void ContextAlbum::SearchCoverInProgress() {
-  downloading_ = true;
-  gtk_widget_set_visible(spinner_, TRUE);
-  gtk_spinner_start(GTK_SPINNER(spinner_));
+
+  downloading_covers_ = true;
+
+  // Show a spinner animation
+  spinner_animation_ = make_unique<QMovie>(u":/pictures/spinner.gif"_s, QByteArray(), this);
+  QObject::connect(&*spinner_animation_, &QMovie::updated, this, &ContextAlbum::Update);
+  spinner_animation_->start();
+  update();
+
 }
 
-void ContextAlbum::SnapshotCurrentToPrevious() {
-  GdkPaintable *paintable = gtk_image_get_paintable(GTK_IMAGE(image_));
-  if (paintable) {
-    gtk_image_set_from_paintable(GTK_IMAGE(previous_image_), paintable);
-  } else {
-    gtk_image_set_from_icon_name(GTK_IMAGE(previous_image_), "audio-x-generic-symbolic");
-  }
-  gtk_image_set_pixel_size(GTK_IMAGE(previous_image_), gtk_image_get_pixel_size(GTK_IMAGE(image_)));
-  gtk_widget_set_visible(previous_image_, TRUE);
-  gtk_widget_set_opacity(previous_image_, 1.0);
-}
+void ContextAlbum::AutomaticCoverSearchDone() {
 
-void ContextAlbum::ApplyImageData(const std::vector<unsigned char> &data, int pixel_size) {
-  if (data.empty()) {
-    gtk_image_set_from_icon_name(GTK_IMAGE(image_), "audio-x-generic-symbolic");
-    gtk_image_set_pixel_size(GTK_IMAGE(image_), pixel_size);
-    return;
-  }
-  GBytes *bytes = g_bytes_new(data.data(), data.size());
-  GError *error = nullptr;
-  GdkTexture *texture = gdk_texture_new_from_bytes(bytes, &error);
-  g_bytes_unref(bytes);
-  if (!texture) {
-    if (error) {
-      g_error_free(error);
-    }
-    gtk_image_set_from_icon_name(GTK_IMAGE(image_), "audio-x-generic-symbolic");
-    return;
-  }
-  gtk_image_set_from_paintable(GTK_IMAGE(image_), GDK_PAINTABLE(texture));
-  gtk_image_set_pixel_size(GTK_IMAGE(image_), pixel_size);
-  g_object_unref(texture);
-}
+  downloading_covers_ = false;
+  spinner_animation_.reset();
+  update();
 
-void ContextAlbum::StartFade(bool to_placeholder) {
-  StopFade();
-  fading_to_placeholder_ = to_placeholder;
-  fade_elapsed_ms_ = 0;
-  gtk_widget_set_opacity(image_, 0.0);
-  fade_timeout_id_ = g_timeout_add(kFadeTickMs, [](gpointer data) -> gboolean { return static_cast<ContextAlbum *>(data)->FadeTick(); }, this);
-}
-
-void ContextAlbum::StopFade() {
-  if (fade_timeout_id_) {
-    g_source_remove(fade_timeout_id_);
-    fade_timeout_id_ = 0;
-  }
-  fade_elapsed_ms_ = 0;
-}
-
-gboolean ContextAlbum::FadeTick() {
-  fade_elapsed_ms_ += kFadeTickMs;
-  const double fade_in = FadeInOpacity(fade_elapsed_ms_);
-  gtk_widget_set_opacity(previous_image_, FadeOutOpacity(fade_elapsed_ms_));
-  gtk_widget_set_opacity(image_, fade_in);
-  if (fade_elapsed_ms_ < kFadeTimelineMs) {
-    return G_SOURCE_CONTINUE;
-  }
-  fade_timeout_id_ = 0;
-  gtk_widget_set_opacity(image_, 1.0);
-  gtk_widget_set_visible(previous_image_, FALSE);
-  gtk_image_set_from_icon_name(GTK_IMAGE(previous_image_), "audio-x-generic-symbolic");
-  if (fading_to_placeholder_ && fade_finished_) {
-    fade_finished_();
-  }
-  fading_to_placeholder_ = false;
-  return G_SOURCE_REMOVE;
-}
-
-void ContextAlbum::SetImage(const std::vector<unsigned char> &data, int pixel_size) {
-  downloading_ = false;
-  gtk_spinner_stop(GTK_SPINNER(spinner_));
-  gtk_widget_set_visible(spinner_, FALSE);
-  SnapshotCurrentToPrevious();
-  has_cover_ = !data.empty();
-  ApplyImageData(data, pixel_size);
-  gtk_widget_set_opacity(image_, 0.0);
-  StartFade(!has_cover_);
 }

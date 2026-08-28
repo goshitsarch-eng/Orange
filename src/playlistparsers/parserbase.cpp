@@ -1,168 +1,157 @@
-#include "playlistparsers/parserbase.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2019-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "playlistparsers/parsercollectionlookup.h"
+#include <QtGlobal>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QString>
+#include <QRegularExpression>
+#include <QUrl>
+
+#include "includes/shared_ptr.h"
+#include "core/logging.h"
+#include "tagreader/tagreaderclient.h"
+#include "collection/collectionbackend.h"
 #include "constants/playlistsettings.h"
-#include "core/settings.h"
-#include "utilities/fileutils.h"
-#include "utilities/strutils.h"
+#include "parserbase.h"
 
-#include <algorithm>
-#include <cctype>
+using namespace Qt::Literals::StringLiterals;
 
-namespace {
+ParserBase::ParserBase(const SharedPtr<TagReaderClient> tagreader_client, const SharedPtr<CollectionBackendInterface> collection_backend, QObject *parent)
+    : QObject(parent), tagreader_client_(tagreader_client), collection_backend_(collection_backend) {}
 
-int g_path_type_override = -1;
-CollectionBackend *g_collection_backend = nullptr;
+void ParserBase::LoadSong(const QString &filename_or_url, const qint64 beginning, const int track, const QDir &dir, Song *song, const bool collection_lookup) const {
 
-}  // namespace
-
-void ParserBase::SetPathTypeOverride(int type) { g_path_type_override = type; }
-
-void ParserBase::SetCollectionBackend(CollectionBackend *backend) { g_collection_backend = backend; }
-
-bool ParserBase::HasUrlScheme(const std::string &value) {
-  const size_t colon = value.find(':');
-  if (colon == std::string::npos || colon < 2) {
-    return false;
+  if (filename_or_url.isEmpty()) {
+    return;
   }
-  for (size_t i = 0; i < colon; ++i) {
-    if (!std::isalpha(static_cast<unsigned char>(value[i]))) {
-      return false;
+
+  QString filename = filename_or_url;
+
+  static const QRegularExpression regex_url_schema(QStringLiteral("^[a-z]{2,}:"), QRegularExpression::CaseInsensitiveOption);
+  if (filename_or_url.contains(regex_url_schema)) {
+    QUrl url(filename_or_url);
+    song->set_source(Song::SourceFromURL(url));
+    if (song->source() == Song::Source::LocalFile) {
+      filename = url.toLocalFile();
+    }
+    else if (song->is_stream()) {
+      url = QUrl::fromUserInput(filename_or_url);
+      if (url.host() == "open.spotify.com"_L1 && url.path().startsWith("/track/"_L1)) {
+        song->set_source(Song::Source::Spotify);
+        url.setScheme("spotify"_L1);
+        url.setHost(QString());
+        url.setPath(url.path().remove(0, 1).replace(u'/', u':'));
+      }
+      song->set_url(url);
+      song->set_filetype(Song::FileType::Stream);
+      song->set_valid(true);
+      return;
+    }
+    else {
+      qLog(Error) << "Don't know how to handle" << url;
+      Q_EMIT Error(tr("Don't know how to handle %1").arg(filename_or_url));
+      return;
     }
   }
-  return true;
-}
 
-Song ParserBase::LoadSong(const std::string &playlist_dir, const std::string &entry) {
-  Song song;
-  std::string path = StrUtils::Trim(XmlUnescape(entry));
-  if (path.empty()) {
-    return song;
-  }
-  if (HasUrlScheme(path)) {
-    song.set_source(StrUtils::StartsWith(StrUtils::ToLower(path), "file:") ? Song::Source::LocalFile : Song::Source::Stream);
-    song.set_url(path);
-    song.set_title(FileUtils::BaseName(FileUtils::PathFromUri(path)));
-    song.set_valid(true);
-    return ParserCollectionLookup::Resolve(song, g_collection_backend);
-  }
-  if (!path.empty() && path[0] != '/') {
-    path = FileUtils::Join(playlist_dir, path);
-  }
-  song.set_source(Song::Source::LocalFile);
-  song.set_url(FileUtils::UriFromPath(path));
-  song.set_title(FileUtils::BaseName(path));
-  song.set_basefilename(FileUtils::BaseName(path));
-  song.set_valid(true);
-  return ParserCollectionLookup::Resolve(song, g_collection_backend);
-}
+  filename = QDir::cleanPath(filename);
 
-std::string ParserBase::URLOrFilename(const std::string &url, const std::string &playlist_dir) {
-  Settings settings;
-  settings.BeginGroup(PlaylistSettings::kSettingsGroup);
-  const int stored = g_path_type_override >= 0
-                         ? g_path_type_override
-                         : settings.IntValue(PlaylistSettings::kPathType, static_cast<int>(PlaylistSettings::kDefaultPathType));
-  const auto type = static_cast<PlaylistSettings::PathType>(stored);
-  if (url.rfind("file://", 0) == 0) {
-    std::string path = FileUtils::PathFromUri(url);
-    if (type == PlaylistSettings::PathType::Absolute) {
-      return path;
-    }
-    if (!playlist_dir.empty() && StrUtils::StartsWith(path, playlist_dir + "/")) {
-      return path.substr(playlist_dir.size() + 1);
-    }
-    if (type == PlaylistSettings::PathType::Relative) {
-      return FileUtils::BaseName(path);
-    }
-    return path;
+  // Make the path absolute
+  if (!QDir::isAbsolutePath(filename)) {
+    filename = dir.absoluteFilePath(filename);
   }
-  return url;
-}
 
-std::string ParserBase::XmlEscape(const std::string &value) {
-  std::string result;
-  result.reserve(value.size());
-  for (char c : value) {
-    switch (c) {
-      case '&':
-        result += "&amp;";
-        break;
-      case '<':
-        result += "&lt;";
-        break;
-      case '>':
-        result += "&gt;";
-        break;
-      case '"':
-        result += "&quot;";
-        break;
-      case '\'':
-        result += "&apos;";
-        break;
-      default:
-        result.push_back(c);
-        break;
+  const QUrl url = QUrl::fromLocalFile(filename);
+
+  // Search the collection
+  if (collection_backend_ && collection_lookup) {
+    Song collection_song;
+    if (track > 0) {
+      collection_song = collection_backend_->GetSongByUrlAndTrack(url, track);
+    }
+    if (!collection_song.is_valid()) {
+      collection_song = collection_backend_->GetSongByUrl(url, beginning);
+    }
+    // Try canonical path
+    if (!collection_song.is_valid()) {
+      const QString canonical_filepath = QFileInfo(filename).canonicalFilePath();
+      if (canonical_filepath != filename) {
+        const QUrl canonical_filepath_url = QUrl::fromLocalFile(canonical_filepath);
+        if (track > 0) {
+          collection_song = collection_backend_->GetSongByUrlAndTrack(canonical_filepath_url, track);
+        }
+        if (!collection_song.is_valid()) {
+          collection_song = collection_backend_->GetSongByUrl(canonical_filepath_url, beginning);
+        }
+      }
+    }
+    // If it was found in the collection then use it, otherwise load metadata from disk.
+    if (collection_song.is_valid()) {
+      *song = collection_song;
+      return;
     }
   }
-  return result;
-}
 
-std::string ParserBase::XmlUnescape(const std::string &value) {
-  std::string result = StrUtils::Replace(value, "&amp;", "&");
-  result = StrUtils::Replace(result, "&lt;", "<");
-  result = StrUtils::Replace(result, "&gt;", ">");
-  result = StrUtils::Replace(result, "&quot;", "\"");
-  result = StrUtils::Replace(result, "&apos;", "'");
-  return result;
-}
+  // Check if the file exists before trying to read it
+  if (!QFile::exists(filename)) {
+    qLog(Error) << "File does not exist:" << filename;
+    Q_EMIT Error(tr("File %1 does not exist").arg(filename));
+    return;
+  }
 
-std::string ParserBase::TagText(const std::string &data, const std::string &tag, size_t from, size_t *next) {
-  const std::string open = "<" + tag;
-  const std::string close = "</" + tag + ">";
-  const std::string lower = StrUtils::ToLower(data);
-  const std::string open_l = StrUtils::ToLower(open);
-  const std::string close_l = StrUtils::ToLower(close);
-  size_t start = lower.find(open_l, from);
-  if (start == std::string::npos) {
-    if (next) {
-      *next = std::string::npos;
+  if (tagreader_client_) {
+    const TagReaderResult result = tagreader_client_->ReadFileBlocking(filename, song);
+    if (!result.success()) {
+      qLog(Error) << "Could not read file" << filename << result.error_string();
+      Q_EMIT Error(tr("Could not read file %1: %2").arg(filename, result.error_string()));
     }
-    return {};
   }
-  const size_t gt = data.find('>', start);
-  if (gt == std::string::npos) {
-    return {};
-  }
-  const size_t end = lower.find(close_l, gt + 1);
-  if (end == std::string::npos) {
-    return {};
-  }
-  if (next) {
-    *next = end + close.size();
-  }
-  return XmlUnescape(data.substr(gt + 1, end - (gt + 1)));
+
 }
 
-std::string ParserBase::AttributeValue(const std::string &element, const std::string &name) {
-  const std::string lower = StrUtils::ToLower(element);
-  const std::string key = StrUtils::ToLower(name) + "=";
-  size_t pos = lower.find(key);
-  if (pos == std::string::npos) {
-    return {};
+Song ParserBase::LoadSong(const QString &filename_or_url, const qint64 beginning, const int track, const QDir &dir, const bool collection_lookup) const {
+
+  Song song(Song::Source::LocalFile);
+  LoadSong(filename_or_url, beginning, track, dir, &song, collection_lookup);
+
+  return song;
+
+}
+
+QString ParserBase::URLOrFilename(const QUrl &url, const QDir &dir, const PlaylistSettings::PathType path_type) {
+
+  if (!url.isLocalFile()) return url.toString();
+
+  const QString filename = url.toLocalFile();
+
+  if (path_type != PlaylistSettings::PathType::Absolute && QDir::isAbsolutePath(filename)) {
+    const QString relative = dir.relativeFilePath(filename);
+
+    if (!relative.startsWith("../"_L1) || path_type == PlaylistSettings::PathType::Relative) {
+      return relative;
+    }
   }
-  pos += key.size();
-  if (pos >= element.size()) {
-    return {};
-  }
-  const char quote = element[pos];
-  if (quote != '"' && quote != '\'') {
-    const size_t end = element.find_first_of(" \t>", pos);
-    return XmlUnescape(element.substr(pos, end == std::string::npos ? std::string::npos : end - pos));
-  }
-  const size_t end = element.find(quote, pos + 1);
-  if (end == std::string::npos) {
-    return {};
-  }
-  return XmlUnescape(element.substr(pos + 1, end - pos - 1));
+
+  return filename;
+
 }

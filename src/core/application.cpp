@@ -1,403 +1,398 @@
-#include "core/application.h"
-
-#include "constants/collectionsettings.h"
-#include "constants/notificationssettings.h"
-#include "core/appearance.h"
-#include "equalizer/equalizerpersist.h"
-#include "playlist/playlist.h"
-#include "playlist/playlistqueuescope.h"
-#include "core/logging.h"
-#include "core/settings.h"
-#include "collection/skipcounteligibility.h"
-#include "scrobbler/scrobblereligibility.h"
-#include "scrobbler/scrobblerlifecycle.h"
-#include "core/exitfade.h"
-#include "constants/behavioursettings.h"
-#include "core/commandlineurlplan.h"
-#include "core/commandlinevolume.h"
-#include "tidal/tidalloginurl.h"
-#include "tidal/tidalservice.h"
-#include "core/playbackcontrolsstate.h"
-#include "core/playeritemoptions.h"
-#include "utilities/fileutils.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2012, David Sansome <me@davidsansome.com>
+ * Copyright 2012, 2014, John Maguire <john.maguire@gmail.com>
+ * Copyright 2018-2026, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
 #include "config.h"
-#ifdef HAVE_SPOTIFY
-#include "spotify/spotifyservice.h"
+
+#include "application.h"
+
+#include <utility>
+#include <functional>
+#include <chrono>
+
+#include <glib.h>
+
+#include <QObject>
+#include <QThread>
+#include <QString>
+#include <QMetaObject>
+#include <QCoreApplication>
+#include <QAbstractEventDispatcher>
+#include <QTimer>
+
+#include "includes/shared_ptr.h"
+#include "includes/lazy.h"
+#include "core/logging.h"
+#include "core/database.h"
+#include "core/taskmanager.h"
+#include "core/networkaccessmanager.h"
+#include "core/player.h"
+#include "core/urlhandlers.h"
+#include "engine/devicefinders.h"
+#include "tagreader/tagreaderclient.h"
+#include "collection/collectionlibrary.h"
+#include "playlist/playlistbackend.h"
+#include "playlist/playlistmanager.h"
+#include "device/devicemanager.h"
+#include "covermanager/albumcoverloader.h"
+#include "covermanager/coverproviders.h"
+#include "covermanager/currentalbumcoverloader.h"
+#include "covermanager/lastfmcoverprovider.h"
+#include "covermanager/discogscoverprovider.h"
+#include "covermanager/musicbrainzcoverprovider.h"
+#include "covermanager/deezercoverprovider.h"
+#include "covermanager/musixmatchcoverprovider.h"
+#include "covermanager/opentidalcoverprovider.h"
+
+#include "lyrics/lyricsproviders.h"
+#include "lyrics/geniuslyricsprovider.h"
+#include "lyrics/ovhlyricsprovider.h"
+#include "lyrics/musixmatchlyricsprovider.h"
+#include "lyrics/songlyricscomlyricsprovider.h"
+#include "lyrics/azlyricscomlyricsprovider.h"
+#include "lyrics/elyricsnetlyricsprovider.h"
+#include "lyrics/letraslyricsprovider.h"
+#include "lyrics/lrcliblyricsprovider.h"
+
+#include "scrobbler/audioscrobbler.h"
+#include "scrobbler/lastfmscrobbler.h"
+#include "scrobbler/listenbrainzscrobbler.h"
+#ifdef HAVE_SUBSONIC
+#  include "scrobbler/subsonicscrobbler.h"
 #endif
 
-Application::Application()
-    : task_manager_(std::make_unique<TaskManager>()),
-      database_(std::make_unique<Database>()),
-      network_(std::make_unique<NetworkAccessManager>()),
-      tagreader_(std::make_unique<TagReader>()),
-      tagreader_client_(std::make_unique<TagReaderClient>(tagreader_.get())),
-      url_handlers_(std::make_unique<UrlHandlers>()),
-      collection_(std::make_unique<CollectionLibrary>(database_.get(), task_manager_.get(), tagreader_.get())),
-      playlist_backend_(std::make_unique<PlaylistBackend>(database_.get(), tagreader_.get(), collection_->backend())),
-      playlist_manager_(std::make_unique<PlaylistManager>(task_manager_.get(), tagreader_.get(), url_handlers_.get(),
-                                                          playlist_backend_.get(), collection_->backend())),
-      player_(std::make_unique<Player>(task_manager_.get(), url_handlers_.get(), playlist_manager_.get())),
-      queue_(std::make_unique<Queue>()),
-      cover_providers_(std::make_unique<CoverProviders>(network_.get())),
-      albumcover_loader_(std::make_unique<AlbumCoverLoader>(tagreader_.get())),
-      current_albumcover_loader_(std::make_unique<CurrentAlbumCoverLoader>(albumcover_loader_.get())),
-      lyrics_providers_(std::make_unique<LyricsProviders>(network_.get())),
-      lyrics_fetcher_(std::make_unique<LyricsFetcher>(lyrics_providers_.get())),
-      scrobbler_(std::make_unique<AudioScrobbler>(network_.get())),
-      streaming_services_(std::make_unique<StreamingServices>(network_.get(), url_handlers_.get(), task_manager_.get())),
-      radio_services_(std::make_unique<RadioServices>(database_.get(), network_.get())),
-      device_manager_(std::make_unique<DeviceManager>(database_.get(), task_manager_.get())),
-      device_finders_(std::make_unique<DeviceFinders>()),
-      equalizer_(std::make_unique<Equalizer>()),
-      analyzer_(std::make_unique<Analyzer>()),
-      moodbar_loader_(std::make_unique<MoodbarLoader>()),
-      moodbar_(std::make_unique<MoodbarController>(moodbar_loader_.get())),
-      waveform_loader_(std::make_unique<WaveformLoader>()),
-      waveform_(std::make_unique<WaveformController>(waveform_loader_.get())),
-      transcoder_(std::make_unique<Transcoder>()),
-      osd_(std::make_unique<OSD>()),
-      tray_(std::make_unique<SystemTrayIcon>()),
-      shortcuts_(std::make_unique<GlobalShortcutsManager>()),
-      discord_(std::make_unique<DiscordRichPresence>()),
-      tag_fetcher_(std::make_unique<TagFetcher>(network_.get())) {}
+#include "streaming/streamingservices.h"
 
-Application::~Application() {
-  if (!exit_started_) {
-    CompleteExit();
+#ifdef HAVE_SUBSONIC
+#  include "subsonic/subsonicservice.h"
+#endif
+
+#ifdef HAVE_TIDAL
+#  include "tidal/tidalservice.h"
+#  include "covermanager/tidalcoverprovider.h"
+#endif
+
+#ifdef HAVE_SPOTIFY
+#  include "spotify/spotifyservice.h"
+#  include "covermanager/spotifycoverprovider.h"
+#endif
+
+#ifdef HAVE_QOBUZ
+#  include "qobuz/qobuzservice.h"
+#  include "covermanager/qobuzcoverprovider.h"
+#endif
+
+#ifdef HAVE_MOODBAR
+#  include "moodbar/moodbarcontroller.h"
+#  include "moodbar/moodbarloader.h"
+#endif
+
+#ifdef HAVE_WAVEFORM
+#  include "waveform/waveformcontroller.h"
+#  include "waveform/waveformloader.h"
+#endif
+
+#include "radios/radioservices.h"
+#include "radios/radiobackend.h"
+
+using std::make_shared;
+using namespace std::chrono_literals;
+
+class ApplicationImpl {
+ public:
+  explicit ApplicationImpl(Application *app)
+      : tagreader_client_([app]() {
+          TagReaderClient *client = new TagReaderClient();
+          app->MoveToNewThread(client);
+          return client;
+        }),
+        database_([app]() {
+          Database *database = new Database(app->task_manager());
+          app->MoveToNewThread(database);
+          QTimer::singleShot(30s, database, &Database::DoBackup);
+          return database;
+        }),
+        task_manager_([]() { return new TaskManager(); }),
+        player_([app]() { return new Player(app->task_manager(), app->url_handlers(), app->playlist_manager()); }),
+        network_([]() { return new NetworkAccessManager(); }),
+        device_finders_([]() { return new DeviceFinders(); }),
+        url_handlers_([]() { return new UrlHandlers(); }),
+        device_manager_([app]() { return new DeviceManager(app->task_manager(), app->database(), app->tagreader_client(), app->albumcover_loader()); }),
+        collection_([app]() { return new CollectionLibrary(app->database(), app->task_manager(), app->tagreader_client(), app->albumcover_loader()); }),
+        playlist_backend_([this, app]() {
+          PlaylistBackend *playlist_backend = new PlaylistBackend(app->database(), app->tagreader_client(), app->collection_backend());
+          app->MoveToThread(playlist_backend, database_->thread());
+          return playlist_backend;
+        }),
+        playlist_manager_([app]() { return new PlaylistManager(app->task_manager(), app->tagreader_client(), app->url_handlers(), app->playlist_backend(), app->collection_backend(), app->current_albumcover_loader()); }),
+        cover_providers_([app]() {
+          CoverProviders *cover_providers = new CoverProviders();
+          // Initialize the repository of cover providers.
+          cover_providers->AddProvider(new LastFmCoverProvider(app->network()));
+          cover_providers->AddProvider(new MusicbrainzCoverProvider(app->network()));
+          cover_providers->AddProvider(new DiscogsCoverProvider(app->network()));
+          cover_providers->AddProvider(new DeezerCoverProvider(app->network()));
+          cover_providers->AddProvider(new MusixmatchCoverProvider(app->network()));
+          cover_providers->AddProvider(new OpenTidalCoverProvider(app->network()));
+#ifdef HAVE_TIDAL
+          cover_providers->AddProvider(new TidalCoverProvider(app->streaming_services()->Service<TidalService>(), app->network()));
+#endif
+#ifdef HAVE_SPOTIFY
+          cover_providers->AddProvider(new SpotifyCoverProvider(app->streaming_services()->Service<SpotifyService>(), app->network()));
+#endif
+#ifdef HAVE_QOBUZ
+          cover_providers->AddProvider(new QobuzCoverProvider(app->streaming_services()->Service<QobuzService>(), app->network()));
+#endif
+          cover_providers->ReloadSettings();
+          return cover_providers;
+        }),
+        albumcover_loader_([app]() {
+          AlbumCoverLoader *loader = new AlbumCoverLoader(app->tagreader_client());
+          app->MoveToNewThread(loader);
+          return loader;
+        }),
+        current_albumcover_loader_([app]() { return new CurrentAlbumCoverLoader(app->albumcover_loader()); }),
+        lyrics_providers_([app]() {
+          LyricsProviders *lyrics_providers = new LyricsProviders(app);
+          // Initialize the repository of lyrics providers.
+          lyrics_providers->AddProvider(new GeniusLyricsProvider(app->network()));
+          lyrics_providers->AddProvider(new OVHLyricsProvider(app->network()));
+          lyrics_providers->AddProvider(new MusixmatchLyricsProvider(app->network()));
+          lyrics_providers->AddProvider(new SongLyricsComLyricsProvider(app->network()));
+          lyrics_providers->AddProvider(new AzLyricsComLyricsProvider(app->network()));
+          lyrics_providers->AddProvider(new ElyricsNetLyricsProvider(app->network()));
+          lyrics_providers->AddProvider(new LetrasLyricsProvider(app->network()));
+          lyrics_providers->AddProvider(new LrcLibLyricsProvider(app->network()));
+          lyrics_providers->ReloadSettings();
+          return lyrics_providers;
+        }),
+        streaming_services_([app]() {
+          StreamingServices *streaming_services = new StreamingServices();
+#ifdef HAVE_SUBSONIC
+          streaming_services->AddService(make_shared<SubsonicService>(app->task_manager(), app->database(), app->network(), app->url_handlers(), app->albumcover_loader()));
+#endif
+#ifdef HAVE_TIDAL
+          streaming_services->AddService(make_shared<TidalService>(app->task_manager(), app->database(), app->network(), app->url_handlers(), app->albumcover_loader()));
+#endif
+#ifdef HAVE_SPOTIFY
+          streaming_services->AddService(make_shared<SpotifyService>(app->task_manager(), app->database(), app->network(), app->albumcover_loader()));
+#endif
+#ifdef HAVE_QOBUZ
+          streaming_services->AddService(make_shared<QobuzService>(app->task_manager(), app->database(), app->network(), app->url_handlers(), app->albumcover_loader()));
+#endif
+          return streaming_services;
+        }),
+        radio_services_([app]() { return new RadioServices(app->task_manager(), app->network(), app->database(), app->albumcover_loader()); }),
+#ifdef HAVE_MOODBAR
+        moodbar_loader_([app]() { return new MoodbarLoader(app); }),
+        moodbar_controller_([app]() { return new MoodbarController(app->player(), app->moodbar_loader()); }),
+#endif
+#ifdef HAVE_WAVEFORM
+        waveform_loader_([app]() { return new WaveformLoader(app); }),
+        waveform_controller_([app]() { return new WaveformController(app->player(), app->waveform_loader()); }),
+#endif
+        scrobbler_([app]() {
+          AudioScrobbler *scrobbler = new AudioScrobbler(app);
+          scrobbler->AddService(make_shared<LastFMScrobbler>(scrobbler->settings(), app->network()));
+          scrobbler->AddService(make_shared<ListenBrainzScrobbler>(scrobbler->settings(), app->network()));
+#ifdef HAVE_SUBSONIC
+          scrobbler->AddService(make_shared<SubsonicScrobbler>(scrobbler->settings(), app->network(), app->streaming_services()->Service<SubsonicService>(), app));
+#endif
+          return scrobbler;
+        })
+  {}
+
+  Lazy<TagReaderClient> tagreader_client_;
+  Lazy<Database> database_;
+  Lazy<TaskManager> task_manager_;
+  Lazy<Player> player_;
+  Lazy<NetworkAccessManager> network_;
+  Lazy<DeviceFinders> device_finders_;
+  Lazy<UrlHandlers> url_handlers_;
+  Lazy<DeviceManager> device_manager_;
+  Lazy<CollectionLibrary> collection_;
+  Lazy<PlaylistBackend> playlist_backend_;
+  Lazy<PlaylistManager> playlist_manager_;
+  Lazy<CoverProviders> cover_providers_;
+  Lazy<AlbumCoverLoader> albumcover_loader_;
+  Lazy<CurrentAlbumCoverLoader> current_albumcover_loader_;
+  Lazy<LyricsProviders> lyrics_providers_;
+  Lazy<StreamingServices> streaming_services_;
+  Lazy<RadioServices> radio_services_;
+#ifdef HAVE_MOODBAR
+  Lazy<MoodbarLoader> moodbar_loader_;
+  Lazy<MoodbarController> moodbar_controller_;
+#endif
+#ifdef HAVE_WAVEFORM
+  Lazy<WaveformLoader> waveform_loader_;
+  Lazy<WaveformController> waveform_controller_;
+#endif
+  Lazy<AudioScrobbler> scrobbler_;
+
+};
+
+Application::Application(QObject *parent)
+    : QObject(parent),
+      p_(new ApplicationImpl(this)),
+      g_thread_(nullptr) {
+
+  setObjectName(QLatin1String(QObject::metaObject()->className()));
+
+  const QMetaObject *mo = QAbstractEventDispatcher::instance(QCoreApplication::instance()->thread())->metaObject();
+  if (mo && strcmp(mo->className(), "QEventDispatcherGlib") != 0 && strcmp(mo->superClass()->className(), "QEventDispatcherGlib") != 0) {
+    g_thread_ = g_thread_new(nullptr, Application::GLibMainLoopThreadFunc, nullptr);
   }
+
+  device_finders()->Init();
+  collection()->Init();
+  tagreader_client();
+
 }
 
-void Application::Init() {
-  Appearance appearance;
-  appearance.Apply();
-  database_->Open();
-  collection_->Init();
-  {
-    Settings settings;
-    settings.BeginGroup("Collection");
-    if (settings.BoolValue("startup_scan", settings.BoolValue("startupscan", true))) {
-      collection_->IncrementalScan();
-    }
-  }
-  playlist_manager_->Init();
-  playlist_manager_->set_network(network_.get());
-  playlist_manager_->set_tagreader_client(tagreader_client_.get());
-  playlist_manager_->PlayRequested.Connect([this](int row) {
-    if (player_) {
-      player_->PlayAt(row);
-    }
-  });
-  player_->Init();
-#ifdef HAVE_SPOTIFY
-  if (auto *spotify = dynamic_cast<SpotifyService *>(streaming_services_->ServiceByName("Spotify"))) {
-    auto push_token = [this, spotify]() { player_->engine()->UpdateSpotifyAccessToken(spotify->access_token()); };
-    spotify->AuthenticationChanged.Connect(push_token);
-    push_token();
-  }
-#endif
-  BindPlayerQueue();
-  playlist_manager_->CurrentChanged.Connect([this](Playlist *) { BindPlayerQueue(); });
-  playlist_manager_->ActiveChanged.Connect([this](Playlist *) { BindPlayerQueue(); });
-  playlist_manager_->PlaylistsLoaded.Connect([this]() { BindPlayerQueue(); });
-  device_finders_->Init();
-  device_manager_->set_tagreader(tagreader_.get());
-  device_manager_->set_network(network_.get());
-  device_manager_->Init();
-  url_handlers_->AddHandler(device_manager_->url_handler());
-  osd_->set_tray_icon(tray_.get());
-  osd_->ReloadSettings();
-  shortcuts_->Init();
-  discord_->ReloadSettings();
-  tray_->SetupStatusNotifier();
-  tray_->PlayPause.Connect([this]() { player_->PlayPause(); });
-  tray_->Stop.Connect([this]() { player_->Stop(); });
-  tray_->Next.Connect([this]() { player_->Next(); });
-  tray_->Previous.Connect([this]() { player_->Previous(); });
-  tray_->Mute.Connect([this]() { player_->Mute(); });
-  tray_->StopAfter.Connect([this]() {
-    player_->StopAfterCurrent();
-    osd_->StopAfterToggle(player_->stop_after_current());
-  });
-  tray_->Love.Connect([this]() { scrobbler_->Love(player_->current_song()); });
-  tray_->Quit.Connect([this]() { Exit(); });
-  player_->engine()->SetEqualizerEnabled(equalizer_->enabled());
-  player_->engine()->SetEqualizerParameters(equalizer_->EffectivePreamp(), equalizer_->EffectiveGains());
-  player_->engine()->SetStereoBalance(equalizer_->EffectiveBalanceFraction());
-  tray_->VolumeScroll.Connect([this](int delta) {
-    if (delta > 0) {
-      player_->VolumeUp();
-    } else if (delta < 0) {
-      player_->VolumeDown();
-    }
-  });
-  mpris_ = std::make_unique<Mpris2>(this);
+Application::~Application() {
 
-  player_->SongChanged.Connect([this](const Song &song) {
-    collection_->CurrentSongChanged(song);
-    scrobbler_->NowPlaying(song);
-    current_albumcover_loader_->Load(song);
-    if (Playlist *playlist = playlist_manager_->active()) {
-      playlist->ApplyDiscoveredArt(song, albumcover_loader_->LoadPath(song));
-    }
-    osd_->SongChanged(song, current_albumcover_loader_->current());
-    moodbar_->CurrentSongChanged(song);
-    waveform_->CurrentSongChanged(song);
-    discord_->UpdatePresence(song, player_->GetState() == GstEngine::State::Playing);
-    tray_->SetNowPlaying(song);
-  });
-  player_->NowPlayingRefresh.Connect([this](const Song &song) { scrobbler_->NowPlaying(song); });
-  current_albumcover_loader_->AlbumCoverReady.Connect([this](const Song &song, const std::vector<unsigned char> &art) {
-    osd_->AlbumCoverLoaded(song, art);
-  });
-  player_->TrackSkipped.Connect([this](const Song &song, int64_t pos_ns, int64_t len_ns) {
-    if (song.id() > 0 && SkipCountEligibility::ShouldIncrement(pos_ns, len_ns)) {
-      collection_->backend()->IncrementSkipCount(song.id());
-    }
-  });
-  player_->TrackEndedPlaycount.Connect([this](const Song &song) {
-    Song tagged = song;
-    tagged.set_playcount(song.playcount() + 1);
-    collection_->SongsPlaycountChanged({tagged});
-  });
-  player_->PlaybackFinished.Connect([this](const Song &song, int64_t listened_nanosec) {
-    Playlist *playlist = playlist_manager_->active();
-    const bool already_scrobbled = playlist && playlist->scrobbled();
-    if (!already_scrobbled && ScrobblerEligibility::ShouldScrobble(song, listened_nanosec)) {
-      scrobbler_->Scrobble(song);
-    }
-  });
-  player_->ForceShowOSD.Connect([this](const Song &song, bool toggle) {
-    if (toggle) {
-      osd_->SetPrettyOSDToggleMode(true);
-    }
-    osd_->ReshowCurrentSong(song, current_albumcover_loader_->current());
-  });
-  player_->Playing.Connect([this]() {
-    tray_->SetPlaying(true, PlaybackControlsState::PlayPauseEnabled(true, PlayerItemOptions::PauseDisabled(player_->current_song())));
-    if (playback_was_paused_) {
-      osd_->Resumed();
-    }
-    playback_was_paused_ = false;
-    discord_->UpdatePresence(player_->current_song(), true);
-  });
-  player_->Paused.Connect([this]() {
-    playback_was_paused_ = true;
-    tray_->SetPaused();
-    osd_->Paused();
-    discord_->Clear();
-  });
-  player_->PositionChanged.Connect([this](int64_t position_nanosec, int64_t) {
-    if (player_->GetState() == GstEngine::State::Playing) {
-      discord_->RefreshAfterSeek(player_->current_song(), position_nanosec / 1000000000LL);
-    }
-  });
-  player_->Stopped.Connect([this]() {
-    playback_was_paused_ = false;
-    collection_->Stopped();
-    scrobbler_->ClearPlaying();
-    moodbar_->PlaybackStopped();
-    waveform_->PlaybackStopped();
-    discord_->Clear();
-    tray_->SetStopped();
-    tray_->ClearNowPlaying();
-    osd_->Stopped();
-  });
-  player_->VolumeChanged.Connect([this](unsigned volume) { osd_->VolumeChanged(volume); });
-  player_->PlaylistFinished.Connect([this]() { osd_->PlaylistFinished(); });
-  WatchPlaylistOsd(playlist_manager_->current());
-  playlist_manager_->CurrentChanged.Connect([this](Playlist *playlist) { WatchPlaylistOsd(playlist); });
-  playlist_manager_->PlaylistsLoaded.Connect([this]() { WatchPlaylistOsd(playlist_manager_->current()); });
-  equalizer_->ParametersChanged.Connect([this](bool enabled, int preamp, const std::vector<int> &gains) {
-    player_->engine()->SetEqualizerEnabled(enabled);
-    player_->engine()->SetEqualizerParameters(EqualizerPersist::EffectivePreamp(enabled, preamp),
-                                              EqualizerPersist::EffectiveGains(enabled, gains));
-  });
-  equalizer_->StereoBalanceChanged.Connect([this](float balance) { player_->engine()->SetStereoBalance(balance); });
-  shortcuts_->Play.Connect([this]() { player_->Play(); });
-  shortcuts_->Pause.Connect([this]() { player_->Pause(); });
-  shortcuts_->PlayPause.Connect([this]() { player_->PlayPause(); });
-  shortcuts_->Stop.Connect([this]() { player_->Stop(); });
-  shortcuts_->StopAfter.Connect([this]() {
-    player_->StopAfterCurrent();
-    osd_->StopAfterToggle(player_->stop_after_current());
-  });
-  shortcuts_->Next.Connect([this]() { player_->Next(); });
-  shortcuts_->Previous.Connect([this]() { player_->Previous(); });
-  shortcuts_->RestartOrPrevious.Connect([this]() { player_->RestartOrPrevious(); });
-  shortcuts_->VolumeUp.Connect([this]() { player_->VolumeUp(); });
-  shortcuts_->VolumeDown.Connect([this]() { player_->VolumeDown(); });
-  shortcuts_->Mute.Connect([this]() { player_->Mute(); });
-  shortcuts_->SeekForward.Connect([this]() { player_->SeekForward(); });
-  shortcuts_->SeekBackward.Connect([this]() { player_->SeekBackward(); });
-  shortcuts_->ShowHide.Connect([this]() { ShowHideRequested.Emit(); });
-  shortcuts_->ShowOSD.Connect([this]() { player_->ShowOSD(); });
-  shortcuts_->TogglePrettyOSD.Connect([this]() { player_->TogglePrettyOSD(); });
-  shortcuts_->CycleShuffle.Connect([this]() { playlist_manager_->CycleShuffleMode(); });
-  shortcuts_->CycleRepeat.Connect([this]() { playlist_manager_->CycleRepeatMode(); });
-  shortcuts_->ToggleScrobbling.Connect([this]() { scrobbler_->ToggleScrobbling(); });
-  shortcuts_->Love.Connect([this]() { scrobbler_->Love(player_->current_song()); });
+  qLog(Debug) << "Terminating application";
+
+  for (QThread *thread : std::as_const(threads_)) {
+    thread->quit();
+  }
+
+  for (QThread *thread : std::as_const(threads_)) {
+    thread->wait();
+    thread->deleteLater();
+  }
+
+  if (g_thread_) g_thread_unref(g_thread_);
+
+}
+
+gpointer Application::GLibMainLoopThreadFunc(gpointer data) {
+
+  Q_UNUSED(data)
+
+  qLog(Info) << "Creating GLib main event loop.";
+
+  GMainLoop *gloop = g_main_loop_new(nullptr, false);
+  g_main_loop_run(gloop);
+  g_main_loop_unref(gloop);
+
+  return nullptr;
+
+}
+
+QThread *Application::MoveToNewThread(QObject *object) {
+
+  QThread *thread = new QThread(this);
+
+  thread->setObjectName(object->objectName());
+
+  MoveToThread(object, thread);
+
+  thread->start();
+  threads_ << thread;
+
+  return thread;
+
+}
+
+void Application::MoveToThread(QObject *object, QThread *thread) {
+  object->setParent(nullptr);
+  object->moveToThread(thread);
+  qLog(Debug) << object << "moved to thread" << thread;
 }
 
 void Application::Exit() {
-  ++exit_count_;
-  const bool playing = player_ && player_->GetState() == EngineBase::State::Playing;
-  const bool fadeout_enabled = player_ && player_->engine() && player_->engine()->fading_enabled();
-  const ExitFade::Action action = ExitFade::Decide(exit_count_, fadeout_enabled, playing, exit_started_);
-  if (action == ExitFade::Action::WaitForFade) {
-    waiting_for_fade_ = true;
-    HideForExit.Emit();
-    if (player_ && player_->engine()) {
-      player_->engine()->Finished.Connect([this]() { CompleteExit(); });
-    }
-    if (player_) {
-      player_->SaveVolume();
-      player_->SavePlaybackStatus();
-      player_->Stop();
-    }
-    return;
-  }
-  if (action == ExitFade::Action::AbortProcess && exit_started_) {
-    return;
-  }
-  CompleteExit();
+
+  wait_for_exit_ << &*tagreader_client()
+                 << &*collection()
+                 << &*playlist_backend()
+                 << &*albumcover_loader()
+                 << &*device_manager()
+                 << &*streaming_services()
+                 << &*radio_services()->radio_backend();
+
+  QObject::connect(&*tagreader_client(), &TagReaderClient::ExitFinished, this, &Application::ExitReceived);
+  tagreader_client()->ExitAsync();
+
+  QObject::connect(&*collection(), &CollectionLibrary::ExitFinished, this, &Application::ExitReceived);
+  collection()->Exit();
+
+  QObject::connect(&*playlist_backend(), &PlaylistBackend::ExitFinished, this, &Application::ExitReceived);
+  playlist_backend()->ExitAsync();
+
+  QObject::connect(&*albumcover_loader(), &AlbumCoverLoader::ExitFinished, this, &Application::ExitReceived);
+  albumcover_loader()->ExitAsync();
+
+  QObject::connect(&*device_manager(), &DeviceManager::ExitFinished, this, &Application::ExitReceived);
+  device_manager()->Exit();
+
+  QObject::connect(&*streaming_services(), &StreamingServices::ExitFinished, this, &Application::ExitReceived);
+  streaming_services()->Exit();
+
+  QObject::connect(&*radio_services()->radio_backend(), &RadioBackend::ExitFinished, this, &Application::ExitReceived);
+  radio_services()->radio_backend()->ExitAsync();
+
 }
 
-void Application::CompleteExit() {
-  if (exit_started_) {
-    return;
+void Application::ExitReceived() {
+
+  QObject *obj = sender();
+  QObject::disconnect(obj, nullptr, this, nullptr);
+
+  qLog(Debug) << obj << "successfully exited.";
+
+  wait_for_exit_.removeAll(obj);
+  if (wait_for_exit_.isEmpty()) {
+    database()->Close();
+    QObject::connect(&*database(), &Database::ExitFinished, this, &Application::ExitFinished);
+    database()->ExitAsync();
   }
-  exit_started_ = true;
-  waiting_for_fade_ = false;
-  if (player_) {
-    player_->SaveVolume();
-    player_->SavePlaybackStatus();
-    player_->Stop();
-  }
-  if (playlist_manager_) {
-    playlist_manager_->SaveActive();
-  }
-  if (scrobbler_ && ScrobblerLifecycle::ShouldFlushOnExit(scrobbler_->enabled())) {
-    scrobbler_->WriteCache();
-  }
-  if (database_) {
-    database_->Backup();
-    database_->Close();
-  }
-  ExitFinished.Emit();
+
 }
 
-void Application::ApplyCommandline(const CommandlineOptions &options) {
-  if (TidalLoginUrl::ConsumesCommandline(options.urls())) {
-    if (auto *tidal = dynamic_cast<TidalService *>(streaming_services_->ServiceByName("Tidal"))) {
-      tidal->AuthorizationUrlReceived(TidalLoginUrl::Find(options.urls()));
-    }
-    return;
-  }
-  if (!options.urls().empty()) {
-    Settings settings;
-    settings.BeginGroup(BehaviourSettings::kSettingsGroup);
-    const auto add_mode = static_cast<BehaviourSettings::AddBehaviour>(
-        settings.IntValue(BehaviourSettings::kDoubleClickAddMode, static_cast<int>(BehaviourSettings::kDefaultDoubleClickAddMode)));
-    const auto play_mode = static_cast<BehaviourSettings::PlayBehaviour>(
-        settings.IntValue(BehaviourSettings::kDoubleClickPlayMode, static_cast<int>(BehaviourSettings::kDefaultDoubleClickPlayMode)));
-    const bool playing = player_ && player_->GetState() == GstEngine::State::Playing;
-    const CollectionBehaviour::Plan plan =
-        CommandlineUrlPlan::FromOptions(options.url_list_action(), options.player_action(), add_mode, play_mode, playing);
-    if (plan.destination == CollectionBehaviour::Destination::New) {
-      playlist_manager_->New(CommandlineUrlPlan::NewPlaylistName(options.playlist_name()));
-    } else if (plan.clear_current) {
-      playlist_manager_->ClearCurrent();
-    }
-    playlist_manager_->InsertUrls(options.urls(), -1, plan.should_play, plan.queue == CollectionBehaviour::QueueMode::Append,
-                                 plan.queue == CollectionBehaviour::QueueMode::Next);
-  }
-  switch (options.player_action()) {
-    case CommandlineOptions::PlayerAction::Play:
-      if (!CommandlineUrlPlan::SkipStandalonePlay(!options.urls().empty(), options.player_action())) {
-        player_->Play();
-      }
-      break;
-    case CommandlineOptions::PlayerAction::PlayPause:
-      player_->PlayPause();
-      break;
-    case CommandlineOptions::PlayerAction::Pause:
-      player_->Pause();
-      break;
-    case CommandlineOptions::PlayerAction::Stop:
-      player_->Stop();
-      break;
-    case CommandlineOptions::PlayerAction::Previous:
-      player_->Previous();
-      break;
-    case CommandlineOptions::PlayerAction::Next:
-      player_->Next();
-      break;
-    case CommandlineOptions::PlayerAction::RestartOrPrevious:
-      player_->RestartOrPrevious();
-      break;
-    case CommandlineOptions::PlayerAction::StopAfterCurrent:
-      player_->StopAfterCurrent();
-      break;
-    case CommandlineOptions::PlayerAction::PlayPlaylist:
-      player_->PlayPlaylist(options.playlist_name());
-      break;
-    case CommandlineOptions::PlayerAction::ResizeWindow:
-      RaiseRequested.Emit();
-      break;
-    default:
-      break;
-  }
-  if (!options.log_levels().empty()) {
-    logging::SetLevels(options.log_levels());
-  }
-  if (options.set_volume() >= 0) {
-    player_->SetVolume(static_cast<unsigned>(options.set_volume()));
-  }
-  if (options.volume_modifier() != 0) {
-    player_->SetVolume(static_cast<unsigned>(CommandlineVolume::Apply(static_cast<int>(player_->GetVolume()), options.volume_modifier())));
-  }
-  if (options.seek_to() >= 0) {
-    player_->SeekTo(options.seek_to());
-  }
-  if (options.seek_by() != 0) {
-    player_->SeekTo(player_->engine()->position_nanosec() / 1000000000LL + options.seek_by());
-  }
-  if (options.play_track_at() >= 0) {
-    player_->PlayAt(options.play_track_at());
-  }
-  if (options.show_osd()) {
-    player_->ShowOSD();
-  }
-  if (options.toggle_pretty_osd()) {
-    player_->TogglePrettyOSD();
-  }
-}
-
-Queue *Application::queue() const { return PlaylistQueueScope::For(playlist_manager_ ? playlist_manager_->current() : nullptr, queue_.get()); }
-
-void Application::BindPlayerQueue() {
-  if (player_) {
-    player_->SetQueue(PlaylistQueueScope::For(playlist_manager_ ? playlist_manager_->active() : nullptr, queue_.get()));
-  }
-}
-
-void Application::WatchPlaylistOsd(Playlist *playlist) {
-  ++playlist_osd_gen_;
-  const int gen = playlist_osd_gen_;
-  if (!playlist) {
-    return;
-  }
-  playlist->RepeatModeChanged.Connect([this, gen]() {
-    if (gen != playlist_osd_gen_ || !playlist_manager_->current()) {
-      return;
-    }
-    osd_->RepeatModeChanged(playlist_manager_->current()->repeat_mode());
-  });
-  playlist->ShuffleModeChanged.Connect([this, gen]() {
-    if (gen != playlist_osd_gen_ || !playlist_manager_->current()) {
-      return;
-    }
-    osd_->ShuffleModeChanged(playlist_manager_->current()->shuffle_mode());
-  });
-}
+SharedPtr<TagReaderClient> Application::tagreader_client() const { return p_->tagreader_client_.ptr(); }
+SharedPtr<Database> Application::database() const { return p_->database_.ptr(); }
+SharedPtr<TaskManager> Application::task_manager() const { return p_->task_manager_.ptr(); }
+SharedPtr<Player> Application::player() const { return p_->player_.ptr(); }
+SharedPtr<NetworkAccessManager> Application::network() const { return p_->network_.ptr(); }
+SharedPtr<DeviceFinders> Application::device_finders() const { return p_->device_finders_.ptr(); }
+SharedPtr<UrlHandlers> Application::url_handlers() const { return p_->url_handlers_.ptr(); }
+SharedPtr<DeviceManager> Application::device_manager() const { return p_->device_manager_.ptr(); }
+SharedPtr<CollectionLibrary> Application::collection() const { return p_->collection_.ptr(); }
+SharedPtr<CollectionBackend> Application::collection_backend() const { return collection()->backend(); }
+CollectionModel *Application::collection_model() const { return collection()->model(); }
+SharedPtr<AlbumCoverLoader> Application::albumcover_loader() const { return p_->albumcover_loader_.ptr(); }
+SharedPtr<CoverProviders> Application::cover_providers() const { return p_->cover_providers_.ptr(); }
+SharedPtr<CurrentAlbumCoverLoader> Application::current_albumcover_loader() const { return p_->current_albumcover_loader_.ptr(); }
+SharedPtr<LyricsProviders> Application::lyrics_providers() const { return p_->lyrics_providers_.ptr(); }
+SharedPtr<PlaylistBackend> Application::playlist_backend() const { return p_->playlist_backend_.ptr(); }
+SharedPtr<PlaylistManager> Application::playlist_manager() const { return p_->playlist_manager_.ptr(); }
+SharedPtr<StreamingServices> Application::streaming_services() const { return p_->streaming_services_.ptr(); }
+SharedPtr<RadioServices> Application::radio_services() const { return p_->radio_services_.ptr(); }
+#ifdef HAVE_MOODBAR
+SharedPtr<MoodbarController> Application::moodbar_controller() const { return p_->moodbar_controller_.ptr(); }
+SharedPtr<MoodbarLoader> Application::moodbar_loader() const { return p_->moodbar_loader_.ptr(); }
+#endif
+#ifdef HAVE_WAVEFORM
+SharedPtr<WaveformController> Application::waveform_controller() const { return p_->waveform_controller_.ptr(); }
+SharedPtr<WaveformLoader> Application::waveform_loader() const { return p_->waveform_loader_.ptr(); }
+#endif
+SharedPtr<AudioScrobbler> Application::scrobbler() const { return p_->scrobbler_.ptr(); }

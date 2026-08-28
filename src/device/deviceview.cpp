@@ -1,502 +1,478 @@
-#include "device/deviceview.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "collection/collectiongrouping.h"
+#include "config.h"
+
+#include <memory>
+
+#include <QApplication>
+#include <QObject>
+#include <QWidget>
+#include <QAbstractItemView>
+#include <QSortFilterProxyModel>
+#include <QItemSelectionModel>
+#include <QStyleOptionViewItem>
+#include <QMimeData>
+#include <QAction>
+#include <QVariant>
+#include <QFont>
+#include <QFontMetrics>
+#include <QString>
+#include <QStringList>
+#include <QPixmap>
+#include <QPainter>
+#include <QPalette>
+#include <QRect>
+#include <QStyle>
+#include <QMenu>
+#include <QFlags>
+#include <QPushButton>
+#include <QMessageBox>
+#include <QtEvents>
+
+#include "includes/shared_ptr.h"
+#include "includes/scoped_ptr.h"
+#include "core/iconloader.h"
+#include "core/deletefiles.h"
+#include "core/mergedproxymodel.h"
+#include "core/mimedata.h"
+#include "core/musicstorage.h"
+#include "utilities/colorutils.h"
+#include "organize/organizedialog.h"
+#include "organize/organizeerrordialog.h"
+#include "collection/collectiondirectorymodel.h"
+#include "collection/collectionmodel.h"
 #include "collection/collectionitemdelegate.h"
-#include "collection/collectiontree.h"
-#include "collection/collectiontreeleft.h"
-#include "device/devicekeyboard.h"
-#include "device/devicedrag.h"
-#include "device/deviceviewlook.h"
-#include "translations/translations.h"
-#include "widgets/listboxkeyboard.h"
-#include "widgets/listboxkeyboardgtk.h"
-#include "widgets/listboxtreepressgtk.h"
+#include "devicelister.h"
+#include "connecteddevice.h"
+#include "devicemanager.h"
+#include "deviceproperties.h"
+#include "deviceview.h"
 
-#include <string>
+using namespace Qt::Literals::StringLiterals;
+using std::make_unique;
 
-DeviceView::DeviceView() {
-  widget_ = gtk_scrolled_window_new();
-  gtk_widget_set_vexpand(widget_, TRUE);
-  list_ = gtk_list_box_new();
-  gtk_widget_add_css_class(list_, "boxed-list");
-  gtk_list_box_set_selection_mode(GTK_LIST_BOX(list_), GTK_SELECTION_MULTIPLE);
-  gtk_scrolled_window_set_child(GTK_SCROLLED_WINDOW(widget_), list_);
-  ListBoxTreePressGtk::Attach(list_, this);
-  g_signal_connect(list_, "row-activated", G_CALLBACK(+[](GtkListBox *, GtkListBoxRow *row, gpointer data) {
-                     auto *self = static_cast<DeviceView *>(data);
-                     const char *kind = static_cast<const char *>(g_object_get_data(G_OBJECT(row), "row-kind"));
-                     if (kind && std::string(kind) == "back" && self->back_cb_) {
-                       self->back_cb_();
-                       return;
-                     }
-                     if (kind && std::string(kind) == "add-all" && self->add_all_cb_) {
-                       self->add_all_cb_();
-                       return;
-                     }
-                     auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));
-                     if (item) {
-                       const SongList songs = CollectionTree::SongsFromItem(item);
-                       if (self->songs_cb_ && !songs.empty()) {
-                         self->songs_cb_(songs);
-                       } else if (self->song_cb_ && !songs.empty()) {
-                         self->song_cb_(songs.front());
-                       }
-                       return;
-                     }
-                     if (auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(row), "song"))) {
-                       if (self->song_cb_) {
-                         self->song_cb_(*song);
-                       }
-                       return;
-                     }
-                     if (auto *device = static_cast<ConnectedDevice *>(g_object_get_data(G_OBJECT(row), "device"))) {
-                       self->RequestOpenDevice(device->unique_id);
-                     }
-                   }),
-                   this);
-  GtkEventController *keys = gtk_event_controller_key_new();
-  gtk_widget_add_controller(list_, keys);
-  gtk_widget_set_focusable(list_, TRUE);
-  g_signal_connect(keys, "key-pressed",
-                   G_CALLBACK((+[](GtkEventControllerKey *, guint keyval, guint, GdkModifierType state, gpointer data) -> gboolean {
-                     return static_cast<DeviceView *>(data)->OnKeyPressed(keyval, state);
-                   })),
-                   this);
-}
+const int DeviceItemDelegate::kIconPadding = 6;
 
-DeviceView::~DeviceView() {
-  ResetTypeAhead();
-  if (open_idle_) {
-    g_source_remove(open_idle_);
-    open_idle_ = 0;
-  }
-}
+DeviceItemDelegate::DeviceItemDelegate(QObject *parent) : CollectionItemDelegate(parent) {}
 
-void DeviceView::RequestOpenDevice(const std::string &id) {
-  if (id.empty() || !device_cb_ || DeviceKeyboard::ShouldCoalesceDeviceOpen(opening_device_, id)) {
+void DeviceItemDelegate::paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &idx) const {
+
+  // Is it a device or a collection item?
+  if (idx.data(DeviceManager::Role::Role_State).isNull()) {
+    CollectionItemDelegate::paint(painter, option, idx);
     return;
   }
-  opening_device_ = id;
-  if (open_idle_) {
-    return;
+
+  // Draw the background
+  const QWidget *widget = option.widget;
+  QStyle *style = widget->style() ? widget->style() : QApplication::style();
+  style->drawPrimitive(QStyle::PE_PanelItemViewItem, &option, painter, widget);
+
+  painter->save();
+
+  // Font for the status line
+  QFont status_font(option.font);
+
+#ifdef Q_OS_WIN32
+  status_font.setPointSize(status_font.pointSize() - 1);
+#else
+  status_font.setPointSize(status_font.pointSize() - 2);
+#endif
+
+  const int text_height = QFontMetrics(option.font).height() + QFontMetrics(status_font).height();
+
+  QRect line1(option.rect);
+  QRect line2(option.rect);
+  line1.setTop(line1.top() + (option.rect.height() - text_height) / 2);
+  line2.setTop(line1.top() + QFontMetrics(option.font).height());
+  line1.setLeft(line1.left() + DeviceManager::kDeviceIconSize + kIconPadding);
+  line2.setLeft(line2.left() + DeviceManager::kDeviceIconSize + kIconPadding);
+
+  // Change the color for selected items
+  if (option.state & QStyle::State_Selected) {
+    painter->setPen(option.palette.color(QPalette::HighlightedText));
   }
-  open_idle_ = g_idle_add(
-      +[](gpointer data) -> gboolean {
-        auto *self = static_cast<DeviceView *>(data);
-        self->open_idle_ = 0;
-        const std::string id = std::move(self->opening_device_);
-        self->opening_device_.clear();
-        if (self->device_cb_ && !id.empty()) {
-          self->device_cb_(id);
+
+  // Draw the icon
+  painter->drawPixmap(option.rect.topLeft(), idx.data(Qt::DecorationRole).value<QPixmap>());
+
+  // Draw the first line (device name)
+  painter->drawText(line1, Qt::AlignLeft | Qt::AlignTop, idx.data().toString());
+
+  // Draw the second line (status)
+  DeviceManager::State state = static_cast<DeviceManager::State>(idx.data(DeviceManager::Role_State).toInt());
+  QVariant progress = idx.data(DeviceManager::Role_UpdatingPercentage);
+  QString status_text;
+
+  if (progress.isValid()) {
+    status_text = tr("Updating %1%...").arg(progress.toInt());
+  }
+  else {
+    switch (state) {
+      case DeviceManager::State::Remembered:
+        status_text = tr("Not connected");
+        break;
+
+      case DeviceManager::State::NotMounted:
+        status_text = tr("Not mounted - double click to mount");
+        break;
+
+      case DeviceManager::State::NotConnected:
+        status_text = tr("Double click to open");
+        break;
+
+      case DeviceManager::State::Connected:{
+        QVariant song_count = idx.data(DeviceManager::Role_SongCount);
+        if (song_count.isValid()) {
+          int count = song_count.toInt();
+          status_text = tr("%1 song%2").arg(count).arg(count == 1 ? ""_L1 : "s"_L1);
         }
-        return G_SOURCE_REMOVE;
-      },
-      this);
-}
-
-void DeviceView::HandlePress(guint button, gint n_press, double x, double y, GdkModifierType state) {
-  GtkListBoxRow *row = ListBoxTreePressGtk::RowAtY(list_, y);
-  auto *device = row ? static_cast<ConnectedDevice *>(g_object_get_data(G_OBJECT(row), "device")) : nullptr;
-  if (DeviceKeyboard::ShouldOpenOnDoubleClick(button, n_press, device != nullptr)) {
-    RequestOpenDevice(device->unique_id);
-    return;
-  }
-  const CollectionTreeClick::Action action = CollectionTreeClick::FromPress(button, n_press, state);
-  if (action == CollectionTreeClick::Action::Enqueue) {
-    if (row && CollectionTreeClick::SelectRowBeforeEnqueue(gtk_list_box_row_is_selected(row))) {
-      ListBoxTreePressGtk::SelectRowIfNeeded(list_, row);
-    }
-    if (enqueue_) {
-      enqueue_(SelectedSongs());
-    }
-    return;
-  }
-  if (action != CollectionTreeClick::Action::ToggleExpand || !row || ListBoxTreePressGtk::OnExpandControl(list_, x, y)) {
-    return;
-  }
-  auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));
-  if (CollectionTreeClick::ShouldToggleFromRowClick(false, CollectionTree::IsExpandable(item))) {
-    ToggleExpanded(item);
-  }
-}
-
-void DeviceView::ResetTypeAhead() {
-  typeahead_.clear();
-  if (typeahead_timeout_) {
-    g_source_remove(typeahead_timeout_);
-    typeahead_timeout_ = 0;
-  }
-}
-
-const CollectionItem *DeviceView::SelectedItem() const {
-  GtkListBoxRow *row = gtk_list_box_get_selected_row(GTK_LIST_BOX(list_));
-  return row ? static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item")) : nullptr;
-}
-
-void DeviceView::SelectFocusItem() {
-  const CollectionItem *target = CollectionFocus::FindTarget(model_.root(), focus_);
-  if (!target) {
-    return;
-  }
-  for (GtkWidget *child = gtk_widget_get_first_child(list_); child; child = gtk_widget_get_next_sibling(child)) {
-    if (!GTK_IS_LIST_BOX_ROW(child)) {
-      continue;
-    }
-    auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(child), "item"));
-    if (item != target) {
-      continue;
-    }
-    gtk_list_box_unselect_all(GTK_LIST_BOX(list_));
-    gtk_list_box_select_row(GTK_LIST_BOX(list_), GTK_LIST_BOX_ROW(child));
-    gtk_widget_grab_focus(child);
-    return;
-  }
-}
-
-bool DeviceView::ApplyTreeLeft() {
-  const CollectionItem *item = SelectedItem();
-  if (!item) {
-    return false;
-  }
-  const bool expanded = CollectionTree::ShowChildren(item, false, expanded_);
-  const CollectionTreeLeft::Action action = CollectionTreeLeft::FromItem(item, expanded);
-  if (action == CollectionTreeLeft::Action::None) {
-    return false;
-  }
-  const CollectionItem *focus = CollectionTreeLeft::FocusItem(item, action);
-  const CollectionItem *parent = CollectionTreeLeft::SelectableParent(item);
-  const bool parent_expanded = CollectionTree::ShowChildren(parent, false, expanded_);
-  const CollectionItem *collapse = CollectionTreeLeft::CollapseItem(item, action, parent_expanded);
-  CollectionFocus::Capture(focus, &focus_);
-  if (collapse) {
-    ToggleExpanded(collapse);
-  }
-  SelectFocusItem();
-  return true;
-}
-
-void DeviceView::ShowSelectedMenu() {
-  GtkListBoxRow *row = gtk_list_box_get_selected_row(GTK_LIST_BOX(list_));
-  if (!row) {
-    return;
-  }
-  auto *device = static_cast<ConnectedDevice *>(g_object_get_data(G_OBJECT(row), "device"));
-  auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));
-  auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(row), "song"));
-  const DeviceKeyboard::MenuTarget target = DeviceKeyboard::MenuForSelection(device != nullptr, item != nullptr || song != nullptr);
-  if (target == DeviceKeyboard::MenuTarget::Device && device_menu_cb_) {
-    device_menu_cb_(*device);
-    return;
-  }
-  if (target != DeviceKeyboard::MenuTarget::Song || !song_menu_cb_) {
-    return;
-  }
-  if (item) {
-    const SongList songs = CollectionTree::SongsFromItem(item);
-    if (!songs.empty()) {
-      song_menu_cb_(songs.front());
-    }
-    return;
-  }
-  if (song) {
-    song_menu_cb_(*song);
-  }
-}
-
-gboolean DeviceView::OnKeyPressed(guint keyval, GdkModifierType state) {
-  if (DeviceKeyboard::IsMenuTrigger(keyval, static_cast<unsigned>(state))) {
-    ShowSelectedMenu();
-    return TRUE;
-  }
-  const DeviceKeyboard::Action action = DeviceKeyboard::FromKey(keyval);
-  if (action == DeviceKeyboard::Action::Activate) {
-    ListBoxKeyboardGtk::ActivateSelected(list_);
-    return TRUE;
-  }
-  if (action == DeviceKeyboard::Action::Collapse && ApplyTreeLeft()) {
-    return TRUE;
-  }
-  if (action == DeviceKeyboard::Action::Expand) {
-    const CollectionItem *item = SelectedItem();
-    if (CollectionTree::IsExpandable(item) && !CollectionTree::ShowChildren(item, false, expanded_)) {
-      CollectionFocus::Capture(item, &focus_);
-      ToggleExpanded(item);
-      SelectFocusItem();
-    }
-    return CollectionTree::IsExpandable(item) ? TRUE : FALSE;
-  }
-  if (action == DeviceKeyboard::Action::Back && back_cb_) {
-    back_cb_();
-    return TRUE;
-  }
-  if (action == DeviceKeyboard::Action::MoveUp || action == DeviceKeyboard::Action::MoveDown || action == DeviceKeyboard::Action::Home ||
-      action == DeviceKeyboard::Action::End) {
-    ListBoxKeyboardGtk::SelectIndex(list_, ListBoxKeyboard::NextIndex(ListBoxKeyboardGtk::SelectedIndex(list_),
-                                                                      ListBoxKeyboardGtk::Count(list_), DeviceKeyboard::MoveAction(action)));
-    return TRUE;
-  }
-  if (action == DeviceKeyboard::Action::Escape) {
-    ResetTypeAhead();
-    return TRUE;
-  }
-  const gunichar ch = gdk_keyval_to_unicode(keyval);
-  if (ch && g_unichar_isprint(ch)) {
-    gchar utf8[8] = {};
-    typeahead_.append(utf8, static_cast<size_t>(g_unichar_to_utf8(ch, utf8)));
-    if (typeahead_timeout_) {
-      g_source_remove(typeahead_timeout_);
-    }
-    typeahead_timeout_ = g_timeout_add(1000, [](gpointer data) -> gboolean {
-      auto *self = static_cast<DeviceView *>(data);
-      self->typeahead_timeout_ = 0;
-      self->typeahead_.clear();
-      return G_SOURCE_REMOVE;
-    }, this);
-    const int index = ListBoxKeyboard::FirstPrefixIndex(ListBoxKeyboardGtk::Labels(list_), typeahead_);
-    if (index >= 0) {
-      ListBoxKeyboardGtk::SelectIndex(list_, index);
-    }
-    return TRUE;
-  }
-  return FALSE;
-}
-
-void DeviceView::AttachMenu(GtkWidget *row) {
-  GtkGesture *menu = gtk_gesture_click_new();
-  gtk_gesture_single_set_button(GTK_GESTURE_SINGLE(menu), GDK_BUTTON_SECONDARY);
-  gtk_widget_add_controller(row, GTK_EVENT_CONTROLLER(menu));
-  g_signal_connect(menu, "pressed", G_CALLBACK(+[](GtkGestureClick *click, gint, gdouble, gdouble, gpointer data) {
-                     auto *self = static_cast<DeviceView *>(data);
-                     GtkWidget *row = gtk_event_controller_get_widget(GTK_EVENT_CONTROLLER(click));
-                     if (GTK_IS_LIST_BOX_ROW(row) && !gtk_list_box_row_is_selected(GTK_LIST_BOX_ROW(row))) {
-                       gtk_list_box_unselect_all(GTK_LIST_BOX(self->list_));
-                       gtk_list_box_select_row(GTK_LIST_BOX(self->list_), GTK_LIST_BOX_ROW(row));
-                     }
-                     if (auto *device = static_cast<ConnectedDevice *>(g_object_get_data(G_OBJECT(row), "device"))) {
-                       if (self->device_menu_cb_) {
-                         self->device_menu_cb_(*device);
-                       }
-                     } else if (auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"))) {
-                       const SongList songs = CollectionTree::SongsFromItem(item);
-                       if (self->song_menu_cb_ && !songs.empty()) {
-                         self->song_menu_cb_(songs.front());
-                       }
-                     } else if (auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(row), "song"))) {
-                       if (self->song_menu_cb_) {
-                         self->song_menu_cb_(*song);
-                       }
-                     }
-                   }),
-                   this);
-}
-
-void DeviceView::Clear() {
-  GtkWidget *child = gtk_widget_get_first_child(list_);
-  while (child) {
-    GtkWidget *next = gtk_widget_get_next_sibling(child);
-    gtk_list_box_remove(GTK_LIST_BOX(list_), child);
-    child = next;
-  }
-}
-
-void DeviceView::ShowDevices(const std::vector<ConnectedDevice> &devices) {
-  Clear();
-  if (devices.empty()) {
-    GtkWidget *row = gtk_list_box_row_new();
-    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), gtk_label_new(Translations::CStr("No devices found")));
-    gtk_list_box_append(GTK_LIST_BOX(list_), row);
-    return;
-  }
-  for (const ConnectedDevice &device : devices) {
-    GtkWidget *row = gtk_list_box_row_new();
-    GtkWidget *row_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-    gtk_widget_set_margin_start(row_box, 12);
-    gtk_widget_set_margin_end(row_box, 12);
-    gtk_widget_set_margin_top(row_box, 8);
-    gtk_widget_set_margin_bottom(row_box, 8);
-    GtkWidget *icon = gtk_image_new_from_icon_name(DeviceViewLook::IconName(device));
-    gtk_image_set_pixel_size(GTK_IMAGE(icon), DeviceViewLook::kIconSize);
-    gtk_widget_set_valign(icon, GTK_ALIGN_CENTER);
-    GtkWidget *text = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-    gtk_widget_set_hexpand(text, TRUE);
-    GtkWidget *primary = gtk_label_new(device.friendly_name.c_str());
-    gtk_widget_set_halign(primary, GTK_ALIGN_START);
-    gtk_widget_add_css_class(primary, "heading");
-    GtkWidget *status = gtk_label_new(DeviceViewLook::RowStatusText(device, device.song_count, device.updating_percent, device.remembered).c_str());
-    gtk_widget_add_css_class(status, "dim-label");
-    gtk_widget_set_halign(status, GTK_ALIGN_START);
-    gtk_label_set_ellipsize(GTK_LABEL(status), PANGO_ELLIPSIZE_END);
-    gtk_box_append(GTK_BOX(text), primary);
-    gtk_box_append(GTK_BOX(text), status);
-    gtk_box_append(GTK_BOX(row_box), icon);
-    gtk_box_append(GTK_BOX(row_box), text);
-    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), row_box);
-    auto *copy = new ConnectedDevice(device);
-    g_object_set_data_full(G_OBJECT(row), "device", copy, [](gpointer p) { delete static_cast<ConnectedDevice *>(p); });
-    AttachMenu(row);
-    gtk_list_box_append(GTK_LIST_BOX(list_), row);
-  }
-}
-
-void DeviceView::ToggleExpanded(const CollectionItem *item) {
-  if (CollectionTree::Toggle(&expanded_, item) || CollectionTree::IsExpandable(item)) {
-    RebuildSongs();
-  }
-}
-
-void DeviceView::AppendItem(const CollectionItem *item, int depth) {
-  if (!item) {
-    return;
-  }
-  const bool expandable = CollectionTree::IsExpandable(item);
-  const bool expanded = CollectionTree::ShowChildren(item, false, expanded_);
-  GtkWidget *row = gtk_list_box_row_new();
-  GtkWidget *row_box = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 8);
-  gtk_widget_set_margin_start(row_box, 8 + depth * 12);
-  gtk_widget_set_margin_end(row_box, 8);
-  gtk_widget_set_margin_top(row_box, 4);
-  gtk_widget_set_margin_bottom(row_box, 4);
-  if (expandable) {
-    GtkWidget *toggle = gtk_button_new_from_icon_name(expanded ? "pan-down-symbolic" : "pan-end-symbolic");
-    gtk_widget_add_css_class(toggle, "flat");
-    gtk_widget_add_css_class(toggle, "circular");
-    gtk_widget_set_tooltip_text(toggle, expanded ? Translations::CStr("Collapse") : Translations::CStr("Expand"));
-    g_object_set_data(G_OBJECT(toggle), "item", const_cast<CollectionItem *>(item));
-    g_signal_connect(toggle, "clicked", G_CALLBACK(+[](GtkButton *button, gpointer data) {
-                       auto *self = static_cast<DeviceView *>(data);
-                       self->ToggleExpanded(static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(button), "item")));
-                     }),
-                     this);
-    gtk_box_append(GTK_BOX(row_box), toggle);
-  }
-  GtkWidget *icon = gtk_image_new_from_icon_name(DeviceViewLook::ItemIconName(item));
-  gtk_image_set_pixel_size(GTK_IMAGE(icon), 16);
-  gtk_widget_set_valign(icon, GTK_ALIGN_CENTER);
-  gtk_box_append(GTK_BOX(row_box), icon);
-  GtkWidget *box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
-  gtk_widget_set_hexpand(box, TRUE);
-  GtkWidget *primary = gtk_label_new(CollectionItemDelegate::PrimaryText(item).c_str());
-  gtk_widget_set_halign(primary, GTK_ALIGN_START);
-  if (expandable) {
-    gtk_widget_add_css_class(primary, "heading");
-  }
-  gtk_box_append(GTK_BOX(box), primary);
-  const std::string secondary = CollectionItemDelegate::SecondaryText(item);
-  if (!secondary.empty()) {
-    GtkWidget *sub = gtk_label_new(secondary.c_str());
-    gtk_widget_add_css_class(sub, "dim-label");
-    gtk_widget_set_halign(sub, GTK_ALIGN_START);
-    gtk_box_append(GTK_BOX(box), sub);
-  }
-  gtk_box_append(GTK_BOX(row_box), box);
-  gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(row), row_box);
-  g_object_set_data(G_OBJECT(row), "item", const_cast<CollectionItem *>(item));
-  const SongList songs = CollectionTree::SongsFromItem(item);
-  if (!songs.empty()) {
-    auto *copy = new Song(songs.front());
-    g_object_set_data_full(G_OBJECT(row), "song", copy, [](gpointer p) { delete static_cast<Song *>(p); });
-    SetupRowDrag(row, songs.front());
-  }
-  AttachMenu(row);
-  gtk_list_box_append(GTK_LIST_BOX(list_), row);
-  if (expanded) {
-    for (const auto &child : item->children) {
-      AppendItem(child.get(), depth + 1);
-    }
-  }
-}
-
-void DeviceView::ShowSongs(const SongList &songs) {
-  songs_ = songs;
-  RebuildSongs();
-}
-
-void DeviceView::RebuildSongs() {
-  Clear();
-  GtkWidget *back = gtk_list_box_row_new();
-  gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(back), gtk_label_new(Translations::CStr("← Devices")));
-  g_object_set_data(G_OBJECT(back), "row-kind", const_cast<char *>("back"));
-  gtk_list_box_append(GTK_LIST_BOX(list_), back);
-  GtkWidget *add_all = gtk_list_box_row_new();
-  gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(add_all), gtk_label_new(Translations::CStr("Add all to playlist")));
-  g_object_set_data(G_OBJECT(add_all), "row-kind", const_cast<char *>("add-all"));
-  gtk_list_box_append(GTK_LIST_BOX(list_), add_all);
-  CollectionGrouping::Grouping grouping;
-  grouping.first = CollectionGrouping::GroupBy::AlbumArtist;
-  grouping.second = CollectionGrouping::GroupBy::Album;
-  grouping.third = CollectionGrouping::GroupBy::None;
-  model_.Reset(songs_, grouping, false, false, false);
-  if (songs_.empty()) {
-    GtkWidget *empty = gtk_list_box_row_new();
-    gtk_list_box_row_set_child(GTK_LIST_BOX_ROW(empty), gtk_label_new(Translations::CStr("No songs found on this device")));
-    gtk_list_box_append(GTK_LIST_BOX(list_), empty);
-    return;
-  }
-  if (model_.root()) {
-    for (const auto &child : model_.root()->children) {
-      AppendItem(child.get(), 0);
-    }
-  }
-}
-
-void DeviceView::SetupRowDrag(GtkWidget *row, const Song &song) {
-  GtkDragSource *src = gtk_drag_source_new();
-  gtk_drag_source_set_actions(src, GDK_ACTION_COPY);
-  auto *copy = new Song(song);
-  g_object_set_data_full(G_OBJECT(src), "song", copy, [](gpointer p) { delete static_cast<Song *>(p); });
-  g_signal_connect(src, "prepare", G_CALLBACK((+[](GtkDragSource *s, double, double, gpointer data) -> GdkContentProvider * {
-                     auto *self = static_cast<DeviceView *>(data);
-                     auto *dragged = static_cast<Song *>(g_object_get_data(G_OBJECT(s), "song"));
-                     SongList songs = dragged ? SongList{*dragged} : SongList{};
-                     for (const Song &selected : self->SelectedSongs()) {
-                       if (dragged && selected.url() == dragged->url()) {
-                         songs = self->SelectedSongs();
-                         break;
-                       }
-                     }
-                     const std::string payload = DeviceDrag::DragPayload(songs);
-                     if (payload.empty()) {
-                       return nullptr;
-                     }
-                     GValue v = G_VALUE_INIT;
-                     g_value_init(&v, G_TYPE_STRING);
-                     g_value_set_string(&v, payload.c_str());
-                     GdkContentProvider *provider = gdk_content_provider_new_for_value(&v);
-                     g_value_unset(&v);
-                     return provider;
-                   })),
-                   this);
-  gtk_widget_add_controller(row, GTK_EVENT_CONTROLLER(src));
-}
-
-const ConnectedDevice *DeviceView::SelectedDevice() const {
-  const ConnectedDevice *selected = nullptr;
-  gtk_list_box_selected_foreach(
-      GTK_LIST_BOX(list_),
-      [](GtkListBox *, GtkListBoxRow *row, gpointer data) {
-        if (auto *device = static_cast<ConnectedDevice *>(g_object_get_data(G_OBJECT(row), "device"))) {
-          *static_cast<const ConnectedDevice **>(data) = device;
+        else {
+          status_text = idx.data(DeviceManager::Role_MountPath).toString();
         }
-      },
-      &selected);
-  return selected;
+        break;
+      }
+    }
+  }
+
+  if (option.state & QStyle::State_Selected) {
+    painter->setPen(option.palette.color(QPalette::HighlightedText));
+  }
+  else {
+    if (Utilities::IsColorDark(option.palette.color(QPalette::Window))) {
+      painter->setPen(option.palette.color(QPalette::Midlight).lighter().lighter());
+    }
+    else {
+      painter->setPen(option.palette.color(QPalette::Dark));
+    }
+  }
+
+  painter->setFont(status_font);
+  painter->drawText(line2, Qt::AlignLeft | Qt::AlignTop, status_text);
+
+  painter->restore();
+
 }
 
-SongList DeviceView::SelectedSongs() const {
+DeviceView::DeviceView(QWidget *parent)
+    : AutoExpandingTreeView(parent),
+      merged_model_(nullptr),
+      sort_model_(nullptr),
+      properties_dialog_(new DeviceProperties),
+      device_menu_(nullptr),
+      eject_action_(nullptr),
+      forget_action_(nullptr),
+      properties_action_(nullptr),
+      collection_menu_(nullptr),
+      load_action_(nullptr),
+      add_to_playlist_action_(nullptr),
+      open_in_new_playlist_(nullptr),
+      organize_action_(nullptr),
+      delete_action_(nullptr) {
+
+  setItemDelegate(new DeviceItemDelegate(this));
+  SetExpandOnReset(false);
+  setAttribute(Qt::WA_MacShowFocusRect, false);
+  setHeaderHidden(true);
+  setAllColumnsShowFocus(true);
+  setDragEnabled(true);
+  setDragDropMode(QAbstractItemView::DragOnly);
+  setSelectionMode(QAbstractItemView::ExtendedSelection);
+}
+
+DeviceView::~DeviceView() = default;
+
+void DeviceView::Init(const SharedPtr<TaskManager> task_manager,
+                      const SharedPtr<TagReaderClient> tagreader_client,
+                      const SharedPtr<DeviceManager> device_manager,
+                      CollectionDirectoryModel *collection_directory_model) {
+
+  task_manager_ = task_manager;
+  tagreader_client_ = tagreader_client;
+  device_manager_ = device_manager;
+
+  QObject::connect(&*device_manager_, &DeviceManager::DeviceConnected, this, &DeviceView::DeviceConnected);
+  QObject::connect(&*device_manager_, &DeviceManager::DeviceDisconnected, this, &DeviceView::DeviceDisconnected);
+
+  sort_model_ = new QSortFilterProxyModel(this);
+  sort_model_->setSourceModel(&*device_manager_);
+  sort_model_->setDynamicSortFilter(true);
+  sort_model_->setSortCaseSensitivity(Qt::CaseInsensitive);
+  sort_model_->sort(0);
+
+  merged_model_ = new MergedProxyModel(this);
+  merged_model_->setSourceModel(sort_model_);
+  setModel(merged_model_);
+
+  QObject::connect(merged_model_, &MergedProxyModel::SubModelReset, this, &AutoExpandingTreeView::RecursivelyExpandSlot);
+
+  properties_dialog_->Init(device_manager_);
+
+  organize_dialog_ = make_unique<OrganizeDialog>(task_manager, tagreader_client, nullptr, this);
+  organize_dialog_->SetDestinationModel(collection_directory_model);
+
+}
+
+void DeviceView::contextMenuEvent(QContextMenuEvent *e) {
+
+  if (!device_menu_) {
+    device_menu_ = new QMenu(this);
+    collection_menu_ = new QMenu(this);
+
+    // Device menu
+    eject_action_ = device_menu_->addAction(IconLoader::Load(u"media-eject"_s), tr("Safely remove device"), this, &DeviceView::Unmount);
+    forget_action_ = device_menu_->addAction(IconLoader::Load(u"list-remove"_s), tr("Forget device"), this, &DeviceView::Forget);
+    device_menu_->addSeparator();
+    properties_action_ = device_menu_->addAction(IconLoader::Load(u"configure"_s), tr("Device properties..."), this, &DeviceView::Properties);
+
+    // Collection menu
+    add_to_playlist_action_ = collection_menu_->addAction(IconLoader::Load(u"media-playback-start"_s), tr("Append to current playlist"), this, &DeviceView::AddToPlaylist);
+    load_action_ = collection_menu_->addAction(IconLoader::Load(u"media-playback-start"_s), tr("Replace current playlist"), this, &DeviceView::Load);
+    open_in_new_playlist_ = collection_menu_->addAction(IconLoader::Load(u"document-new"_s), tr("Open in new playlist"), this, &DeviceView::OpenInNewPlaylist);
+
+    collection_menu_->addSeparator();
+    organize_action_ = collection_menu_->addAction(IconLoader::Load(u"edit-copy"_s), tr("Copy to collection..."), this, &DeviceView::Organize);
+    delete_action_ = collection_menu_->addAction(IconLoader::Load(u"edit-delete"_s), tr("Delete from device..."), this, &DeviceView::Delete);
+  }
+
+  menu_index_ = currentIndex();
+
+  const QModelIndex device_index = MapToDevice(menu_index_);
+  const QModelIndex collection_index = MapToCollection(menu_index_);
+
+  if (device_index.isValid()) {
+    const bool is_plugged_in = device_manager_->GetLister(device_index);
+    const bool is_remembered = device_manager_->GetDatabaseId(device_index) != -1;
+
+    forget_action_->setEnabled(is_remembered);
+    eject_action_->setEnabled(is_plugged_in);
+
+    device_menu_->popup(e->globalPos());
+  }
+  else if (collection_index.isValid()) {
+    const QModelIndex parent_device_index = FindParentDevice(menu_index_);
+
+    bool is_filesystem_device = false;
+    if (parent_device_index.isValid()) {
+      SharedPtr<ConnectedDevice> device = device_manager_->GetConnectedDevice(parent_device_index);
+      if (device && !device->LocalPath().isEmpty()) is_filesystem_device = true;
+    }
+
+    organize_action_->setEnabled(is_filesystem_device);
+
+    collection_menu_->popup(e->globalPos());
+  }
+
+}
+
+QModelIndex DeviceView::MapToDevice(const QModelIndex &merged_model_index) const {
+
+  QModelIndex sort_model_index = merged_model_->mapToSource(merged_model_index);
+  if (sort_model_index.model() != sort_model_) return QModelIndex();
+  return sort_model_->mapToSource(sort_model_index);
+
+}
+
+QModelIndex DeviceView::FindParentDevice(const QModelIndex &merged_model_index) const {
+
+  QModelIndex idx = merged_model_->FindSourceParent(merged_model_index);
+  if (idx.model() != sort_model_) return QModelIndex();
+  return sort_model_->mapToSource(idx);
+
+}
+
+QModelIndex DeviceView::MapToCollection(const QModelIndex &merged_model_index) const {
+
+  QModelIndex sort_model_index = merged_model_->mapToSource(merged_model_index);
+  if (const QSortFilterProxyModel *sort_model = qobject_cast<const QSortFilterProxyModel*>(sort_model_index.model())) {
+    return sort_model->mapToSource(sort_model_index);
+  }
+  return QModelIndex();
+
+}
+
+void DeviceView::Connect() {
+  QModelIndex device_idx = MapToDevice(menu_index_);
+  device_manager_->data(device_idx, MusicStorage::Role_StorageForceConnect);
+}
+
+void DeviceView::DeviceConnected(const QModelIndex &idx) {
+
+  if (!idx.isValid()) return;
+
+  SharedPtr<ConnectedDevice> device = device_manager_->GetConnectedDevice(idx);
+  if (!device) return;
+
+  QModelIndex sort_idx = sort_model_->mapFromSource(idx);
+  if (!sort_idx.isValid()) return;
+
+  QSortFilterProxyModel *sort_model = new QSortFilterProxyModel(device->collection_model());
+  sort_model->setSourceModel(device->collection_model());
+  sort_model->setSortRole(CollectionModel::Role_SortText);
+  sort_model->setDynamicSortFilter(true);
+  sort_model->sort(0);
+  merged_model_->AddSubModel(sort_idx, sort_model);
+
+  expand(menu_index_);
+
+}
+
+void DeviceView::DeviceDisconnected(const QModelIndex &idx) {
+  if (!idx.isValid()) return;
+  merged_model_->RemoveSubModel(sort_model_->mapFromSource(idx));
+}
+
+void DeviceView::Forget() {
+
+  QModelIndex device_idx = MapToDevice(menu_index_);
+  QString unique_id = device_manager_->data(device_idx, DeviceManager::Role_UniqueId).toString();
+  if (device_manager_->GetLister(device_idx) && device_manager_->GetLister(device_idx)->AskForScan(unique_id)) {
+    ScopedPtr<QMessageBox> dialog(new QMessageBox(
+        QMessageBox::Question, tr("Forget device"),
+        tr("Forgetting a device will remove it from this list and Strawberry will have to rescan all the songs again next time you connect it."),
+        QMessageBox::Cancel, this));
+    QPushButton *forget = dialog->addButton(tr("Forget device"), QMessageBox::DestructiveRole);
+    dialog->exec();
+
+    if (dialog->clickedButton() != forget) return;
+  }
+
+  device_manager_->Forget(device_idx);
+
+}
+
+void DeviceView::Properties() {
+  properties_dialog_->ShowDevice(MapToDevice(menu_index_));
+}
+
+void DeviceView::mouseDoubleClickEvent(QMouseEvent *e) {
+
+  AutoExpandingTreeView::mouseDoubleClickEvent(e);
+
+  QModelIndex merged_index = indexAt(e->pos());
+  QModelIndex device_index = MapToDevice(merged_index);
+  if (device_index.isValid()) {
+    if (!device_manager_->GetConnectedDevice(device_index)) {
+      menu_index_ = merged_index;
+      Connect();
+    }
+  }
+
+}
+
+SongList DeviceView::GetSelectedSongs() const {
+
+  const QModelIndexList selected_merged_indexes = selectionModel()->selectedRows();
   SongList songs;
-  gtk_list_box_selected_foreach(
-      GTK_LIST_BOX(list_),
-      [](GtkListBox *, GtkListBoxRow *row, gpointer data) {
-        auto *item = static_cast<const CollectionItem *>(g_object_get_data(G_OBJECT(row), "item"));
-        const SongList more = CollectionTree::SongsFromItem(item);
-        if (!more.empty()) {
-          static_cast<SongList *>(data)->insert(static_cast<SongList *>(data)->end(), more.begin(), more.end());
-          return;
-        }
-        if (auto *song = static_cast<Song *>(g_object_get_data(G_OBJECT(row), "song"))) {
-          static_cast<SongList *>(data)->push_back(*song);
-        }
-      },
-      &songs);
+  for (const QModelIndex &merged_index : selected_merged_indexes) {
+    QModelIndex collection_index = MapToCollection(merged_index);
+    if (!collection_index.isValid()) continue;
+
+    const CollectionModel *collection = qobject_cast<const CollectionModel*>(collection_index.model());
+    if (!collection) continue;
+
+    songs << collection->GetChildSongs(collection_index);
+  }
   return songs;
+
+}
+
+void DeviceView::Load() {
+
+  QMimeData *q_mimedata = model()->mimeData(selectedIndexes());
+  if (MimeData *mimedata = qobject_cast<MimeData*>(q_mimedata)) {
+    mimedata->clear_first_ = true;
+  }
+  Q_EMIT AddToPlaylistSignal(q_mimedata);
+
+}
+
+void DeviceView::AddToPlaylist() {
+  Q_EMIT AddToPlaylistSignal(model()->mimeData(selectedIndexes()));
+}
+
+void DeviceView::OpenInNewPlaylist() {
+
+  QMimeData *q_mimedata = model()->mimeData(selectedIndexes());
+  if (MimeData *mimedata = qobject_cast<MimeData*>(q_mimedata)) {
+    mimedata->open_in_new_playlist_ = true;
+  }
+  Q_EMIT AddToPlaylistSignal(q_mimedata);
+
+}
+
+void DeviceView::Delete() {
+
+  QModelIndexList selected_indexes = selectedIndexes();
+
+  if (selected_indexes.isEmpty()) return;
+
+  // Take the device of the first selected item
+  QModelIndex device_index = FindParentDevice(selected_indexes[0]);
+  if (!device_index.isValid()) return;
+
+  if (QMessageBox::question(this, tr("Delete files"), tr("These files will be deleted from the device, are you sure you want to continue?"), QMessageBox::Yes, QMessageBox::Cancel) != QMessageBox::Yes) {
+    return;
+  }
+
+  SharedPtr<MusicStorage> storage = device_index.data(MusicStorage::Role_Storage).value<SharedPtr<MusicStorage>>();
+
+  DeleteFiles *delete_files = new DeleteFiles(task_manager_, storage, false);
+  QObject::connect(delete_files, &DeleteFiles::Finished, this, &DeviceView::DeleteFinished);
+  delete_files->Start(GetSelectedSongs());
+
+}
+
+void DeviceView::Organize() {
+
+  const SongList songs = GetSelectedSongs();
+  QStringList filenames;
+  filenames.reserve(songs.count());
+  for (const Song &song : songs) {
+    filenames << song.url().toLocalFile();
+  }
+
+  organize_dialog_->SetCopy(true);
+  organize_dialog_->SetFilenames(filenames);
+  organize_dialog_->show();
+
+}
+
+void DeviceView::Unmount() {
+  QModelIndex device_idx = MapToDevice(menu_index_);
+  device_manager_->Unmount(device_idx);
+}
+
+void DeviceView::DeleteFinished(const SongList &songs_with_errors) {
+
+  if (songs_with_errors.isEmpty()) return;
+
+  OrganizeErrorDialog *dialog = new OrganizeErrorDialog(this);
+  dialog->setAttribute(Qt::WA_DeleteOnClose);
+  dialog->Show(OrganizeErrorDialog::OperationType::Delete, songs_with_errors);
+
+}
+
+bool DeviceView::CanRecursivelyExpand(const QModelIndex &idx) const {
+  // Never expand devices
+  return idx.parent().isValid();
 }

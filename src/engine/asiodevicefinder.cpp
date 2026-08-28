@@ -1,55 +1,96 @@
-#include "engine/asiodevicefinder.h"
+/*
+ * Strawberry Music Player
+ * Copyright 2024, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include <string>
-
-#ifdef _WIN32
 #include <windows.h>
-#endif
+#include <string.h>
+#include <atlconv.h>
+#include <winreg.h>
 
-AsioDeviceFinder::AsioDeviceFinder() : DeviceFinder("asio", {"asiosink"}) {}
+#include <QString>
+
+#include "asiodevicefinder.h"
+#include "enginedevice.h"
+#include "core/logging.h"
+
+using namespace Qt::Literals::StringLiterals;
+
+AsioDeviceFinder::AsioDeviceFinder() : DeviceFinder(u"asio"_s, { u"asiosink"_s }) {}
 
 EngineDeviceList AsioDeviceFinder::ListDevices() {
+
   EngineDeviceList devices;
-#ifdef _WIN32
+
   HKEY reg_key = nullptr;
-  if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"software\\asio", 0, KEY_READ, &reg_key) != ERROR_SUCCESS) {
-    return devices;
+  LSTATUS status = RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"software\\asio", 0, KEY_READ, &reg_key);
+
+  for (DWORD i = 0; status == ERROR_SUCCESS; i++) {
+    WCHAR key_name[256];
+    // RegEnumKeyW expects the buffer size in characters, not bytes.
+    status = RegEnumKeyW(reg_key, i, key_name, sizeof(key_name) / sizeof(key_name[0]));
+    if (status != ERROR_SUCCESS) break;  // Don't call GetDevice with a stale key_name on ERROR_NO_MORE_ITEMS / errors.
+    EngineDevice device = GetDevice(reg_key, key_name);
+    if (device.value.isValid()) {
+      devices.append(device);
+    }
   }
-  for (DWORD i = 0;; ++i) {
-    WCHAR key_name[256]{};
-    const LSTATUS status = RegEnumKeyW(reg_key, i, key_name, sizeof(key_name) / sizeof(key_name[0]));
-    if (status != ERROR_SUCCESS) {
-      break;
-    }
-    HKEY sub_key = nullptr;
-    if (RegOpenKeyExW(reg_key, key_name, 0, KEY_READ, &sub_key) != ERROR_SUCCESS) {
-      continue;
-    }
-    WCHAR clsid_data[256]{};
-    DWORD clsid_size = sizeof(clsid_data);
-    DWORD type = REG_SZ;
-    if (RegQueryValueExW(sub_key, L"clsid", nullptr, &type, reinterpret_cast<LPBYTE>(clsid_data), &clsid_size) == ERROR_SUCCESS) {
-      EngineDevice device;
-      const int needed = WideCharToMultiByte(CP_UTF8, 0, key_name, -1, nullptr, 0, nullptr, nullptr);
-      std::string name(needed > 0 ? static_cast<size_t>(needed - 1) : 0, '\0');
-      if (needed > 1) {
-        WideCharToMultiByte(CP_UTF8, 0, key_name, -1, name.data(), needed, nullptr, nullptr);
-      }
-      device.description = name;
-      const int id_needed = WideCharToMultiByte(CP_UTF8, 0, clsid_data, -1, nullptr, 0, nullptr, nullptr);
-      std::string id(id_needed > 0 ? static_cast<size_t>(id_needed - 1) : 0, '\0');
-      if (id_needed > 1) {
-        WideCharToMultiByte(CP_UTF8, 0, clsid_data, -1, id.data(), id_needed, nullptr, nullptr);
-      }
-      device.value = id;
-      device.iconname = device.GuessIconName();
-      if (!device.value.empty()) {
-        devices.push_back(device);
-      }
-    }
-    RegCloseKey(sub_key);
+
+  if (reg_key) {
+    RegCloseKey(reg_key);
   }
-  RegCloseKey(reg_key);
-#endif
+
   return devices;
+
+}
+
+EngineDevice AsioDeviceFinder::GetDevice(HKEY reg_key, LPWSTR key_name) {
+
+  HKEY sub_key = nullptr;
+  const QScopeGuard scopeguard_sub_key = qScopeGuard([&sub_key]() {
+    if (sub_key) {
+      RegCloseKey(sub_key);
+    }
+  });
+
+  LSTATUS status = RegOpenKeyExW(reg_key, key_name, 0, KEY_READ, &sub_key);
+  if (status != ERROR_SUCCESS) {
+    return EngineDevice();
+  }
+
+  DWORD type = REG_SZ;
+  WCHAR clsid_data[256]{};
+  DWORD clsid_data_size = sizeof(clsid_data);
+  status = RegQueryValueExW(sub_key, L"clsid", 0, &type, (LPBYTE)clsid_data, &clsid_data_size);
+  if (status != ERROR_SUCCESS) {
+    return EngineDevice();
+  }
+
+  EngineDevice device;
+  device.value = QString::fromStdWString(clsid_data);
+  device.description = QString::fromStdWString(key_name);
+
+  WCHAR desc_data[256]{};
+  DWORD desc_data_size = sizeof(desc_data);
+  status = RegQueryValueExW(sub_key, L"description", 0, &type, (LPBYTE)desc_data, &desc_data_size);
+  if (status == ERROR_SUCCESS) {
+    device.description = QString::fromStdWString(desc_data);
+  }
+
+  return device;
+
 }

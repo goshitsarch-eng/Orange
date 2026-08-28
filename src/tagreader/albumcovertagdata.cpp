@@ -1,23 +1,27 @@
-#include "tagreader/albumcovertagdata.h"
+/*
+ * Strawberry Music Player
+ * Copyright 2024, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-std::string AlbumCoverTagData::GuessMimeType(const std::vector<unsigned char> &data) {
-  if (data.size() >= 3 && data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF) {
-    return "image/jpeg";
-  }
-  if (data.size() >= 8 && data[0] == 0x89 && data[1] == 'P' && data[2] == 'N' && data[3] == 'G') {
-    return "image/png";
-  }
-  if (data.size() >= 6 && data[0] == 'G' && data[1] == 'I' && data[2] == 'F') {
-    return "image/gif";
-  }
-  if (data.size() >= 12 && data[0] == 'R' && data[1] == 'I' && data[2] == 'F' && data[3] == 'F' && data[8] == 'W' && data[9] == 'E' &&
-      data[10] == 'B' && data[11] == 'P') {
-    return "image/webp";
-  }
-  return "image/jpeg";
-}
+#include <QByteArray>
+#include <QString>
 
-AlbumCoverTagData AlbumCoverTagData::FromBytes(const std::vector<unsigned char> &data, const std::string &mimetype) {
-  AlbumCoverTagData cover(data, mimetype.empty() ? GuessMimeType(data) : mimetype);
-  return cover;
-}
+#include "albumcovertagdata.h"
+
+AlbumCoverTagData::AlbumCoverTagData(const QByteArray &_data, const QString &_mimetype)
+    : data(_data),
+      mimetype(_mimetype) {}

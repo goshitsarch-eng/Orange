@@ -1,82 +1,85 @@
-#include "globalshortcuts/globalshortcutsbackend-win.h"
+/*
+ * Strawberry Music Player
+ * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
+
+#include "config.h"
+
+#include "globalshortcutsbackend-win.h"
 
 #include "core/logging.h"
-#include "globalshortcuts/globalshortcut.h"
-#include "globalshortcuts/globalshortcuts.h"
-#include "globalshortcuts/keymapper_win.h"
 
-#ifdef _WIN32
-#include <windows.h>
-#endif
+#include <QObject>
+#include <QMap>
+#include <QAction>
+#include <QKeySequence>
+#include <QtAlgorithms>
 
-GlobalShortcutsBackendWin::GlobalShortcutsBackendWin(GlobalShortcutsManager *manager)
-    : GlobalShortcutsBackend(manager, GlobalShortcutsBackend::Type::Win) {}
+#include "globalshortcutsmanager.h"
+#include "globalshortcutsbackend.h"
+#include "globalshortcut.h"
 
-GlobalShortcutsBackendWin::~GlobalShortcutsBackendWin() { DoUnregister(); }
+GlobalShortcutsBackendWin::GlobalShortcutsBackendWin(GlobalShortcutsManager *manager, QObject *parent)
+    : GlobalShortcutsBackend(manager, GlobalShortcutsBackend::Type::Win, parent),
+      gshortcut_init_(nullptr) {}
+
+GlobalShortcutsBackendWin::~GlobalShortcutsBackendWin() {
+  GlobalShortcutsBackendWin::DoUnregister();
+}
 
 bool GlobalShortcutsBackendWin::IsAvailable() const {
-#ifdef _WIN32
   return true;
-#else
-  return false;
-#endif
 }
 
 bool GlobalShortcutsBackendWin::DoRegister() {
-#ifdef _WIN32
-  if (!manager_) {
-    return false;
+
+  qLog(Debug) << "Registering";
+
+  if (!gshortcut_init_) gshortcut_init_ = new GlobalShortcut(this);
+
+  for (const GlobalShortcutsManager::Shortcut &shortcut : manager_->shortcuts()) {
+    AddShortcut(shortcut.action);
   }
-  for (const GlobalShortcutsManager::ShortcutDef &def : GlobalShortcutsManager::Catalog()) {
-    if (GlobalShortcut *shortcut = manager_->ShortcutById(def.id)) {
-      AddShortcut(shortcut->id(), shortcut->key());
-    }
-  }
+
   return true;
-#else
-  return false;
-#endif
+
+}
+
+bool GlobalShortcutsBackendWin::AddShortcut(QAction *action) {
+
+  if (action->shortcut().isEmpty()) return false;
+
+  GlobalShortcut *shortcut = new GlobalShortcut(action->shortcut(), this, this);
+  QObject::connect(shortcut, &GlobalShortcut::activated, action, &QAction::trigger);
+  shortcuts_ << shortcut;
+  return true;
+
 }
 
 void GlobalShortcutsBackendWin::DoUnregister() {
-#ifdef _WIN32
-  for (const auto &entry : ids_) {
-    UnregisterHotKey(nullptr, entry.second);
-  }
-#endif
-  ids_.clear();
-}
 
-bool GlobalShortcutsBackendWin::AddShortcut(const std::string &id, const std::string &key) {
-#ifdef _WIN32
-  UINT modifiers = 0;
-  UINT vk = 0;
-  if (!KeyMapperWin::Parse(key, &modifiers, &vk) || vk == 0) {
-    return false;
-  }
-  const int hotkey_id = static_cast<int>(ids_.size()) + 1;
-  if (!RegisterHotKey(nullptr, hotkey_id, modifiers, vk)) {
-    LogWarning("RegisterHotKey failed for %s", id.c_str());
-    return false;
-  }
-  ids_[id] = hotkey_id;
-  return true;
-#else
-  (void)id;
-  (void)key;
-  return false;
-#endif
-}
+  qLog(Debug) << "Unregistering";
 
-void GlobalShortcutsBackendWin::RemoveShortcut(const std::string &id) {
-#ifdef _WIN32
-  auto it = ids_.find(id);
-  if (it == ids_.end()) {
-    return;
+  qDeleteAll(shortcuts_);
+  shortcuts_.clear();
+
+  if (gshortcut_init_) {
+    delete gshortcut_init_;
+    gshortcut_init_ = nullptr;
   }
-  UnregisterHotKey(nullptr, it->second);
-  ids_.erase(it);
-#else
-  (void)id;
-#endif
+
 }

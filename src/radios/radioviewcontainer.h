@@ -1,44 +1,49 @@
-#ifndef STRAWBERRY_RADIOVIEWCONTAINER_H
-#define STRAWBERRY_RADIOVIEWCONTAINER_H
+/*
+ * Strawberry Music Player
+ * Copyright 2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "radios/radiobrowsersearchview.h"
-#include "radios/radiomodel.h"
-#include "radios/radioview.h"
+#ifndef RADIOVIEWCONTAINER_H
+#define RADIOVIEWCONTAINER_H
 
-#include <functional>
-#include <memory>
-#include <string>
+#include <QWidget>
 
-#include <gtk/gtk.h>
+#include "ui_radioviewcontainer.h"
 
-class RadioServices;
+class RadioView;
+class RadioBrowserSearchView;
 
-class RadioViewContainer {
+class RadioViewContainer : public QWidget {
+  Q_OBJECT
+
  public:
-  explicit RadioViewContainer(RadioServices *services);
+  explicit RadioViewContainer(QWidget *parent = nullptr);
+  ~RadioViewContainer() override;
 
-  GtkWidget *widget() const { return widget_; }
-  RadioView *view() { return view_.get(); }
-  RadioBrowserSearchView *search_view() { return search_view_.get(); }
-  void Reload();
-  void ApplyLook();
-  void RefreshChannels();
-  void Search(const std::string &query);
-  void SetActivateCallback(std::function<void(const RadioChannel &)> callback);
-  void SetEnqueueCallback(RadioView::EnqueueCallback callback);
-  void SetMenuCallback(RadioView::MenuCallback callback);
+  void ReloadSettings();
+
+  RadioView *view() const { return ui_->view; }
+  RadioBrowserSearchView *search_view() const { return ui_->search_view; }
+
+ Q_SIGNALS:
+  void Refresh();
 
  private:
-  void OnShown();
-
-  RadioServices *services_ = nullptr;
-  GtkWidget *widget_ = nullptr;
-  GtkWidget *refresh_button_ = nullptr;
-  GtkWidget *stack_ = nullptr;
-  RadioModel model_;
-  std::unique_ptr<RadioView> view_;
-  std::unique_ptr<RadioBrowserSearchView> search_view_;
-  bool channels_initialized_ = false;
+  Ui_RadioViewContainer *ui_;
 };
 
-#endif
+#endif  // RADIOVIEWCONTAINER_H

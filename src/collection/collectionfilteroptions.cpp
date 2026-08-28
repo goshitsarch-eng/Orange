@@ -1,39 +1,46 @@
-#include "collection/collectionfilteroptions.h"
+/*
+ * Strawberry Music Player
+ * Copyright 2023, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "utilities/strutils.h"
+#include <QtGlobal>
+#include <QDateTime>
 
-#include <cstdint>
-#include <ctime>
+#include "core/song.h"
 
-CollectionFilterOptions::CollectionFilterOptions() = default;
+#include "collectionfilteroptions.h"
 
-void CollectionFilterOptions::set_filter_mode(FilterMode filter_mode) {
-  filter_mode_ = filter_mode;
-  filter_text_.clear();
-  has_filter_text_ = false;
-}
-
-void CollectionFilterOptions::set_filter_text(const std::string &filter_text) {
-  filter_mode_ = FilterMode::All;
-  filter_text_ = filter_text;
-  has_filter_text_ = true;
-}
+CollectionFilterOptions::CollectionFilterOptions() : filter_mode_(FilterMode::All), max_age_(-1), min_rating_(-1.0F) {}
 
 bool CollectionFilterOptions::Matches(const Song &song) const {
+
   if (max_age_ != -1) {
-    const int64_t cutoff = static_cast<int64_t>(std::time(nullptr)) - max_age_;
-    if (song.ctime() <= cutoff) {
-      return false;
-    }
+    const qint64 cutoff = QDateTime::currentSecsSinceEpoch() - max_age_;
+    if (song.ctime() <= cutoff) return false;
   }
-  if (min_rating_ >= 0.0f) {
-    if (song.rating() <= min_rating_) {
-      return false;
-    }
+
+  if (min_rating_ >= 0.0F) {
+    if (song.rating() <= min_rating_) return false;
   }
-  if (has_filter_text_) {
-    return StrUtils::ContainsInsensitive(song.albumartist(), filter_text_) || StrUtils::ContainsInsensitive(song.artist(), filter_text_) ||
-           StrUtils::ContainsInsensitive(song.album(), filter_text_) || StrUtils::ContainsInsensitive(song.title(), filter_text_);
+
+  if (!filter_text_.isNull()) {
+    return song.albumartist().contains(filter_text_, Qt::CaseInsensitive) || song.artist().contains(filter_text_, Qt::CaseInsensitive) || song.album().contains(filter_text_, Qt::CaseInsensitive) || song.title().contains(filter_text_, Qt::CaseInsensitive);
   }
+
   return true;
+
 }

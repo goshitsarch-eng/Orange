@@ -1,1 +1,0 @@
-// GTK build has no Qt search-field private helpers.\n

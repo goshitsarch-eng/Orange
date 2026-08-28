@@ -1,144 +1,168 @@
-#include "globalshortcuts/globalshortcutsbackend-macos.h"
+/*
+ * Strawberry Music Player
+ * This file was part of Clementine.
+ * Copyright 2010, David Sansome <me@davidsansome.com>
+ * Copyright 2018-2021, Jonas Kvinge <jonas@jkvinge.net>
+ *
+ * Strawberry is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * Strawberry is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with Strawberry.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#include "core/logging.h"
-#include "globalshortcuts/globalshortcut.h"
-#include "globalshortcuts/globalshortcuts.h"
-#include "globalshortcuts/keymapper_macos.h"
-#include "globalshortcuts/macosaccessibility.h"
-#ifdef __APPLE__
-#include "core/mac_startup.h"
-#endif
+ #include "config.h"
 
-#ifdef __APPLE__
-#include <AppKit/AppKit.h>
-#include <ApplicationServices/ApplicationServices.h>
+ #include <QtGlobal>
+
+#include "globalshortcutsbackend-macos.h"
+
+#include <AppKit/NSEvent.h>
+#include <AppKit/NSWorkspace.h>
+#include <Foundation/NSString.h>
 #include <IOKit/hidsystem/ev_keymap.h>
-#endif
+#include <ApplicationServices/ApplicationServices.h>
 
-GlobalShortcutsBackendMacOs::GlobalShortcutsBackendMacOs(GlobalShortcutsManager *manager)
-    : GlobalShortcutsBackend(manager, GlobalShortcutsBackend::Type::macOS) {}
+#include <QAction>
+#include <QList>
+#include <QMessageBox>
+#include <QPushButton>
 
-GlobalShortcutsBackendMacOs::~GlobalShortcutsBackendMacOs() { DoUnregister(); }
+#include "globalshortcutsmanager.h"
+#include "core/logging.h"
+#include "core/mac_startup.h"
 
-bool GlobalShortcutsBackendMacOs::IsAvailable() const {
-#ifdef __APPLE__
-  return true;
-#else
-  return false;
-#endif
-}
+#import "includes/SBSystemPreferences.h"
 
-bool GlobalShortcutsBackendMacOs::IsAccessibilityEnabled() {
-#ifdef __APPLE__
-  const id prompt = MacOsAccessibility::PromptWhenCheckingTrust() ? @YES : @NO;
-  NSDictionary *options = @{(__bridge id)kAXTrustedCheckOptionPrompt : prompt};
-  return AXIsProcessTrustedWithOptions((__bridge CFDictionaryRef)options);
-#else
-  return false;
-#endif
-}
+class GlobalShortcutsBackendMacOSPrivate {
+ public:
+  explicit GlobalShortcutsBackendMacOSPrivate(GlobalShortcutsBackendMacOS *backend)
+      : global_monitor_(nil), local_monitor_(nil), backend_(backend) {}
 
-void GlobalShortcutsBackendMacOs::ShowAccessibilityDialog() {
-#ifdef __APPLE__
-  NSURL *url = [NSURL URLWithString:[NSString stringWithUTF8String:MacOsAccessibility::PreferencesUrl()]];
-  if (url) {
-    [[NSWorkspace sharedWorkspace] openURL:url];
+  bool Register() {
+    global_monitor_ = [NSEvent addGlobalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^(NSEvent *event) {
+      HandleKeyEvent(event);
+    } ];
+    local_monitor_ = [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^(NSEvent *event) {
+      // Filter event if we handle it as a global shortcut.
+      return HandleKeyEvent(event) ? nil : event;
+    } ];
+    return true;
   }
-#endif
+
+  void Unregister() {
+    [NSEvent removeMonitor:global_monitor_];
+    [NSEvent removeMonitor:local_monitor_];
+  }
+
+ private:
+  bool HandleKeyEvent(NSEvent *event) {
+    QKeySequence sequence = mac::KeySequenceFromNSEvent(event);
+    return backend_->KeyPressed(sequence);
+  }
+
+  id global_monitor_;
+  id local_monitor_;
+  GlobalShortcutsBackendMacOS *backend_;
+
+  Q_DISABLE_COPY(GlobalShortcutsBackendMacOSPrivate)
+};
+
+GlobalShortcutsBackendMacOS::GlobalShortcutsBackendMacOS(GlobalShortcutsManager *manager, QObject *parent)
+    : GlobalShortcutsBackend(manager, GlobalShortcutsBackend::Type::macOS, parent),
+      p_(new GlobalShortcutsBackendMacOSPrivate(this)) {}
+
+GlobalShortcutsBackendMacOS::~GlobalShortcutsBackendMacOS() {}
+
+bool GlobalShortcutsBackendMacOS::DoRegister() {
+
+  // Always enable media keys.
+  mac::SetShortcutHandler(this);
+
+  QList<GlobalShortcutsManager::Shortcut> shortcuts = manager_->shortcuts().values();
+  for (const GlobalShortcutsManager::Shortcut &shortcut : shortcuts) {
+    shortcuts_[shortcut.action->shortcut()] = shortcut.action;
+  }
+
+  return p_->Register();
+
 }
 
-bool GlobalShortcutsBackendMacOs::HandleAccel(const std::string &accel) {
-  if (!manager_ || accel.empty()) {
+void GlobalShortcutsBackendMacOS::DoUnregister() {
+
+  p_->Unregister();
+  shortcuts_.clear();
+
+}
+
+void GlobalShortcutsBackendMacOS::MacMediaKeyPressed(const int key) {
+
+  switch (key) {
+    case NX_KEYTYPE_PLAY:
+      KeyPressed(Qt::Key_MediaPlay);
+      break;
+    case NX_KEYTYPE_FAST:
+      KeyPressed(Qt::Key_MediaNext);
+      break;
+    case NX_KEYTYPE_REWIND:
+      KeyPressed(Qt::Key_MediaPrevious);
+      break;
+  }
+
+}
+
+bool GlobalShortcutsBackendMacOS::KeyPressed(const QKeySequence &sequence) {
+
+  if (sequence.isEmpty()) {
     return false;
   }
-  for (const auto &shortcut : manager_->shortcuts()) {
-    const std::string bound = shortcut->key().empty() ? shortcut->default_key() : shortcut->key();
-    if (KeyMapperMacOs::KeysMatch(accel, bound)) {
-      manager_->Emit(shortcut->id());
-      return true;
-    }
-  }
-  const char *id = KeyMapperMacOs::ShortcutIdFromKey(accel);
-  if (id && *id) {
-    manager_->Emit(id);
+  QAction *action = shortcuts_[sequence];
+  if (action) {
+    action->trigger();
     return true;
   }
   return false;
+
 }
 
-void GlobalShortcutsBackendMacOs::MacMediaKeyPressed(int nx_key) { HandleMediaKey(nx_key); }
+bool GlobalShortcutsBackendMacOS::IsAccessibilityEnabled() {
 
-void GlobalShortcutsBackendMacOs::HandleMediaKey(int nx_key) {
-  const char *id = KeyMapperMacOs::IdFromMediaKey(nx_key);
-  if (id && *id && manager_) {
-    manager_->Emit(id);
-  }
+  NSDictionary *options = @{reinterpret_cast<id>(kAXTrustedCheckOptionPrompt): @YES};
+  return AXIsProcessTrustedWithOptions(reinterpret_cast<CFDictionaryRef>(options));
+
 }
 
-bool GlobalShortcutsBackendMacOs::DoRegister() {
-#ifdef __APPLE__
-  if (!manager_) {
-    return false;
-  }
-  LogDebug("Registering macOS global shortcuts");
+void GlobalShortcutsBackendMacOS::ShowAccessibilityDialog() {
 
-  auto handle_event = [](NSEvent *event, GlobalShortcutsBackendMacOs *self) -> BOOL {
-    if ([event type] == NSEventTypeSystemDefined && KeyMapperMacOs::IsAuxControlEvent(static_cast<int>([event subtype]))) {
-      const int data1 = static_cast<int>([event data1]);
-      if (KeyMapperMacOs::IsMediaKeyDown(data1)) {
-        self->HandleMediaKey(KeyMapperMacOs::MediaKeyFromData1(data1));
-        return YES;
+  NSArray *paths = NSSearchPathForDirectoriesInDomains(NSPreferencePanesDirectory, NSSystemDomainMask, YES);
+  if ([paths count] == 1) {
+    SBSystemPreferencesApplication *system_prefs = [SBApplication applicationWithBundleIdentifier:@"com.apple.systempreferences"];
+    [system_prefs activate];
+
+    SBElementArray *panes = [system_prefs panes];
+    SBSystemPreferencesPane *security_pane = nil;
+    for (SBSystemPreferencesPane *pane : panes) {
+      if ([[pane id] isEqualToString:@"com.apple.preference.security"]) {
+        security_pane = pane;
+        break;
       }
-      return NO;
     }
-    if ([event type] != NSEventTypeKeyDown) {
-      return NO;
-    }
-    unsigned modifiers = 0;
-    const NSEventModifierFlags flags = [event modifierFlags];
-    if (flags & NSEventModifierFlagControl) {
-      modifiers |= KeyMapperMacOs::kControl;
-    }
-    if (flags & NSEventModifierFlagOption) {
-      modifiers |= KeyMapperMacOs::kOption;
-    }
-    if (flags & NSEventModifierFlagShift) {
-      modifiers |= KeyMapperMacOs::kShift;
-    }
-    if (flags & NSEventModifierFlagCommand) {
-      modifiers |= KeyMapperMacOs::kCommand;
-    }
-    NSString *chars = [event charactersIgnoringModifiers];
-    const std::string key = chars && [chars length] ? [[chars uppercaseString] UTF8String] : "";
-    return self->HandleAccel(KeyMapperMacOs::AcceleratorFromEvent(modifiers, key)) ? YES : NO;
-  };
+    [system_prefs setCurrentPane:security_pane];
 
-  global_monitor_ = (void *)[NSEvent addGlobalMonitorForEventsMatchingMask:(NSEventMaskKeyDown | NSEventMaskSystemDefined)
-                                                                 handler:^(NSEvent *event) {
-                                                                   handle_event(event, this);
-                                                                 }];
-  local_monitor_ = (void *)[NSEvent addLocalMonitorForEventsMatchingMask:(NSEventMaskKeyDown | NSEventMaskSystemDefined)
-                                                               handler:^(NSEvent *event) {
-                                                                 return handle_event(event, this) ? nil : event;
-                                                               }];
-  MacSetShortcutHandler(this);
-  return true;
-#else
-  return false;
-#endif
-}
+    SBElementArray *anchors = [security_pane anchors];
+    for (SBSystemPreferencesAnchor *anchor : anchors) {
+      if ([[anchor name] isEqualToString:@"Privacy_Accessibility"]) {
+        [anchor reveal];
+      }
+    }
+  }
 
-void GlobalShortcutsBackendMacOs::DoUnregister() {
-#ifdef __APPLE__
-  LogDebug("Unregistering macOS global shortcuts");
-  if (global_monitor_) {
-    [NSEvent removeMonitor:(id)global_monitor_];
-    global_monitor_ = nullptr;
-  }
-  if (local_monitor_) {
-    [NSEvent removeMonitor:(id)local_monitor_];
-    local_monitor_ = nullptr;
-  }
-  MacSetShortcutHandler(nullptr);
-#endif
 }

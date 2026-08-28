@@ -1,4 +1,4 @@
-Source: strawberry
+Source: orange
 Section: sound
 Priority: optional
 Maintainer: Jonas Kvinge <jonas@jkvinge.net>
@@ -16,10 +16,13 @@ Build-Depends: debhelper-compat (= 12),
                libtag1-dev,
                libicu-dev,
                libxkbcommon-dev,
-               libgtk-4-dev,
-               libadwaita-1-dev,
-               libsoup-3.0-dev,
-               libjson-glib-dev,
+               qt6-base-dev,
+               qt6-base-private-dev,
+               qt6-base-dev-tools,
+               qt6-tools-dev,
+               qt6-tools-dev-tools,
+               qt6-l10n-tools,
+               libkdsingleapplication-qt6-dev,
                libgstreamer1.0-dev,
                libgstreamer-plugins-base1.0-dev,
                libcdio-dev,
@@ -31,16 +34,18 @@ Build-Depends: debhelper-compat (= 12),
                libsparsehash-dev
 Standards-Version: 4.7.0
 
-Package: strawberry
+Package: orange
 Architecture: any
 Depends: ${shlibs:Depends},
          ${misc:Depends},
+         libqt6sql6-sqlite,
+         qt6-qpa-plugins,
          gstreamer1.0-plugins-base,
          gstreamer1.0-plugins-good,
          gstreamer1.0-alsa,
          gstreamer1.0-pulseaudio
-Homepage: http://www.strawberrymusicplayer.org/
-Description: music player and music collection organizer
+Homepage: https://github.com/goshitsarch-eng/Orange
+Description: music player and music collection organizer (Orange, based on Strawberry)
  Strawberry is a music player aimed at music collectors and audiophiles.
  .
  Features:
