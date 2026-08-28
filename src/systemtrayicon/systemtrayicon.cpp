@@ -180,6 +180,13 @@ GVariant *ItemProps(const char *label, const char *type = "standard", bool enabl
   return g_variant_builder_end(&props);
 }
 
+// gtk_is_initialized() only reports that gtk_init() ran, not that it succeeded: with no display GTK still
+// marks itself initialised while gdk_display_get_default() stays null, and constructing a widget then
+// crashes.  Widgets may only be created once a display is actually open.
+bool CanCreateWidgets() {
+  return gtk_is_initialized() && gdk_display_get_default() != nullptr;
+}
+
 }  // namespace
 
 std::vector<int> SystemTrayIcon::RootMenuIds(bool show_love, bool show_mute) {
@@ -238,7 +245,7 @@ void SystemTrayIcon::ShowPopup(const std::string &summary, const std::string &me
   popup_message_ = message;
   popup_timeout_ms_ = timeout_ms;
   popup_art_ = art;
-  if (!gtk_is_initialized()) {
+  if (!CanCreateWidgets()) {
     return;
   }
   if (!popup_window_) {
@@ -526,7 +533,7 @@ void SystemTrayIcon::PositionMenuWindow(GtkWidget *window, int x, int y) {
 void SystemTrayIcon::ShowMenu(int x, int y) {
   last_menu_x_ = x;
   last_menu_y_ = y;
-  if (!gtk_is_initialized()) {
+  if (!CanCreateWidgets()) {
     return;
   }
   GtkWidget *window = gtk_window_new();

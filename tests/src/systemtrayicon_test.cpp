@@ -221,8 +221,17 @@ TEST(SystemTrayIcon, OverlayIconNameHonorsProgressSetting) {
   EXPECT_FALSE(tray.paused());
   EXPECT_FALSE(tray.playing());
   EXPECT_TRUE(tray.OverlayIconName().empty());
-  EXPECT_EQ(0, tray.icon_pixmap_width());
-  EXPECT_EQ(0u, tray.icon_pixmap_size());
+  // The tray pixmap is drawn with cairo rather than looked up in an icon theme, so it exists whenever GTK is
+  // initialised and is empty otherwise.  Either way it is a complete ARGB buffer for the size it reports.
+  if (tray.icon_pixmap_size() == 0u) {
+    EXPECT_EQ(0, tray.icon_pixmap_width());
+    EXPECT_EQ(0, tray.icon_pixmap_height());
+  }
+  else {
+    EXPECT_EQ(TrayIconPixmap::kDefaultSize, tray.icon_pixmap_width());
+    EXPECT_EQ(TrayIconPixmap::kDefaultSize, tray.icon_pixmap_height());
+    EXPECT_EQ(TrayIconPixmap::ByteCount(tray.icon_pixmap_width(), tray.icon_pixmap_height()), tray.icon_pixmap_size());
+  }
   tray.ShowMenu(120, 80);
   EXPECT_EQ(120, tray.last_menu_x());
   EXPECT_EQ(80, tray.last_menu_y());
