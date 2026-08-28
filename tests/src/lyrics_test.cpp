@@ -1,4 +1,5 @@
 #include "context/contextlyrics.h"
+#include "context/contextsongupdate.h"
 #include "lyrics/geniuslyricscredentials.h"
 #include "lyrics/geniuslyricsprovider.h"
 #include "lyrics/htmllyricsprovider.h"
@@ -191,6 +192,36 @@ TEST(ContextLyrics, PrefersTagLyricsAndFormatsFetch) {
   EXPECT_FALSE(ContextLyrics::ShouldFetchOnline({}, false, true, song, false));
   song.set_artist({});
   EXPECT_FALSE(ContextLyrics::ShouldFetchOnline({}, true, true, song, false));
+}
+
+TEST(ContextSongUpdate, UsesQtMinorMetadataPath) {
+  Song current;
+  current.set_valid(true);
+  current.set_url("file:///tmp/roads.flac");
+  current.set_title("Roads");
+  current.set_album("Dummy");
+  current.set_artist("Portishead");
+  current.set_lyrics("How can I even try");
+  current.set_bitrate(320);
+
+  Song incoming = current;
+  incoming.set_bitrate(256);
+  incoming.set_lyrics({});
+  EXPECT_TRUE(ContextSongUpdate::IsMinorMetadataUpdate(current, incoming, true));
+  EXPECT_FALSE(ContextSongUpdate::ShouldResetLyrics(true));
+  EXPECT_FALSE(ContextSongUpdate::ShouldResetSearch(true));
+
+  incoming.set_title("Wandering Star");
+  EXPECT_FALSE(ContextSongUpdate::IsMinorMetadataUpdate(current, incoming, true));
+  incoming.set_title("Roads");
+  incoming.set_url("file:///tmp/glory-box.flac");
+  EXPECT_FALSE(ContextSongUpdate::IsMinorMetadataUpdate(current, incoming, true));
+  incoming.set_url(current.url());
+  EXPECT_FALSE(ContextSongUpdate::IsMinorMetadataUpdate(current, incoming, false));
+  Song invalid;
+  EXPECT_FALSE(ContextSongUpdate::IsMinorMetadataUpdate(invalid, incoming, true));
+  EXPECT_TRUE(ContextSongUpdate::ShouldResetLyrics(false));
+  EXPECT_TRUE(ContextSongUpdate::ShouldResetSearch(false));
 }
 
 TEST(StrUtils, TransliterateAscii) {

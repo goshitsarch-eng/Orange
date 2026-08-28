@@ -50,6 +50,7 @@ class ContextView {
  private:
   void NoSong();
   void SetSong();
+  void UpdateSong(const Song &song);
   void FadeStopFinished();
   void ApplyVisibility();
   void PersistVisibility();
