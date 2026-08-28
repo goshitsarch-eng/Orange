@@ -27,7 +27,6 @@
 #include <QGuiApplication>
 #include <QWidget>
 #include <QStyleFactory>
-#include <QStyleHints>
 #include <QVariant>
 #include <QMap>
 #include <QString>
@@ -70,7 +69,7 @@ AppearanceSettingsPage::AppearanceSettingsPage(SettingsDialog *dialog, SharedPtr
       appearance_(appearance),
       original_style_(QApplication::style() ? QApplication::style()->objectName() : QString()),
       system_palette_(QApplication::palette()),
-      original_dark_mode_(false),
+      original_color_scheme_(AppearanceSettings::kDefaultColorScheme),
       original_use_custom_color_set_(false),
       background_image_type_(BackgroundImageType::Default) {
 
@@ -91,7 +90,13 @@ AppearanceSettingsPage::AppearanceSettingsPage(SettingsDialog *dialog, SharedPtr
   ui_->combobox_background_image_position->setItemData(3, static_cast<int>(BackgroundImagePosition::BottomLeft));
   ui_->combobox_background_image_position->setItemData(4, static_cast<int>(BackgroundImagePosition::BottomRight));
 
-  QObject::connect(ui_->checkbox_dark_mode, &QCheckBox::toggled, this, &AppearanceSettingsPage::DarkModeToggled);
+  QObject::connect(ui_->combobox_color_scheme, &QComboBox::currentIndexChanged, this, &AppearanceSettingsPage::ColorSchemeChanged);
+
+#if QT_VERSION < QT_VERSION_CHECK(6, 8, 0)
+  ui_->label_color_scheme->setEnabled(false);
+  ui_->combobox_color_scheme->setEnabled(false);
+  ui_->combobox_color_scheme->setToolTip(tr("Forcing a light or dark color scheme requires Qt 6.8 or newer"));
+#endif
 
   QObject::connect(ui_->use_custom_color_set, &QRadioButton::toggled, this, &AppearanceSettingsPage::UseCustomColorSetOptionChanged);
   QObject::connect(ui_->use_custom_color_set, &QRadioButton::toggled, ui_->widget_custom_colors, &QWidget::setEnabled);
@@ -151,8 +156,11 @@ void AppearanceSettingsPage::Load() {
   ui_->checkbox_system_icons->setChecked(s.value(kSystemThemeIcons, kDefaultSystemIcons).toBool());
 #endif
 
-  original_dark_mode_ = s.value(kDarkMode, kDefaultDarkMode).toBool();
-  ui_->checkbox_dark_mode->setChecked(original_dark_mode_);
+  original_color_scheme_ = Appearance::LoadColorScheme();
+  {
+    const QSignalBlocker blocker(ui_->combobox_color_scheme);
+    ui_->combobox_color_scheme->setCurrentIndex(static_cast<int>(original_color_scheme_));
+  }
 
   // Colors
   const QPalette palette = QApplication::palette();
@@ -286,7 +294,8 @@ void AppearanceSettingsPage::Save() {
   s.setValue(kSystemThemeIcons, ui_->checkbox_system_icons->isChecked());
 #endif
 
-  s.setValue(kDarkMode, Utilities::StyleHasDarkModeSupport(selected_style) ? ui_->checkbox_dark_mode->isChecked() : false);
+  s.setValue(kColorScheme, ui_->combobox_color_scheme->currentIndex());
+  s.remove(kDarkMode);
 
   // Colors
   const bool use_custom_color_set = Utilities::StyleHasCustomPaletteColorsSupport(selected_style) && ui_->use_custom_color_set->isChecked();
@@ -372,9 +381,7 @@ void AppearanceSettingsPage::Cancel() {
     ApplyStyle(current_style, original_style_);
   }
 
-#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
-  QGuiApplication::styleHints()->setColorScheme(original_dark_mode_ ? Qt::ColorScheme::Dark : Qt::ColorScheme::Unknown);
-#endif
+  Appearance::ApplyColorScheme(original_color_scheme_);
 
   if (original_use_custom_color_set_) {
     Appearance::SetCustomPaletteColors(original_colors_);
@@ -420,17 +427,11 @@ void AppearanceSettingsPage::SetStyle(const QString &new_style, const bool apply
 
   const QString style_for_caps = apply ? current_style : (new_style.compare("default"_L1, Qt::CaseInsensitive) == 0 ? appearance_->default_style() : new_style);
   const bool custom_palette_colors_support = Utilities::StyleHasCustomPaletteColorsSupport(style_for_caps);
-  const bool dark_mode_support = Utilities::StyleHasDarkModeSupport(style_for_caps);
-
-  if (!dark_mode_support && ui_->checkbox_dark_mode->isChecked()) {
-    ui_->checkbox_dark_mode->setChecked(false);
-  }
 
   if (!custom_palette_colors_support && !ui_->use_system_color_set->isChecked()) {
     ui_->use_system_color_set->setChecked(true);
   }
 
-  ui_->checkbox_dark_mode->setEnabled(dark_mode_support);
   ui_->groupbox_colors->setEnabled(custom_palette_colors_support);
 
   if (style_changed) {
@@ -439,9 +440,7 @@ void AppearanceSettingsPage::SetStyle(const QString &new_style, const bool apply
     if (ui_->use_custom_color_set->isChecked()) {
       ApplyCustomColors();
     }
-#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
-    QGuiApplication::styleHints()->setColorScheme(dark_mode_support && ui_->checkbox_dark_mode->isChecked() ? Qt::ColorScheme::Dark : Qt::ColorScheme::Unknown);
-#endif
+    Appearance::ApplyColorScheme(static_cast<ColorScheme>(ui_->combobox_color_scheme->currentIndex()));
   }
 
 }
@@ -467,13 +466,9 @@ bool AppearanceSettingsPage::ApplyStyle(const QString &current_style, const QStr
 
 }
 
-void AppearanceSettingsPage::DarkModeToggled(const bool checked) {
+void AppearanceSettingsPage::ColorSchemeChanged(const int index) {
 
-#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
-  QGuiApplication::styleHints()->setColorScheme(checked ? Qt::ColorScheme::Dark : Qt::ColorScheme::Unknown);
-#else
-  Q_UNUSED(checked)
-#endif
+  Appearance::ApplyColorScheme(static_cast<ColorScheme>(index));
 
 }
 

@@ -56,7 +56,7 @@ class AppearanceSettingsPage : public SettingsPage {
 
  private Q_SLOTS:
   void StyleChanged(const int index);
-  void DarkModeToggled(const bool checked);
+  void ColorSchemeChanged(const int index);
   void UseCustomColorSetOptionChanged(const bool checked);
   void SetDarkColors();
   void ResetToDefaultColors();
@@ -93,7 +93,7 @@ class AppearanceSettingsPage : public SettingsPage {
 
   QString original_style_;
   QPalette system_palette_;
-  bool original_dark_mode_;
+  AppearanceSettings::ColorScheme original_color_scheme_;
   bool original_use_custom_color_set_;
   QMap<QPalette::ColorRole, QColor> original_colors_;
   QMap<QPalette::ColorRole, QColor> current_colors_;

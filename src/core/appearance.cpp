@@ -26,6 +26,7 @@
 #include <QMap>
 #include <QPalette>
 #include <QColor>
+#include <QStyleHints>
 
 #include "settings.h"
 #include "appearance.h"
@@ -100,6 +101,52 @@ const QMap<QPalette::ColorRole, QColor> &Appearance::DarkColors() {
   };
 
   return dark_colors;
+
+}
+
+AppearanceSettings::ColorScheme Appearance::LoadColorScheme() {
+
+  using AppearanceSettings::ColorScheme;
+
+  Settings s;
+  s.beginGroup(AppearanceSettings::kSettingsGroup);
+  const QVariant value = s.value(AppearanceSettings::kColorScheme);
+  // Settings written before the color scheme setting existed only have the dark mode boolean.
+  const bool legacy_dark_mode = s.value(AppearanceSettings::kDarkMode, AppearanceSettings::kDefaultDarkMode).toBool();
+  s.endGroup();
+
+  if (!value.isValid()) {
+    return legacy_dark_mode ? ColorScheme::Dark : AppearanceSettings::kDefaultColorScheme;
+  }
+
+  switch (value.toInt()) {
+    case static_cast<int>(ColorScheme::Light):
+      return ColorScheme::Light;
+    case static_cast<int>(ColorScheme::Dark):
+      return ColorScheme::Dark;
+    default:
+      return ColorScheme::System;
+  }
+
+}
+
+void Appearance::ApplyColorScheme(const AppearanceSettings::ColorScheme scheme) {
+
+#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
+  switch (scheme) {
+    case AppearanceSettings::ColorScheme::Light:
+      QGuiApplication::styleHints()->setColorScheme(Qt::ColorScheme::Light);
+      break;
+    case AppearanceSettings::ColorScheme::Dark:
+      QGuiApplication::styleHints()->setColorScheme(Qt::ColorScheme::Dark);
+      break;
+    case AppearanceSettings::ColorScheme::System:
+      QGuiApplication::styleHints()->setColorScheme(Qt::ColorScheme::Unknown);
+      break;
+  }
+#else
+  Q_UNUSED(scheme)
+#endif
 
 }
 

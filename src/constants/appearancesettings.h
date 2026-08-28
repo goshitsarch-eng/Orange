@@ -40,8 +40,17 @@ enum class BackgroundImagePosition {
   BottomRight = 5
 };
 
+// Whether the application follows the system's light/dark preference or forces one of the two.
+enum class ColorScheme {
+  System,
+  Light,
+  Dark
+};
+
 constexpr char kStyle[] = "style";
 constexpr char kSystemThemeIcons[] = "system_icons";
+constexpr char kColorScheme[] = "color_scheme";
+// Legacy boolean predating kColorScheme, still read for migration.
 constexpr char kDarkMode[] = "dark_mode";
 constexpr char kUseCustomColorSet[] = "use-custom-color-set";
 
@@ -82,6 +91,7 @@ constexpr char kIconSizePlaylistButtons[] = "icon_size_playlist_buttons";
 constexpr char kIconSizeLeftPanelButtons[] = "icon_size_left_panel_buttons";
 constexpr char kIconSizeConfigureButtons[] = "icon_size_configure_buttons";
 
+constexpr ColorScheme kDefaultColorScheme = ColorScheme::System;
 constexpr bool kDefaultDarkMode = false;
 constexpr bool kDefaultSystemIcons = false;
 constexpr bool kDefaultUseCustomColorSet = false;

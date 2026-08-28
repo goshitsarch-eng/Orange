@@ -25,7 +25,6 @@
 namespace Utilities {
 
 bool StyleHasCustomPaletteColorsSupport(const QString &style_name);
-bool StyleHasDarkModeSupport(const QString &style_name);
 
 }  // namespace Utilities
 

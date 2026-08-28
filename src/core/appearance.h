@@ -29,6 +29,8 @@
 #include <QColor>
 #include <QPalette>
 
+#include "constants/appearancesettings.h"
+
 class Appearance : public QObject {
   Q_OBJECT
   Q_DISABLE_COPY_MOVE(Appearance)
@@ -60,6 +62,13 @@ class Appearance : public QObject {
 
   // Applies the given per-role colors on top of the current application palette.
   static void SetCustomPaletteColors(const QMap<QPalette::ColorRole, QColor> &colors);
+
+  // Reads the configured color scheme, falling back to the legacy dark_mode boolean.
+  static AppearanceSettings::ColorScheme LoadColorScheme();
+
+  // Forces the light or dark scheme on the whole application, or hands control back to the system.
+  // Requires Qt 6.8; a no-op on older Qt, where only the system scheme is available.
+  static void ApplyColorScheme(const AppearanceSettings::ColorScheme scheme);
 
  private:
   QString default_style_;

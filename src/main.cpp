@@ -77,7 +77,7 @@
 #include "core/settings.h"
 
 #include "utilities/envutils.h"
-#include "utilities/styleutils.h"
+#include "core/appearance.h"
 
 #include <kdsingleapplication.h>
 
@@ -245,7 +245,6 @@ int main(int argc, char *argv[]) {
     Settings s;
     s.beginGroup(AppearanceSettings::kSettingsGroup);
     const QString style_name = s.value(AppearanceSettings::kStyle).toString();
-    const bool dark_mode = s.value(AppearanceSettings::kDarkMode, false).toBool();
     s.endGroup();
     if (!style_name.isEmpty() && style_name.compare("default"_L1, Qt::CaseInsensitive) != 0) {
       if (!QApplication::setStyle(style_name)) {
@@ -255,15 +254,7 @@ int main(int argc, char *argv[]) {
         }
       }
     }
-    if (dark_mode && QApplication::style()) {
-      const QString current_style = QApplication::style() ? QApplication::style()->objectName() : QString();
-      const bool dark_mode_supported = Utilities::StyleHasDarkModeSupport(current_style);
-      if (dark_mode_supported) {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 8, 0)
-        QGuiApplication::styleHints()->setColorScheme(Qt::ColorScheme::Dark);
-#endif
-      }
-    }
+    Appearance::ApplyColorScheme(Appearance::LoadColorScheme());
     if (QApplication::style()) {
       qLog(Debug) << "Style:" << QApplication::style()->objectName();
     }

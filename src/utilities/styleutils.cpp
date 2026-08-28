@@ -38,17 +38,4 @@ bool StyleHasCustomPaletteColorsSupport(const QString &style_name) {
 
 }
 
-bool StyleHasDarkModeSupport(const QString &style_name) {
-
-#if defined(Q_OS_WIN32)
-  return style_name.compare(u"windows"_s, Qt::CaseInsensitive) == 0 || style_name.compare(u"windows11"_s, Qt::CaseInsensitive) == 0;
-#elif defined(Q_OS_MACOS)
-  return style_name.compare(u"macos"_s, Qt::CaseInsensitive) == 0;
-#else
-  Q_UNUSED(style_name)
-  return false;
-#endif
-
-}
-
 }  // namespace Utilities

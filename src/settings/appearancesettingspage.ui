@@ -37,10 +37,32 @@
          </widget>
         </item>
         <item>
-         <widget class="QCheckBox" name="checkbox_dark_mode">
+         <widget class="QLabel" name="label_color_scheme">
           <property name="text">
-           <string>Dark mode</string>
+           <string>Color scheme</string>
           </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QComboBox" name="combobox_color_scheme">
+          <property name="toolTip">
+           <string>Follow the system light or dark scheme, or force one of the two</string>
+          </property>
+          <item>
+           <property name="text">
+            <string>System</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Light</string>
+           </property>
+          </item>
+          <item>
+           <property name="text">
+            <string>Dark</string>
+           </property>
+          </item>
          </widget>
         </item>
         <item>
@@ -680,7 +702,7 @@
  </widget>
  <tabstops>
   <tabstop>combobox_style</tabstop>
-  <tabstop>checkbox_dark_mode</tabstop>
+  <tabstop>combobox_color_scheme</tabstop>
   <tabstop>checkbox_system_icons</tabstop>
   <tabstop>use_system_color_set</tabstop>
   <tabstop>use_custom_color_set</tabstop>
