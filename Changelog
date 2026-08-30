@@ -2,6 +2,12 @@ Strawberry Music Player
 =======================
 ChangeLog
 
+Version 2.1.2 (2026.08.30):
+
+  Changes:
+    * Migrated the permanent desktop, AppStream, icon export and identity-bound D-Bus paths to the canonical Gosh Apps ID com.goshapps.Orange for catalog enrollment.
+    * Kept the existing Orange application/organization names and user library, database, settings and cache locations unchanged; the catalog identity migration does not move or delete Orange or Strawberry user data.
+
 Version 2.1.1 (2026.08.29):
 
   Bugfixes:

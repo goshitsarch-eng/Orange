@@ -1923,11 +1923,11 @@ void MainWindow::UpdateTrackSliderPosition() {
 void MainWindow::UpdateTaskbarProgress(const bool visible, const double progress) {
 
   QVariantMap map;
-  QDBusMessage msg = QDBusMessage::createSignal(u"/org/orangemusicplayer/orange"_s, u"com.canonical.Unity.LauncherEntry"_s, u"Update"_s);
+  QDBusMessage msg = QDBusMessage::createSignal(u"/com/goshapps/Orange"_s, u"com.canonical.Unity.LauncherEntry"_s, u"Update"_s);
 
   map.insert(u"progress-visible"_s, visible);
   map.insert(u"progress"_s, progress);
-  msg << u"application://org.orangemusicplayer.orange.desktop"_s << map;
+  msg << u"application://com.goshapps.Orange.desktop"_s << map;
 
   QDBusConnection::sessionBus().send(msg);
 

@@ -1,6 +1,6 @@
 set(STRAWBERRY_VERSION_MAJOR 2)
 set(STRAWBERRY_VERSION_MINOR 1)
-set(STRAWBERRY_VERSION_PATCH 1)
+set(STRAWBERRY_VERSION_PATCH 2)
 #set(STRAWBERRY_VERSION_PRERELEASE rc1)
 
 # Release builds must report the authoritative Orange version rather than the
