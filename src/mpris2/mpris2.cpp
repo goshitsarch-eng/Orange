@@ -107,7 +107,7 @@ namespace mpris {
 constexpr char kMprisObjectPath[] = "/org/mpris/MediaPlayer2";
 constexpr char kServiceName[] = "org.mpris.MediaPlayer2.orange";
 constexpr char kFreedesktopPath[] = "org.freedesktop.DBus.Properties";
-constexpr char kTrackPrefix[] = "/org/orangemusicplayer/orange/Track/";
+constexpr char kTrackPrefix[] = "/com/goshapps/Orange/Track/";
 constexpr char kNoTrack[] = "/org/mpris/MediaPlayer2/TrackList/NoTrack";
 constexpr int kTracksSubsetCount = 20;
 
@@ -828,7 +828,7 @@ quint32 Mpris2::PlaylistCount() const {
 QStringList Mpris2::Orderings() const { return QStringList() << u"UserDefined"_s << u"Alphabetical"_s; }
 
 QDBusObjectPath Mpris2::MakePlaylistPath(const int id) const {
-  return QDBusObjectPath(QStringLiteral("/org/orangemusicplayer/orange/PlaylistId/%1").arg(id));
+  return QDBusObjectPath(QStringLiteral("/com/goshapps/Orange/PlaylistId/%1").arg(id));
 }
 
 MaybePlaylist Mpris2::ActivePlaylist() const {

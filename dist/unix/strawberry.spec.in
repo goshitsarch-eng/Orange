@@ -139,11 +139,11 @@ export QT_QPA_PLATFORM="offscreen"
 %else
 %make_build -j $(nproc) -C build strawberry_tests
 %endif
-desktop-file-validate %{buildroot}%{_datadir}/applications/org.orangemusicplayer.orange.desktop
+desktop-file-validate %{buildroot}%{_datadir}/applications/com.goshapps.Orange.desktop
 %if 0%{?suse_version}
-  appstream-util validate-relax --nonet %{buildroot}%{_datadir}/metainfo/org.orangemusicplayer.orange.appdata.xml
+  appstream-util validate-relax --nonet %{buildroot}%{_datadir}/metainfo/com.goshapps.Orange.appdata.xml
 %else
-  appstream-util validate-relax --nonet %{buildroot}%{_metainfodir}/org.orangemusicplayer.orange.appdata.xml
+  appstream-util validate-relax --nonet %{buildroot}%{_metainfodir}/com.goshapps.Orange.appdata.xml
 %endif
 
 %files
@@ -152,7 +152,7 @@ desktop-file-validate %{buildroot}%{_datadir}/applications/org.orangemusicplayer
 %license COPYING
 %{_bindir}/orange
 %{_datadir}/applications/*.desktop
-%{_datadir}/icons/hicolor/*/apps/orange.*
+%{_datadir}/icons/hicolor/*/apps/com.goshapps.Orange.*
 %{_mandir}/man1/%{name}.1.*
 %if 0%{?suse_version}
 %{_datadir}/metainfo/*.appdata.xml

@@ -151,11 +151,12 @@ int main(int argc, char *argv[]) {
   QCoreApplication::setApplicationName(u"Orange"_s);
   QCoreApplication::setOrganizationName(u"Orange"_s);
   QCoreApplication::setApplicationVersion(QStringLiteral(STRAWBERRY_VERSION_DISPLAY));
+  // Keep these legacy runtime names stable: Settings and StandardPaths derive existing user-data locations from them.
   QCoreApplication::setOrganizationDomain(u"strawberrymusicplayer.org"_s);
 
   // This makes us show up nicely in gnome-volume-control
   g_set_application_name("Orange");
-  g_setenv("PULSE_PROP_application.icon_name", "orange", TRUE);
+  g_setenv("PULSE_PROP_application.icon_name", "com.goshapps.Orange", TRUE);
   g_setenv("PULSE_PROP_media.role", "music", TRUE);
 
   RegisterMetaTypes();
@@ -202,7 +203,7 @@ int main(int argc, char *argv[]) {
 #endif
 
   QGuiApplication::setApplicationDisplayName(u"Orange Music Player"_s);
-  QGuiApplication::setDesktopFileName(u"org.orangemusicplayer.orange"_s);
+  QGuiApplication::setDesktopFileName(u"com.goshapps.Orange"_s);
   QGuiApplication::setQuitOnLastWindowClosed(false);
 
   QApplication a(argc, argv);

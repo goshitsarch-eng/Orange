@@ -13,7 +13,7 @@
   <key>CFBundleIconFile</key>
   <string>strawberry.icns</string>
   <key>CFBundleIdentifier</key>
-  <string>org.orangemusicplayer.orange</string>
+  <string>com.goshapps.Orange</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleLongVersionString</key>
@@ -44,7 +44,7 @@
       <key>CFBundleTypeRole</key>
       <string>Viewer</string>
       <key>CFBundleURLName</key>
-      <string>org.orangemusicplayer.orange</string>
+      <string>com.goshapps.Orange</string>
       <key>CFBundleURLSchemes</key>
       <array>
         <string>tidal</string>

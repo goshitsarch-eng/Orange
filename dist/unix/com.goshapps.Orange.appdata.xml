@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>org.orangemusicplayer.orange</id>
-  <launchable type="desktop-id">org.orangemusicplayer.orange.desktop</launchable>
+  <id>com.goshapps.Orange</id>
+  <launchable type="desktop-id">com.goshapps.Orange.desktop</launchable>
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>GPL-3.0+</project_license>
   <provides>
@@ -52,6 +52,7 @@
   </screenshots>
   <update_contact>eclipseo@fedoraproject.org</update_contact>
     <releases>
+        <release version="2.1.2" date="2026-08-30"/>
         <release version="2.1.1" date="2026-08-29"/>
         <release version="2.1.0" date="2026-08-28"/>
         <release version="1.2.27" date="2026-08-11"/>
