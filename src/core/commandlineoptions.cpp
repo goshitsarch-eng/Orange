@@ -94,7 +94,7 @@ constexpr char kHelpText[] =
     "      --version              %34\n"
     "      --create-fingerprint <filename>  %35\n";
 
-constexpr char kVersionText[] = "Orange %1";
+constexpr char kVersionText[] = "Orange %1\nMaker: Gosh";
 
 }  // namespace
 

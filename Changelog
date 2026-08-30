@@ -2,6 +2,15 @@ Strawberry Music Player
 =======================
 ChangeLog
 
+Version 2.1.1 (2026.08.29):
+
+  Bugfixes:
+    * Synchronized the release version across builds, command-line output, the About dialog, AppStream metadata and project documentation.
+    * Ensured Git checkouts report the authoritative Orange release instead of an inherited Strawberry Git tag.
+
+  Changes:
+    * Identified the Orange maker as Gosh while preserving the complete Strawberry, Clementine and Amarok credits and GPL notices.
+
 Version 2.1.0 (2026.08.28):
 
   Changes:

@@ -159,6 +159,8 @@ QString AboutDialog::MainHtml() const {
 
   ret += "<p>"_L1;
   ret += tr("Version %1").arg(QCoreApplication::applicationVersion());
+  ret += "<br />"_L1;
+  ret += tr("Maker: Gosh");
   ret += "</p>"_L1;
 
   ret += "<p>"_L1;
