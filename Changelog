@@ -2,6 +2,11 @@ Strawberry Music Player
 =======================
 ChangeLog
 
+Version 2.1.3 (2026.08.30):
+
+  Bugfixes:
+    * Parse command-line help and version requests before creating the single-instance socket, so querying the version cannot block the next real launch with stale instance state.
+
 Version 2.1.2 (2026.08.30):
 
   Changes:
