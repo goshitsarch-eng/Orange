@@ -53,6 +53,8 @@ assert_file_contains("dist/unix/strawberry.spec.in" "applications/${APP_ID}.desk
 assert_file_contains("dist/unix/strawberry.spec.in" "metainfo/${APP_ID}.appdata.xml")
 assert_file_contains("dist/unix/strawberry.spec.in" "apps/${APP_ID}.*")
 assert_file_contains("dist/macos/Info.plist.in" "<string>${APP_ID}</string>")
+assert_file_contains(".github/workflows/build.yaml" "AppDir/usr/share/applications/${APP_ID}.desktop")
+assert_file_excludes(".github/workflows/build.yaml" "AppDir/usr/share/applications/${LEGACY_APP_ID}.desktop")
 
 assert_file_contains("src/main.cpp" "setDesktopFileName(u\"${APP_ID}\"_s)")
 assert_file_contains("src/main.cpp" "PULSE_PROP_application.icon_name\", \"${APP_ID}\"")
