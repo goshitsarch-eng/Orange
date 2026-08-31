@@ -2397,7 +2397,7 @@ TEST_F(TagReaderTest, TestMP4AudioFileRating) {
 TEST_F(TagReaderTest, TestFLACAudioFileCover) {
 
   TemporaryResource r(u":/audio/strawberry.flac"_s);
-  const QString cover_filename = u":/pictures/strawberry.png"_s;
+  const QString cover_filename = u":/pictures/orange.png"_s;
 
   QImage original_image;
   EXPECT_TRUE(original_image.load(cover_filename));
@@ -2414,7 +2414,7 @@ TEST_F(TagReaderTest, TestFLACAudioFileCover) {
 TEST_F(TagReaderTest, TestOggVorbisAudioFileCover) {
 
   TemporaryResource r(u":/audio/strawberry.ogg"_s);
-  const QString cover_filename = u":/pictures/strawberry.png"_s;
+  const QString cover_filename = u":/pictures/orange.png"_s;
 
   QImage original_image;
   EXPECT_TRUE(original_image.load(cover_filename));
@@ -2431,7 +2431,7 @@ TEST_F(TagReaderTest, TestOggVorbisAudioFileCover) {
 TEST_F(TagReaderTest, TestOggOpusAudioFileCover) {
 
   TemporaryResource r(u":/audio/strawberry.opus"_s);
-  const QString cover_filename = u":/pictures/strawberry.png"_s;
+  const QString cover_filename = u":/pictures/orange.png"_s;
 
   QImage original_image;
   EXPECT_TRUE(original_image.load(cover_filename));
@@ -2448,7 +2448,7 @@ TEST_F(TagReaderTest, TestOggOpusAudioFileCover) {
 TEST_F(TagReaderTest, TestOggSpeexAudioFileCover) {
 
   TemporaryResource r(u":/audio/strawberry.spx"_s);
-  const QString cover_filename = u":/pictures/strawberry.png"_s;
+  const QString cover_filename = u":/pictures/orange.png"_s;
 
   QImage original_image;
   EXPECT_TRUE(original_image.load(cover_filename));
@@ -2465,7 +2465,7 @@ TEST_F(TagReaderTest, TestOggSpeexAudioFileCover) {
 TEST_F(TagReaderTest, TestMP3AudioFileCover) {
 
   TemporaryResource r(u":/audio/strawberry.mp3"_s);
-  const QString cover_filename = u":/pictures/strawberry.png"_s;
+  const QString cover_filename = u":/pictures/orange.png"_s;
 
   QImage original_image;
   EXPECT_TRUE(original_image.load(cover_filename));
@@ -2482,7 +2482,7 @@ TEST_F(TagReaderTest, TestMP3AudioFileCover) {
 TEST_F(TagReaderTest, TestMP4AudioFileCover) {
 
   TemporaryResource r(u":/audio/strawberry.mp4"_s);
-  const QString cover_filename = u":/pictures/strawberry.png"_s;
+  const QString cover_filename = u":/pictures/orange.png"_s;
 
   QImage original_image;
   EXPECT_TRUE(original_image.load(cover_filename));

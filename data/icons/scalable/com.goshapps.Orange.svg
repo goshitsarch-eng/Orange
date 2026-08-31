@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Original Orange application icon, created for this repository. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="fruit" cx="34%" cy="28%" r="72%">
+      <stop offset="0" stop-color="#ffbd45"/>
+      <stop offset="0.52" stop-color="#f58a18"/>
+      <stop offset="1" stop-color="#d95b08"/>
+    </radialGradient>
+    <linearGradient id="leaf" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5fc45a"/>
+      <stop offset="1" stop-color="#237d3b"/>
+    </linearGradient>
+  </defs>
+  <circle cx="256" cy="286" r="184" fill="url(#fruit)" stroke="#bd4d08" stroke-width="14"/>
+  <path d="M257 111C244 73 256 42 288 24" fill="none" stroke="#476929" stroke-width="22" stroke-linecap="round"/>
+  <path d="M272 103C310 51 374 57 411 82C370 119 320 133 272 103Z" fill="url(#leaf)" stroke="#237d3b" stroke-width="8" stroke-linejoin="round"/>
+  <path d="M146 219C164 173 201 143 245 134" fill="none" stroke="#ffd37b" stroke-width="18" stroke-linecap="round" opacity="0.48"/>
+  <path d="M230 233V351M230 233L348 208V323" fill="none" stroke="#fffaf0" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+  <ellipse cx="197" cy="355" rx="47" ry="35" transform="rotate(-16 197 355)" fill="#fffaf0"/>
+  <ellipse cx="315" cy="327" rx="47" ry="35" transform="rotate(-16 315 327)" fill="#fffaf0"/>
+</svg>

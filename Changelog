@@ -2,6 +2,11 @@ Strawberry Music Player
 =======================
 ChangeLog
 
+Version 2.1.4 (2026.08.31):
+
+  Bugfixes:
+    * Installed and used original Orange artwork for the KDE application icon, bundled icon fallbacks, system tray, dialogs, context view and empty collection state instead of Strawberry artwork.
+
 Version 2.1.3 (2026.08.30):
 
   Bugfixes:

@@ -231,7 +231,7 @@ int main(int argc, char *argv[]) {
   QThread::currentThread()->setObjectName(u"Main"_s);
 
   if (QGuiApplication::platformName() != "wayland"_L1) {
-    QGuiApplication::setWindowIcon(IconLoader::Load(u"strawberry"_s));
+    QGuiApplication::setWindowIcon(IconLoader::Load(u"com.goshapps.Orange"_s));
   }
 
 #if defined(USE_BUNDLE)
