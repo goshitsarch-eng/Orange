@@ -43,7 +43,7 @@ assert_file_excludes("dist/unix/${APP_ID}.appdata.xml" "strawberrymusicplayer.or
 assert_file_excludes("dist/unix/${APP_ID}.appdata.xml" "<update_contact>")
 assert_file_contains("dist/CMakeLists.txt" "data/icons/scalable/${APP_ID}.svg")
 assert_file_contains("dist/CMakeLists.txt" "share/icons/hicolor/scalable/apps")
-foreach(size 48 64 128)
+foreach(size 16 22 32 48 64 128)
   assert_file_contains("dist/CMakeLists.txt" "data/icons/${size}x${size}/${APP_ID}.png")
   assert_file_contains("dist/CMakeLists.txt" "share/icons/hicolor/${size}x${size}/apps")
 endforeach()

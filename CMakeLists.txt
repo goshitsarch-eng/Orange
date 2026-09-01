@@ -1559,6 +1559,11 @@ if(BUILD_TESTING)
            COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/tests/release_identity_test.cmake)
   add_test(NAME kde_branding
            COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/tests/kde_branding_test.cmake)
+  add_test(NAME desktop_integration_install
+           COMMAND ${CMAKE_COMMAND}
+             "-DBUILD_DIR=${CMAKE_BINARY_DIR}"
+             "-DINSTALL_PREFIX=/app"
+             -P ${CMAKE_SOURCE_DIR}/tests/desktop_integration_install_test.cmake)
 endif()
 
 if(TARGET GTest::gtest AND TARGET GTest::gmock AND Qt${QT_VERSION_MAJOR}Test_FOUND)
