@@ -1557,6 +1557,8 @@ add_subdirectory(dist)
 if(BUILD_TESTING)
   add_test(NAME release_identity
            COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/tests/release_identity_test.cmake)
+  add_test(NAME kde_branding
+           COMMAND ${CMAKE_COMMAND} -P ${CMAKE_SOURCE_DIR}/tests/kde_branding_test.cmake)
 endif()
 
 if(TARGET GTest::gtest AND TARGET GTest::gmock AND Qt${QT_VERSION_MAJOR}Test_FOUND)

@@ -84,7 +84,7 @@ CollectionView::CollectionView(QWidget *parent)
       total_song_count_(-1),
       total_artist_count_(-1),
       total_album_count_(-1),
-      nomusic_(u":/pictures/nomusic.png"_s),
+      nomusic_(u":/pictures/collection-empty.png"_s),
       context_menu_(nullptr),
       action_load_(nullptr),
       action_add_to_playlist_(nullptr),
@@ -341,7 +341,7 @@ void CollectionView::paintEvent(QPaintEvent *event) {
     QPainter p(viewport());
     QRect rect(viewport()->rect());
 
-    // Draw the confused strawberry
+    // Draw the Orange empty-collection artwork.
     QRect image_rect((rect.width() - nomusic_.width()) / 2, 50, nomusic_.width(), nomusic_.height());
     p.drawPixmap(image_rect, nomusic_);
 
