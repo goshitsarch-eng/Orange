@@ -2,6 +2,12 @@ Strawberry Music Player
 =======================
 ChangeLog
 
+Version 2.1.5 (2026.09.01):
+
+  Bugfixes:
+    * Installed the Orange application icon at KDE menu sizes as well as a scalable fallback, so Flatpak exports resolve the canonical com.goshapps.Orange icon without host cache workarounds.
+    * Aligned the KDE Wayland launcher identity with the Flatpak application ID and removed inherited Strawberry and Clementine launcher keywords.
+
 Version 2.1.4 (2026.08.31):
 
   Bugfixes:

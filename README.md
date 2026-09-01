@@ -3,7 +3,7 @@
 Orange is a **music player and music collection organizer**, a fork of *Strawberry* (itself forked from *Clementine* in 2018).
 It’s written in **C++ using the Qt 6 framework**, designed for **audiophiles and music collectors**, and follows the KDE look and feel: it prefers the Breeze widget style and icon theme when available, and supports system, light and dark color schemes.
 
-**Current release:** 2.1.4
+**Current release:** 2.1.5
 
 **Maker:** Gosh
 
