@@ -68,7 +68,8 @@ AppearanceSettingsPage::AppearanceSettingsPage(SettingsDialog *dialog, SharedPtr
       ui_(new Ui_AppearanceSettingsPage),
       appearance_(appearance),
       original_style_(QApplication::style() ? QApplication::style()->objectName() : QString()),
-      system_palette_(QApplication::palette()),
+      system_palette_(appearance->system_palette()),
+      original_palette_(QApplication::palette()),
       original_color_scheme_(AppearanceSettings::kDefaultColorScheme),
       original_use_custom_color_set_(false),
       background_image_type_(BackgroundImageType::Default) {
@@ -119,11 +120,8 @@ AppearanceSettingsPage::AppearanceSettingsPage(SettingsDialog *dialog, SharedPtr
   QObject::connect(ui_->use_custom_background_image, &QRadioButton::toggled, ui_->background_image_filename, &AppearanceSettingsPage::setEnabled);
   QObject::connect(ui_->use_custom_background_image, &QRadioButton::toggled, ui_->select_background_image_filename_button, &AppearanceSettingsPage::setEnabled);
 
-  QObject::connect(ui_->checkbox_background_image_stretch, &QCheckBox::toggled, ui_->checkbox_background_image_do_not_cut, &AppearanceSettingsPage::setEnabled);
-  QObject::connect(ui_->checkbox_background_image_stretch, &QCheckBox::toggled, ui_->checkbox_background_image_keep_aspect_ratio, &AppearanceSettingsPage::setEnabled);
-  QObject::connect(ui_->checkbox_background_image_stretch, &QCheckBox::toggled, ui_->spinbox_background_image_maxsize, &AppearanceSettingsPage::setDisabled);
-
-  QObject::connect(ui_->checkbox_background_image_keep_aspect_ratio, &QCheckBox::toggled, ui_->checkbox_background_image_do_not_cut, &AppearanceSettingsPage::setEnabled);
+  QObject::connect(ui_->checkbox_background_image_stretch, &QCheckBox::toggled, this, &AppearanceSettingsPage::UpdateBackgroundImageControls);
+  QObject::connect(ui_->checkbox_background_image_keep_aspect_ratio, &QCheckBox::toggled, this, &AppearanceSettingsPage::UpdateBackgroundImageControls);
 
   QObject::connect(ui_->slider_background_image_blur, &QSlider::valueChanged, this, &AppearanceSettingsPage::BackgroundImageBlurLevelChanged);
   QObject::connect(ui_->slider_background_image_opacity, &QSlider::valueChanged, this, &AppearanceSettingsPage::BackgroundImageOpacityLevelChanged);
@@ -149,6 +147,8 @@ void AppearanceSettingsPage::Load() {
   s.beginGroup(kSettingsGroup);
 
   // Style
+  original_palette_ = QApplication::palette();
+  system_palette_ = appearance_->system_palette();
   original_style_ = QApplication::style() ? QApplication::style()->objectName() : QString();
   ComboBoxLoadFromSettings(s, ui_->combobox_style, QLatin1String(kStyle), u"default"_s);
 
@@ -249,8 +249,7 @@ void AppearanceSettingsPage::Load() {
   ui_->slider_background_image_blur->setValue(s.value(kBackgroundImageBlurRadius, kDefaultBackgroundImageBlurRadius).toInt());
   ui_->slider_background_image_opacity->setValue(s.value(kBackgroundImageOpacityLevel, kDefaultBackgroundImageOpacityLevel).toInt());
 
-  ui_->checkbox_background_image_keep_aspect_ratio->setEnabled(ui_->checkbox_background_image_stretch->isChecked());
-  ui_->checkbox_background_image_do_not_cut->setEnabled(ui_->checkbox_background_image_stretch->isChecked() && ui_->checkbox_background_image_keep_aspect_ratio->isChecked());
+  UpdateBackgroundImageControls();
 
   // Button sizes
   ui_->spinbox_icon_size_tabbar_small_mode->setValue(s.value(kIconSizeTabbarSmallMode, kDefaultIconSizeTabbarSmallMode).toInt());
@@ -372,6 +371,16 @@ void AppearanceSettingsPage::Save() {
 
   appearance_->set_system_palette(system_palette_);
 
+  // Apply establishes the new baseline for any subsequent Cancel.
+  original_style_ = QApplication::style() ? QApplication::style()->objectName() : QString();
+  original_palette_ = QApplication::palette();
+  original_color_scheme_ = static_cast<ColorScheme>(ui_->combobox_color_scheme->currentIndex());
+  original_use_custom_color_set_ = use_custom_color_set;
+  original_colors_ = current_colors_;
+  original_tabbar_bg_color_ = current_tabbar_bg_color_;
+  original_background_image_filename_ = background_image_filename_;
+  original_playlist_playing_song_color_ = current_playlist_playing_song_color_;
+
 }
 
 void AppearanceSettingsPage::Cancel() {
@@ -383,12 +392,8 @@ void AppearanceSettingsPage::Cancel() {
 
   Appearance::ApplyColorScheme(original_color_scheme_);
 
-  if (original_use_custom_color_set_) {
-    Appearance::SetCustomPaletteColors(original_colors_);
-  }
-  else {
-    QApplication::setPalette(system_palette_);
-  }
+  QApplication::setPalette(original_palette_);
+  system_palette_ = appearance_->system_palette();
 
   background_image_filename_ = original_background_image_filename_;
   current_tabbar_bg_color_ = original_tabbar_bg_color_;
@@ -598,6 +603,15 @@ void AppearanceSettingsPage::SelectBackgroundImage() {
   if (selected_filename.isEmpty()) return;
   background_image_filename_ = selected_filename;
   ui_->background_image_filename->setText(background_image_filename_);
+
+}
+
+void AppearanceSettingsPage::UpdateBackgroundImageControls() {
+
+  const bool stretch = ui_->checkbox_background_image_stretch->isChecked();
+  ui_->checkbox_background_image_keep_aspect_ratio->setEnabled(stretch);
+  ui_->checkbox_background_image_do_not_cut->setEnabled(stretch && ui_->checkbox_background_image_keep_aspect_ratio->isChecked());
+  ui_->spinbox_background_image_maxsize->setEnabled(!stretch);
 
 }
 

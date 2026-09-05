@@ -25,6 +25,7 @@
 #include "core/settings.h"
 #include "constants/appearancesettings.h"
 #include "radioviewcontainer.h"
+#include "radiobrowsersearchview.h"
 #include "ui_radioviewcontainer.h"
 
 using namespace Qt::Literals::StringLiterals;
@@ -53,5 +54,6 @@ void RadioViewContainer::ReloadSettings() {
   s.endGroup();
 
   ui_->refresh->setIconSize(QSize(iconsize, iconsize));
+  ui_->search_view->ReloadSettings();
 
 }

@@ -61,6 +61,7 @@ class AppearanceSettingsPage : public SettingsPage {
   void SetDarkColors();
   void ResetToDefaultColors();
   void SelectBackgroundImage();
+  void UpdateBackgroundImageControls();
   void BackgroundImageBlurLevelChanged(const int value);
   void BackgroundImageOpacityLevelChanged(const int percent);
   void TabBarSystemColor(const bool checked);
@@ -93,6 +94,7 @@ class AppearanceSettingsPage : public SettingsPage {
 
   QString original_style_;
   QPalette system_palette_;
+  QPalette original_palette_;
   AppearanceSettings::ColorScheme original_color_scheme_;
   bool original_use_custom_color_set_;
   QMap<QPalette::ColorRole, QColor> original_colors_;

@@ -17,12 +17,14 @@
  *
  */
 
+#include <algorithm>
 #include <chrono>
 
 #include <QWidget>
 #include <QString>
 #include <QUrl>
 #include <QTimer>
+#include <QSignalBlocker>
 #include <QMenu>
 #include <QAction>
 #include <QShowEvent>
@@ -54,7 +56,8 @@ RadioBrowserSearchView::RadioBrowserSearchView(QWidget *parent)
       search_limit_(100),
       hide_broken_(true),
       has_more_(false),
-      countries_loaded_(false) {
+      countries_loaded_(false),
+      search_in_progress_(false) {
 
   ui_->setupUi(this);
 
@@ -129,35 +132,63 @@ void RadioBrowserSearchView::Init(RadioBrowserService *service) {
   QObject::connect(service_, &RadioBrowserService::SearchError, this, &RadioBrowserSearchView::SearchError);
   QObject::connect(service_, &RadioBrowserService::CountriesLoaded, this, &RadioBrowserSearchView::CountriesLoaded);
 
+  ReloadSettings();
+
+}
+
+void RadioBrowserSearchView::ReloadSettings() {
+
+  // Block filter signals so loading settings sends at most one search.
+  const QSignalBlocker country_blocker(ui_->combo_country);
+  const QSignalBlocker sort_blocker(ui_->combo_sort);
+  const int previous_limit = search_limit_;
+  const bool previous_hide_broken = hide_broken_;
+  const QString previous_country = default_country_;
+  const QString previous_sort = default_sort_;
+
   // Load defaults from settings
   Settings s;
   s.beginGroup(QLatin1String(RadioBrowserSettings::kSettingsGroup));
-  search_limit_ = s.value(QLatin1String(RadioBrowserSettings::kSearchLimit), RadioBrowserSettings::kSearchLimitDefault).toInt();
+  search_limit_ = std::clamp(s.value(QLatin1String(RadioBrowserSettings::kSearchLimit), RadioBrowserSettings::kSearchLimitDefault).toInt(), 10, 500);
   hide_broken_ = s.value(QLatin1String(RadioBrowserSettings::kHideBroken), RadioBrowserSettings::kHideBrokenDefault).toBool();
 
-  const QString default_sort = s.value(QLatin1String(RadioBrowserSettings::kDefaultSort), QLatin1String(RadioBrowserSettings::kDefaultSortDefault)).toString();
-  for (int i = 0; i < ui_->combo_sort->count(); ++i) {
-    if (ui_->combo_sort->itemData(i).toString() == default_sort) {
-      ui_->combo_sort->setCurrentIndex(i);
-      break;
-    }
-  }
-
+  default_sort_ = s.value(QLatin1String(RadioBrowserSettings::kDefaultSort), QLatin1String(RadioBrowserSettings::kDefaultSortDefault)).toString();
   default_country_ = s.value(QLatin1String(RadioBrowserSettings::kDefaultCountry)).toString();
   s.endGroup();
+
+  if (previous_sort != default_sort_) {
+    const int index = ui_->combo_sort->findData(default_sort_);
+    ui_->combo_sort->setCurrentIndex(index < 0 ? 0 : index);
+    ui_->results->header()->setSortIndicator(-1, Qt::AscendingOrder);
+  }
+  if (countries_loaded_ && previous_country != default_country_) {
+    const int index = ui_->combo_country->findData(default_country_);
+    ui_->combo_country->setCurrentIndex(index < 0 ? 0 : index);
+  }
+
+  if (service_ && (previous_limit != search_limit_ || previous_hide_broken != hide_broken_ || previous_country != default_country_ || previous_sort != default_sort_)) {
+    SearchTriggered();
+  }
 
 }
 
 void RadioBrowserSearchView::TextChanged(const QString &text) {
 
   Q_UNUSED(text)
+  if (service_) service_->CancelSearch();
+  search_in_progress_ = false;
+  has_more_ = false;
+  ui_->button_loadmore->hide();
   search_timer_->start();
 
 }
 
 void RadioBrowserSearchView::SearchTriggered() {
 
+  search_timer_->stop();
   current_offset_ = 0;
+  has_more_ = false;
+  ui_->button_loadmore->hide();
   model_->Clear();
   DoSearch();
 
@@ -168,9 +199,11 @@ void RadioBrowserSearchView::DoSearch() {
   if (!service_) return;
 
   const QString query = ui_->search->text().trimmed();
-  const QString country = ui_->combo_country->currentData().toString();
+  const QString country = countries_loaded_ ? ui_->combo_country->currentData().toString() : default_country_;
   const QString order = ui_->combo_sort->currentData().toString();
 
+  search_in_progress_ = true;
+  ui_->button_loadmore->setEnabled(false);
   ui_->label_status->setText(tr("Searching..."));
   ui_->stacked->setCurrentWidget(ui_->page_results);
 
@@ -180,10 +213,13 @@ void RadioBrowserSearchView::DoSearch() {
 
 void RadioBrowserSearchView::SearchFinished(const RadioChannelList &channels, const bool has_more) {
 
+  search_in_progress_ = false;
+  current_offset_ += search_limit_;
   has_more_ = has_more;
+  ui_->button_loadmore->setEnabled(true);
   ui_->button_loadmore->setVisible(has_more);
 
-  if (channels.isEmpty() && current_offset_ == 0) {
+  if (channels.isEmpty() && model_->rowCount() == 0) {
     ui_->label_status->setText(tr("No stations found."));
     return;
   }
@@ -196,12 +232,15 @@ void RadioBrowserSearchView::SearchFinished(const RadioChannelList &channels, co
 
 void RadioBrowserSearchView::SearchError(const QString &error) {
 
+  search_in_progress_ = false;
+  ui_->button_loadmore->setEnabled(true);
   ui_->label_status->setText(error);
 
 }
 
 void RadioBrowserSearchView::CountriesLoaded(const QList<QPair<QString, QString>> &countries) {
 
+  const QSignalBlocker blocker(ui_->combo_country);
   countries_loaded_ = true;
 
   ui_->combo_country->clear();
@@ -225,7 +264,7 @@ void RadioBrowserSearchView::CountriesLoaded(const QList<QPair<QString, QString>
 
 void RadioBrowserSearchView::LoadMore() {
 
-  current_offset_ += search_limit_;
+  if (search_in_progress_ || !has_more_ || search_timer_->isActive()) return;
   DoSearch();
 
 }
@@ -259,6 +298,7 @@ void RadioBrowserSearchView::ItemDoubleClicked(const QModelIndex &index) {
 
   RadioMimeData *mimedata = new RadioMimeData;
   mimedata->songs << channel.ToSong();
+  mimedata->from_doubleclick_ = true;
   Q_EMIT AddToPlaylist(mimedata);
 
 }

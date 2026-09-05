@@ -1,6 +1,20 @@
-Strawberry Music Player
+Orange Music Player
 =======================
 ChangeLog
+
+Version 2.1.6 (2026.09.05):
+
+  Bugfixes:
+    * Apply radio search settings without restarting, cancel obsolete requests, share server discovery and retry failed result pages without skipping stations.
+    * Avoid intermediate country-filter searches and respect configured playlist behavior when activating radio results.
+    * Remove the selected file-tree root correctly when paths overlap and activate selected files with Enter using the correct view.
+    * Commit typed folder paths with Enter instead of navigating while the path is being edited.
+    * Preserve applied appearance settings on Cancel, restore the original system palette and synchronize background-image option dependencies.
+    * Clear stale decimal-setting snapshots to prevent repeated unnecessary saves.
+
+  Changes:
+    * Add deterministic GUI/radio regression tests and Orange CI for Linux builds and offline tests on pushes and pull requests.
+    * Replace inherited support/build instructions with Orange documentation and record audit coverage and remaining validation limits.
 
 Version 2.1.5 (2026.09.01):
 

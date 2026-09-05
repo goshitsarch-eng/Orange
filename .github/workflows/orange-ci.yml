@@ -1,0 +1,39 @@
+name: Orange CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: orange-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Qt 6 build and regression tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      QT_QPA_PLATFORM: offscreen
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libboost-dev libicu-dev libasound2-dev \
+            libglib2.0-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+            libsqlite3-dev libtag1-dev qt6-base-dev qt6-base-private-dev qt6-tools-dev \
+            libkdsingleapplication-qt6-dev libgtest-dev libgmock-dev libfftw3-dev \
+            libchromaprint-dev libebur128-dev libpulse-dev gstreamer1.0-plugins-good
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_WERROR=ON
+      - name: Build application and tests
+        run: cmake --build build --target strawberry build_tests --parallel 2
+      - name: Run offline tests
+        run: ctest --test-dir build --output-on-failure --timeout 120
+      - name: Check command-line version
+        run: test "$(build/orange --version)" = "Orange 2.1.6"

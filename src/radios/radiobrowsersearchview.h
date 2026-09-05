@@ -47,6 +47,7 @@ class RadioBrowserSearchView : public QWidget {
   ~RadioBrowserSearchView() override;
 
   void Init(RadioBrowserService *service);
+  void ReloadSettings();
 
  protected:
   void showEvent(QShowEvent *e) override;
@@ -79,11 +80,13 @@ class RadioBrowserSearchView : public QWidget {
   QAction *action_add_to_playlist_;
 
   QString default_country_;
+  QString default_sort_;
   int current_offset_;
   int search_limit_;
   bool hide_broken_;
   bool has_more_;
   bool countries_loaded_;
+  bool search_in_progress_;
 };
 
 #endif  // RADIOBROWSERSEARCHVIEW_H

@@ -45,6 +45,7 @@ class RadioBrowserService : public RadioService {
   QUrl Donate() override;
 
   void Abort();
+  void CancelSearch();
 
   void Search(const QString &query,
               const QString &country = QString(),
@@ -75,9 +76,11 @@ class RadioBrowserService : public RadioService {
   void TestServer(const QString &hostname);
 
   QList<QNetworkReply*> replies_;
-  QList<int> pending_search_tasks_;
+  QNetworkReply *search_reply_;
+  int search_task_id_;
   QUrl server_url_;
   bool server_discovered_;
+  bool discovering_server_;
 
   // Pending search to execute after server discovery
   struct PendingSearch {

@@ -90,7 +90,7 @@ FileView::FileView(QWidget *parent)
   QObject::connect(ui_->forward, &QToolButton::clicked, undo_stack_, &QUndoStack::redo);
   QObject::connect(ui_->home, &QToolButton::clicked, this, &FileView::FileHome);
   QObject::connect(ui_->up, &QToolButton::clicked, this, &FileView::FileUp);
-  QObject::connect(ui_->path, &QLineEdit::textChanged, this, &FileView::ChangeFilePath);
+  QObject::connect(ui_->path, &QLineEdit::returnPressed, this, [this]() { ChangeFilePath(ui_->path->text()); });
   QObject::connect(ui_->toggle_view, &QToolButton::clicked, this, &FileView::ToggleViewMode);
 
   network_menu_ = new QMenu(this);
@@ -101,7 +101,6 @@ FileView::FileView(QWidget *parent)
   QObject::connect(undo_stack_, &QUndoStack::canRedoChanged, ui_->forward, &FileView::setEnabled);
 
   QObject::connect(ui_->list, &FileViewList::activated, this, &FileView::ItemActivated);
-  QObject::connect(ui_->list, &FileViewList::doubleClicked, this, &FileView::ItemDoubleClick);
   QObject::connect(ui_->list, &FileViewList::AddToPlaylist, this, &FileView::AddToPlaylist);
   QObject::connect(ui_->list, &FileViewList::CopyToCollection, this, &FileView::CopyToCollection);
   QObject::connect(ui_->list, &FileViewList::MoveToCollection, this, &FileView::MoveToCollection);
@@ -117,7 +116,6 @@ FileView::FileView(QWidget *parent)
   QObject::connect(ui_->tree, &FileViewTree::Delete, this, &FileView::Delete);
   QObject::connect(ui_->tree, &FileViewTree::EditTags, this, &FileView::EditTags);
   QObject::connect(ui_->tree, &FileViewTree::activated, this, &FileView::ItemActivated);
-  QObject::connect(ui_->tree, &FileViewTree::doubleClicked, this, &FileView::ItemDoubleClick);
 
   // Setup tree root management buttons
   ui_->add_tree_root->setIcon(IconLoader::Load(u"folder-new"_s));
@@ -239,12 +237,17 @@ void FileView::ChangeFilePathWithoutUndo(const QString &new_path) {
 
 void FileView::ItemActivated(const QModelIndex &idx) {
   // Only handle activation for list view (not tree view)
-  if (!tree_view_active_ && model_->isDir(idx)) {
+  if (!tree_view_active_ && model_ && model_->isDir(idx)) {
     ChangeFilePath(model_->filePath(idx));
+  }
+  else {
+    ItemDoubleClick(idx);
   }
 }
 
 void FileView::ItemDoubleClick(const QModelIndex &idx) {
+
+  if (!idx.isValid()) return;
 
   QString file_path;
   bool is_file = false;
@@ -514,25 +517,13 @@ void FileView::RemoveRootButtonClicked() {
   QModelIndex current = ui_->tree->currentIndex();
   if (!current.isValid()) return;
 
-  QString path;
+  if (!tree_model_) return;
 
-  // Get the file path from the appropriate model
-  if (tree_model_) {
-    path = tree_model_->data(current, FileViewTreeModel::Role_FilePath).toString();
+  while (current.parent().isValid()) {
+    current = current.parent();
   }
-
-  if (path.isEmpty()) return;
-
-  const QString clean_path = QDir::cleanPath(path);
-
-  // Check if this path or any parent is a configured root
-  for (const QString &root : std::as_const(tree_root_paths_)) {
-    const QString clean_root = QDir::cleanPath(root);
-    if (clean_path == clean_root || clean_path.startsWith(clean_root + QDir::separator())) {
-      RemoveTreeRootPath(root);
-      return;
-    }
-  }
+  const QString path = tree_model_->data(current, FileViewTreeModel::Role_FilePath).toString();
+  if (!path.isEmpty()) RemoveTreeRootPath(path);
 
 }
 
@@ -545,8 +536,9 @@ void FileView::keyPressEvent(QKeyEvent *e) {
       break;
     case Qt::Key_Enter:
     case Qt::Key_Return:
-      ItemDoubleClick(ui_->list->currentIndex());
-      break;
+      ItemActivated(tree_view_active_ ? ui_->tree->currentIndex() : ui_->list->currentIndex());
+      e->accept();
+      return;
     default:
       break;
   }

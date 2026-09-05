@@ -47,7 +47,10 @@ const QStringList RadioBrowserService::kServers = {
 
 RadioBrowserService::RadioBrowserService(const SharedPtr<TaskManager> task_manager, const SharedPtr<NetworkAccessManager> network, QObject *parent)
     : RadioService(Song::Source::RadioBrowser, u"Radio Browser"_s, IconLoader::Load(u"radiobrowser"_s), task_manager, network, parent),
+      search_reply_(nullptr),
+      search_task_id_(-1),
       server_discovered_(false),
+      discovering_server_(false),
       has_pending_search_(false),
       has_pending_countries_(false),
       server_index_(0),
@@ -62,6 +65,9 @@ QUrl RadioBrowserService::Donate() { return QUrl(u"https://www.radio-browser.inf
 
 void RadioBrowserService::Abort() {
 
+  CancelSearch();
+  discovering_server_ = false;
+
   while (!replies_.isEmpty()) {
     QNetworkReply *reply = replies_.takeFirst();
     QObject::disconnect(reply, nullptr, this, nullptr);
@@ -69,13 +75,24 @@ void RadioBrowserService::Abort() {
     reply->deleteLater();
   }
 
-  for (const int task_id : std::as_const(pending_search_tasks_)) {
-    task_manager_->SetTaskFinished(task_id);
-  }
-  pending_search_tasks_.clear();
-
   has_pending_search_ = false;
   has_pending_countries_ = false;
+
+}
+
+void RadioBrowserService::CancelSearch() {
+
+  has_pending_search_ = false;
+  if (!search_reply_) return;
+
+  QNetworkReply *reply = search_reply_;
+  search_reply_ = nullptr;
+  replies_.removeAll(reply);
+  QObject::disconnect(reply, nullptr, this, nullptr);
+  if (reply->isRunning()) reply->abort();
+  reply->deleteLater();
+  task_manager_->SetTaskFinished(search_task_id_);
+  search_task_id_ = -1;
 
 }
 
@@ -86,6 +103,9 @@ void RadioBrowserService::GetChannels() {
 }
 
 void RadioBrowserService::DiscoverServer() {
+
+  if (discovering_server_) return;
+  discovering_server_ = true;
 
   // The API guidelines ask clients to spread load across the mirrors, so start at a random server and advance round-robin on failure.
   server_index_ = QRandomGenerator::global()->bounded(static_cast<int>(kServers.size()));
@@ -103,6 +123,7 @@ void RadioBrowserService::TestServer(const QString &hostname) {
   url.setPath(u"/json/stats"_s);
 
   QNetworkRequest request(url);
+  request.setTransferTimeout(10000);
   QNetworkReply *reply = network_->get(request);
   replies_ << reply;
   QObject::connect(reply, &QNetworkReply::finished, this, [this, reply]() { ServerTestReply(reply); });
@@ -121,10 +142,14 @@ void RadioBrowserService::ServerTestReply(QNetworkReply *reply) {
       TestServer(kServers.at(server_index_));
     }
     else {
+      discovering_server_ = false;
+      has_pending_search_ = false;
       Q_EMIT SearchError(tr("No Radio Browser server available."));
     }
     return;
   }
+
+  discovering_server_ = false;
 
   // Server works
   QUrl url;
@@ -155,6 +180,8 @@ void RadioBrowserService::Search(const QString &query,
                                   const int limit,
                                   const int offset,
                                   const bool hide_broken) {
+
+  CancelSearch();
 
   if (!server_discovered_) {
     // Save search and discover server first
@@ -190,10 +217,12 @@ void RadioBrowserService::Search(const QString &query,
   url.setQuery(url_query);
 
   QNetworkRequest request(url);
+  request.setTransferTimeout(10000);
   QNetworkReply *reply = network_->get(request);
   replies_ << reply;
   const int task_id = task_manager_->StartTask(tr("Searching Radio Browser"));
-  pending_search_tasks_ << task_id;
+  search_reply_ = reply;
+  search_task_id_ = task_id;
   QObject::connect(reply, &QNetworkReply::finished, this, [this, reply, task_id, limit]() { SearchReply(reply, task_id, limit); });
 
 }
@@ -203,7 +232,8 @@ void RadioBrowserService::SearchReply(QNetworkReply *reply, const int task_id, c
   if (replies_.contains(reply)) replies_.removeAll(reply);
   reply->deleteLater();
   task_manager_->SetTaskFinished(task_id);
-  pending_search_tasks_.removeAll(task_id);
+  search_reply_ = nullptr;
+  search_task_id_ = -1;
 
   if (reply->error() != QNetworkReply::NoError) {
     // The server may have gone down since discovery; rediscover on the next search.
@@ -267,6 +297,7 @@ void RadioBrowserService::FetchCountries() {
   url.setPath(u"/json/countrycodes"_s);
 
   QNetworkRequest request(url);
+  request.setTransferTimeout(10000);
   QNetworkReply *reply = network_->get(request);
   replies_ << reply;
   QObject::connect(reply, &QNetworkReply::finished, this, [this, reply]() { CountriesReply(reply); });
