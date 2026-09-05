@@ -19,7 +19,7 @@ Reviewed main-window action connections, settings load/apply/cancel, radio searc
 | Appearance | Cancel after Apply could restore the pre-Apply theme; a page opened after custom colors were applied could mistake them for system colors. | Save the applied palette/style baseline and use Appearance's saved system palette. |
 | Background controls | Stretch could enable crop while aspect-ratio preservation was off. | Derive dependent control states together during loading and editing. |
 | Decimal settings | Reinitialization retained old double-spinbox snapshots, causing repeated saves on later Apply operations. | Clear decimal snapshots along with the other widget snapshots. |
-| Documentation/CI | README directed Orange users to upstream builds/support; inherited CI excluded Orange pushes. | Document Orange's own behavior and add a dedicated Linux build/test workflow. |
+| Documentation/CI | README directed Orange users to upstream builds/support; inherited CI excluded Orange pushes. | Document Orange's own behavior and add native x86_64/ARM64 builds, tests and gated tar.gz/Flatpak releases. |
 
 ## Verification
 
@@ -31,6 +31,6 @@ Existing tests cover playlists, collection/database operations, parsers, utiliti
 
 - Native KDE/Wayland visual inspection and physical audio outputs, MTP/iPod devices and audio CDs require a suitable desktop/device environment.
 - Authenticated streaming, scrobbling and live cover/lyrics services require working accounts and external endpoints. Their main GUI entries being connected is not proof of provider availability.
-- macOS and Windows packaging/signing and release binary publication are outside this patch's verification.
+- macOS and Windows packaging/signing are outside this patch's verification. Linux tar.gz and Flatpak packages are built for x86_64 and ARM64 before automatic publication.
 - Mounted network-share enumeration is connected to the Files menu; mounting new shares is delegated to the system file manager.
 - Waveform mode is already connected to playback and settings; existing waveform tests remain part of the build.

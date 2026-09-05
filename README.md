@@ -14,6 +14,7 @@ The permanent desktop and AppStream catalog identity is `com.goshapps.Orange`. T
 - [Orange releases](https://github.com/goshitsarch-eng/Orange/releases)
 - [Report an Orange bug or request a feature](https://github.com/goshitsarch-eng/Orange/issues)
 - [Changelog](Changelog)
+- [Install packages and automatic releases](docs/releases.md)
 - [2.1.6 GUI audit and verification](docs/gui-audit-2.1.6.md)
 
 Please include your Orange version, operating system, Qt version, installation method and reproduction steps when reporting an issue. Strawberry's wiki can help with inherited features, but its packages, sponsorship terms and support policies belong to Strawberry, not Orange.
@@ -69,7 +70,7 @@ QT_QPA_PLATFORM=offscreen ctest --test-dir build --output-on-failure --timeout 1
 
 `gui_regressions_test` exercises appearance, file-tree activation/root removal and radio search behavior using controlled network replies. It needs no radio account or external service. The separate `lyrics_live_tests` target contacts real providers and is intentionally excluded from the offline suite.
 
-Orange CI runs on pushes and pull requests. The inherited packaging workflow remains separate; building and testing a commit does not publish release binaries automatically.
+Orange CI runs native x86_64 and ARM64 builds/tests on pushes and pull requests. An unpublished version also builds both Flatpak bundles. A successful push to `master` publishes that version as a tagged GitHub release with both Linux tar.gz archives, both Flatpaks, source and checksums. See [release instructions](docs/releases.md).
 
 ## Credits and license
 

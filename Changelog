@@ -13,6 +13,7 @@ Version 2.1.6 (2026.09.05):
     * Clear stale decimal-setting snapshots to prevent repeated unnecessary saves.
 
   Changes:
+    * Automatically build and publish versioned x86_64 and ARM64 Linux tar.gz archives and Flatpak bundles, source and checksums after all build/test jobs pass.
     * Add deterministic GUI/radio regression tests and Orange CI for Linux builds and offline tests on pushes and pull requests.
     * Replace inherited support/build instructions with Orange documentation and record audit coverage and remaining validation limits.
 

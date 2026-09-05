@@ -1,0 +1,124 @@
+# Dependency versions/checksums adapted from flathub/org.strawberrymusicplayer.strawberry.
+app-id: com.goshapps.Orange
+runtime: org.kde.Platform
+runtime-version: '6.11'
+sdk: org.kde.Sdk
+command: orange
+cleanup:
+- /include
+- /lib/cmake
+- /lib/pkgconfig
+- /share/info
+- /share/man
+- /share/tagparser
+- /share/c++utilities
+- /bin/mmc-tool
+finish-args:
+- --share=ipc
+- --socket=fallback-x11
+- --socket=wayland
+- --socket=pulseaudio
+- --device=all
+- --share=network
+- --filesystem=xdg-music
+- --filesystem=/mnt
+- --filesystem=/media
+- --filesystem=/run/media
+- --system-talk-name=org.freedesktop.Avahi
+- --talk-name=org.freedesktop.Notifications
+- --system-talk-name=org.freedesktop.UDisks2
+- --talk-name=org.wiimotedev.deviceEvents
+- --talk-name=org.mpris.MediaPlayer2.Player
+- --own-name=org.mpris.MediaPlayer2.orange
+- --talk-name=org.kde.StatusNotifierWatcher
+- --talk-name=org.kde.kglobalaccel
+- --filesystem=xdg-run/app/com.discordapp.Discord:create
+- --filesystem=xdg-run/gvfs:ro
+- --filesystem=xdg-run/kio-fuse:ro
+modules:
+- name: boost
+  buildsystem: simple
+  build-commands:
+  - ./bootstrap.sh --prefix=/app --with-libraries=headers
+  - ./b2 -j $FLATPAK_BUILDER_N_JOBS install
+  sources:
+  - type: archive
+    url: https://archives.boost.io/release/1.91.0/source/boost_1_91_0.tar.gz
+    sha256: 5734305f40a76c30f951c9abd409a45a2a19fb546efe4162119250bbe4d3a463
+- name: chromaprint
+  config-opts:
+  - -DCMAKE_BUILD_TYPE=Release
+  buildsystem: cmake-ninja
+  sources:
+  - type: archive
+    url: https://github.com/acoustid/chromaprint/releases/download/v1.6.0/chromaprint-1.6.0.tar.gz
+    sha256: 9d33482e56a1389a37a0d6742c376139fa43e3b8a63d29003222b93db2cb40da
+- name: libebur128
+  buildsystem: cmake-ninja
+  config-opts:
+  - -DCMAKE_BUILD_TYPE=Release
+  - -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+  sources:
+  - type: archive
+    url: https://github.com/jiixyj/libebur128/archive/refs/tags/v1.2.6.tar.gz
+    sha256: baa7fc293a3d4651e244d8022ad03ab797ca3c2ad8442c43199afe8059faa613
+- name: libcdio
+  config-opts:
+  - --without-cd-drive
+  - --without-cd-info
+  - --without-cdda-player
+  - --without-cd-read
+  - --without-iso-info
+  - --without-iso-read
+  - --with-pic
+  - --disable-static
+  sources:
+  - type: archive
+    url: https://github.com/libcdio/libcdio/releases/download/2.3.0/libcdio-2.3.0.tar.gz
+    sha256: 37bcb13296febbcff9dc4485834bac09212cb463c31fcea52f70ee1dd3a5a5de
+  cleanup:
+  - /bin
+- name: libmtp
+  cleanup:
+  - /bin
+  - /share
+  config-opts:
+  - --disable-static
+  - --with-udev=/app/lib/udev
+  sources:
+  - type: archive
+    url: https://github.com/libmtp/libmtp/releases/download/v1.1.23/libmtp-1.1.23.tar.gz
+    sha256: 74a2b6e8cb4a0304e95b995496ea3ac644c29371649b892b856e22f12a0bdeed
+- name: KDSingleApplication
+  buildsystem: cmake-ninja
+  builddir: true
+  config-opts:
+  - -DCMAKE_BUILD_TYPE=Release
+  - -DKDSingleApplication_EXAMPLES=OFF
+  sources:
+  - type: archive
+    url: https://github.com/KDAB/KDSingleApplication/releases/download/v1.2.1/kdsingleapplication-1.2.1.tar.gz
+    sha256: e3254ce9dc5ecf6d61ef83264bc61d486a307f0e3c9ed1bb2176f068cdbcbe09
+- name: sparsehash
+  sources:
+  - type: archive
+    url: https://github.com/sparsehash/sparsehash/archive/sparsehash-2.0.4.tar.gz
+    sha256: 8cd1a95827dfd8270927894eb77f62b4087735cbede953884647f16c521c7e58
+- name: orange
+  buildsystem: cmake-ninja
+  config-opts:
+  - -DCMAKE_BUILD_TYPE=Release
+  - -DBUILD_TESTING=OFF
+  - -DENABLE_GPOD=OFF
+  - -DINSTALL_TRANSLATIONS=ON
+  sources:
+  - type: dir
+    path: ../..
+    skip:
+    - build
+    - .git
+    - .flatpak-builder
+    - flatpak-build
+    - flatpak-repo
+    - release-artifacts
+    - staging

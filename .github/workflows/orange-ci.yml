@@ -10,15 +10,55 @@ permissions:
 
 concurrency:
   group: orange-ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
-  linux:
-    name: Qt 6 build and regression tests
+  version:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      package: ${{ steps.version.outputs.package }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read version and check for a published release
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(python3 dist/scripts/release-version.py)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          # A missing release or an unfinished draft needs packaging. Authentication/server errors fail the job.
+          status=$(curl --silent --show-error --output release.json --write-out '%{http_code}' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/releases/tags/v$version")
+          case "$status" in
+            404) echo 'package=true' >> "$GITHUB_OUTPUT" ;;
+            200) echo "package=$(jq -r '.draft' release.json)" >> "$GITHUB_OUTPUT" ;;
+            *) cat release.json; exit 1 ;;
+          esac
+      - name: Validate release metadata and packaging contract
+        run: |
+          cmake -P tests/release_identity_test.cmake
+          cmake -P tests/kde_branding_test.cmake
+          python3 tests/release_workflow_test.py
+
+  linux:
+    name: Linux ${{ matrix.arch }} build and tests
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
     env:
       QT_QPA_PLATFORM: offscreen
+      ORANGE_VERSION: ${{ needs.version.outputs.version }}
+      ORANGE_ARCH: ${{ matrix.arch }}
     steps:
       - uses: actions/checkout@v4
       - name: Install build dependencies
@@ -27,13 +67,127 @@ jobs:
           sudo apt-get install -y ninja-build libboost-dev libicu-dev libasound2-dev \
             libglib2.0-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
             libsqlite3-dev libtag1-dev qt6-base-dev qt6-base-private-dev qt6-tools-dev \
-            libkdsingleapplication-qt6-dev libgtest-dev libgmock-dev libfftw3-dev \
-            libchromaprint-dev libebur128-dev libpulse-dev gstreamer1.0-plugins-good
+            libgtest-dev libgmock-dev libfftw3-dev \
+            libchromaprint-dev libebur128-dev libpulse-dev libcdio-dev libmtp-dev \
+            libgpod-dev gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
+            gstreamer1.0-plugins-ugly gstreamer1.0-libav
+      - name: Build pinned single-instance dependency
+        run: |
+          curl -fL --retry 3 -o /tmp/kdsingleapplication.tar.gz https://github.com/KDAB/KDSingleApplication/releases/download/v1.2.1/kdsingleapplication-1.2.1.tar.gz
+          echo 'e3254ce9dc5ecf6d61ef83264bc61d486a307f0e3c9ed1bb2176f068cdbcbe09  /tmp/kdsingleapplication.tar.gz' | sha256sum -c -
+          mkdir -p /tmp/kdsingleapplication
+          tar -xf /tmp/kdsingleapplication.tar.gz -C /tmp/kdsingleapplication --strip-components=1
+          cmake -S /tmp/kdsingleapplication -B /tmp/kdsingleapplication-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DKDSingleApplication_QT6=ON -DKDSingleApplication_EXAMPLES=OFF -DKDSingleApplication_STATIC=ON
+          cmake --build /tmp/kdsingleapplication-build --parallel 2
+          sudo cmake --install /tmp/kdsingleapplication-build
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DBUILD_WERROR=ON
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_WERROR=ON -DINSTALL_TRANSLATIONS=ON -DCMAKE_INSTALL_PREFIX=/usr/local
       - name: Build application and tests
         run: cmake --build build --target strawberry build_tests --parallel 2
       - name: Run offline tests
         run: ctest --test-dir build --output-on-failure --timeout 120
       - name: Check command-line version
-        run: test "$(build/orange --version)" = "Orange 2.1.6"
+        run: test "$(build/orange --version)" = "Orange $ORANGE_VERSION"
+      - name: Package Linux install archive
+        if: needs.version.outputs.package == 'true'
+        run: |
+          bash dist/scripts/package-linux.sh
+      - uses: actions/upload-artifact@v4
+        if: needs.version.outputs.package == 'true'
+        with:
+          name: linux-${{ matrix.arch }}
+          path: release-artifacts/*.tar.gz
+          if-no-files-found: error
+
+  flatpak:
+    name: Flatpak ${{ matrix.arch }}
+    needs: version
+    if: needs.version.outputs.package == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-24.04
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    env:
+      ORANGE_VERSION: ${{ needs.version.outputs.version }}
+      ORANGE_ARCH: ${{ matrix.arch }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Flatpak tools and SDK
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user --noninteractive flathub org.kde.Platform//6.11 org.kde.Sdk//6.11
+      - name: Cache dependency builds
+        uses: actions/cache@v4
+        with:
+          path: .flatpak-builder
+          key: flatpak-${{ matrix.arch }}-${{ hashFiles('dist/flatpak/com.goshapps.Orange.yml') }}
+      - name: Build and export bundle
+        run: |
+          flatpak-builder --user --force-clean --repo=flatpak-repo --default-branch=stable \
+            --arch="$ORANGE_ARCH" --jobs=2 flatpak-build dist/flatpak/com.goshapps.Orange.yml
+          mkdir -p release-artifacts
+          flatpak build-bundle --arch="$ORANGE_ARCH" \
+            --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo \
+            flatpak-repo "release-artifacts/orange-$ORANGE_VERSION-$ORANGE_ARCH.flatpak" com.goshapps.Orange stable
+      - name: Verify exported application
+        run: |
+          flatpak install --user --noninteractive "release-artifacts/orange-$ORANGE_VERSION-$ORANGE_ARCH.flatpak"
+          test "$(flatpak run --env=QT_QPA_PLATFORM=offscreen com.goshapps.Orange --version)" = "Orange $ORANGE_VERSION"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: flatpak-${{ matrix.arch }}
+          path: release-artifacts/*.flatpak
+          if-no-files-found: error
+
+  release:
+    name: Publish versioned GitHub release
+    needs: [version, linux, flatpak]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master' && needs.version.outputs.package == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      ORANGE_VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true
+      - name: Verify all packages and create source archive
+        run: |
+          for arch in x86_64 aarch64; do
+            test -s "release-artifacts/orange-$ORANGE_VERSION-linux-$arch.tar.gz"
+            test -s "release-artifacts/orange-$ORANGE_VERSION-$arch.flatpak"
+          done
+          git archive --format=tar.gz --prefix="orange-$ORANGE_VERSION/" \
+            -o "release-artifacts/orange-$ORANGE_VERSION-source.tar.gz" "$GITHUB_SHA"
+          (cd release-artifacts && sha256sum *.tar.gz *.flatpak > SHA256SUMS)
+          python3 dist/scripts/release-version.py --notes > release-notes.md
+      - name: Publish only after both architectures pass
+        run: |
+          tag="v$ORANGE_VERSION"
+          # Never move an existing tag to a different commit.
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            test "$(git rev-list -n 1 "$tag")" = "$GITHUB_SHA"
+          fi
+          if gh release view "$tag" --json isDraft --jq '.isDraft' > draft.txt 2>/dev/null; then
+            test "$(cat draft.txt)" = true
+            gh release upload "$tag" release-artifacts/* --clobber
+          else
+            gh release create "$tag" release-artifacts/* --target "$GITHUB_SHA" \
+              --title "Orange $ORANGE_VERSION" --notes-file release-notes.md --draft
+          fi
+          gh release edit "$tag" --draft=false --latest
