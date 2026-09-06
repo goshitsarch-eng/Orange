@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: orange-ci-${{ github.workflow }}-${{ github.ref }}
+  group: orange-ci-${{ github.workflow }}-${{ github.ref == 'refs/heads/master' && github.ref || github.sha }}
   cancel-in-progress: false
 
 jobs:
@@ -64,7 +64,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build libsparsehash-dev libboost-dev libicu-dev libasound2-dev \
+          sudo apt-get install -y ninja-build ccache libsparsehash-dev libboost-dev libicu-dev libasound2-dev \
             libglib2.0-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
             libsqlite3-dev libtag1-dev qt6-base-dev qt6-base-private-dev qt6-tools-dev \
             libgtest-dev libgmock-dev libfftw3-dev \
@@ -81,10 +81,20 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release -DKDSingleApplication_QT6=ON -DKDSingleApplication_EXAMPLES=OFF -DKDSingleApplication_STATIC=ON
           cmake --build /tmp/kdsingleapplication-build --parallel 2
           sudo cmake --install /tmp/kdsingleapplication-build
+      - uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ccache
+          key: native-${{ matrix.arch }}-${{ github.sha }}
+          restore-keys: native-${{ matrix.arch }}-
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_WERROR=ON -DINSTALL_TRANSLATIONS=ON -DCMAKE_INSTALL_PREFIX=/usr/local
       - name: Build application and tests
         run: cmake --build build --target strawberry build_tests --parallel 2
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: ~/.cache/ccache
+          key: native-${{ matrix.arch }}-${{ github.sha }}
       - name: Run offline tests
         run: ctest --test-dir build --output-on-failure --timeout 120
       - name: Check command-line version

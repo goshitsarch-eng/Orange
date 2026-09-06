@@ -196,11 +196,13 @@ TEST_F(GuiRegressionsTest, RemovingNestedRootKeepsItsParentRoot) {
 }
 
 TEST_F(GuiRegressionsTest, EnterInFileTreeAddsSelectedFileExactlyOnce) {
-  const QString filename = directory_.path() + u"/track.flac"_s;
+  const QString music = directory_.path() + u"/music"_s;
+  ASSERT_TRUE(QDir().mkpath(music));
+  const QString filename = music + u"/track.flac"_s;
   QFile file(filename);
   ASSERT_TRUE(file.open(QIODevice::WriteOnly));
   file.close();
-  Settings().setValue(u"FileView/tree_root_paths"_s, QStringList{directory_.path()});
+  Settings().setValue(u"FileView/tree_root_paths"_s, QStringList{music});
   Settings().setValue(u"FileView/tree_view_active"_s, true);
   FileView view;
   view.show();
