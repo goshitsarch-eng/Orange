@@ -79,7 +79,7 @@ jobs:
           tar -xf /tmp/kdsingleapplication.tar.gz -C /tmp/kdsingleapplication --strip-components=1
           cmake -S /tmp/kdsingleapplication -B /tmp/kdsingleapplication-build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release -DKDSingleApplication_QT6=ON -DKDSingleApplication_EXAMPLES=OFF -DKDSingleApplication_STATIC=ON
-          cmake --build /tmp/kdsingleapplication-build --parallel 2
+          cmake --build /tmp/kdsingleapplication-build --parallel 4
           sudo cmake --install /tmp/kdsingleapplication-build
       - uses: actions/cache/restore@v4
         with:
@@ -89,7 +89,7 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DBUILD_WERROR=ON -DINSTALL_TRANSLATIONS=ON -DCMAKE_INSTALL_PREFIX=/usr/local
       - name: Build application and tests
-        run: cmake --build build --target strawberry build_tests --parallel 2
+        run: cmake --build build --target strawberry build_tests --parallel 4
       - uses: actions/cache/save@v4
         if: always()
         with:
@@ -144,7 +144,7 @@ jobs:
       - name: Build and export bundle
         run: |
           flatpak-builder --user --force-clean --repo=flatpak-repo --default-branch=stable \
-            --arch="$ORANGE_ARCH" --jobs=2 flatpak-build dist/flatpak/com.goshapps.Orange.yml
+            --arch="$ORANGE_ARCH" --ccache --jobs=4 flatpak-build dist/flatpak/com.goshapps.Orange.yml
           mkdir -p release-artifacts
           flatpak build-bundle --arch="$ORANGE_ARCH" \
             --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo \

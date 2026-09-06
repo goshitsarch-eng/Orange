@@ -236,7 +236,7 @@ void FileView::ChangeFilePathWithoutUndo(const QString &new_path) {
 }
 
 void FileView::ItemActivated(const QModelIndex &idx) {
-  // Only handle activation for list view (not tree view)
+  // Directories navigate in list mode; file activation uses the originating view index.
   if (!tree_view_active_ && model_ && model_->isDir(idx)) {
     ChangeFilePath(model_->filePath(idx));
   }
@@ -536,11 +536,8 @@ void FileView::keyPressEvent(QKeyEvent *e) {
       break;
     case Qt::Key_Enter:
     case Qt::Key_Return:
-      if (ui_->path->hasFocus()) {
-        e->accept();
-        return;
-      }
-      ItemActivated(tree_view_active_ ? ui_->tree->currentIndex() : ui_->list->currentIndex());
+      // The child view emits activated() before propagating Enter to its parent.
+      // The path field likewise handles returnPressed(); do not repeat either action.
       e->accept();
       return;
     default:
