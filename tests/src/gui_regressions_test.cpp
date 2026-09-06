@@ -223,6 +223,25 @@ TEST_F(GuiRegressionsTest, EnterInFileTreeAddsSelectedFileExactlyOnce) {
   EXPECT_EQ(additions, 1);
 }
 
+TEST_F(GuiRegressionsTest, TypedFilePathNavigatesOnlyOnEnter) {
+  const QString music = directory_.path() + u"/music"_s;
+  ASSERT_TRUE(QDir().mkpath(music));
+  FileView view;
+  view.SetPath(directory_.path());
+  view.show();
+  auto *path = view.findChild<QLineEdit*>(u"path"_s);
+  ASSERT_NE(path, nullptr);
+  QSignalSpy navigations(&view, &FileView::PathChanged);
+  QSignalSpy additions(&view, &FileView::AddToPlaylist);
+  path->setFocus();
+  path->setText(music);
+  EXPECT_EQ(navigations.count(), 0);
+  QTest::keyClick(path, Qt::Key_Return);
+  ASSERT_EQ(navigations.count(), 1);
+  EXPECT_EQ(navigations.first().first().toString(), music);
+  EXPECT_EQ(additions.count(), 0);
+}
+
 TEST_F(GuiRegressionsTest, RadioSearchCoalescesDiscoveryAndDiscardsObsoleteReply) {
   auto tasks = std::make_shared<TaskManager>();
   auto network = std::make_shared<ControlledNetwork>();

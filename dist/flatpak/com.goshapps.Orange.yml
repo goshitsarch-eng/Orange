@@ -49,6 +49,7 @@ modules:
 - name: chromaprint
   config-opts:
   - -DCMAKE_BUILD_TYPE=Release
+  - -DCMAKE_INSTALL_LIBDIR=lib
   buildsystem: cmake-ninja
   sources:
   - type: archive
@@ -59,6 +60,7 @@ modules:
   config-opts:
   - -DCMAKE_BUILD_TYPE=Release
   - -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+  - -DCMAKE_INSTALL_LIBDIR=lib
   sources:
   - type: archive
     url: https://github.com/jiixyj/libebur128/archive/refs/tags/v1.2.6.tar.gz
@@ -96,6 +98,7 @@ modules:
   config-opts:
   - -DCMAKE_BUILD_TYPE=Release
   - -DKDSingleApplication_EXAMPLES=OFF
+  - -DCMAKE_INSTALL_LIBDIR=lib
   sources:
   - type: archive
     url: https://github.com/KDAB/KDSingleApplication/releases/download/v1.2.1/kdsingleapplication-1.2.1.tar.gz
@@ -112,6 +115,7 @@ modules:
   - -DBUILD_TESTING=OFF
   - -DENABLE_GPOD=OFF
   - -DINSTALL_TRANSLATIONS=ON
+  - -DCMAKE_INSTALL_LIBDIR=lib
   sources:
   - type: dir
     path: ../..

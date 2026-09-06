@@ -136,10 +136,11 @@ jobs:
           flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
           flatpak install --user --noninteractive flathub org.kde.Platform//6.11 org.kde.Sdk//6.11
       - name: Cache dependency builds
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: .flatpak-builder
-          key: flatpak-${{ matrix.arch }}-${{ hashFiles('dist/flatpak/com.goshapps.Orange.yml') }}
+          key: flatpak-${{ matrix.arch }}-${{ hashFiles('dist/flatpak/com.goshapps.Orange.yml') }}-${{ github.sha }}
+          restore-keys: flatpak-${{ matrix.arch }}-
       - name: Build and export bundle
         run: |
           flatpak-builder --user --force-clean --repo=flatpak-repo --default-branch=stable \
@@ -148,6 +149,11 @@ jobs:
           flatpak build-bundle --arch="$ORANGE_ARCH" \
             --runtime-repo=https://flathub.org/repo/flathub.flatpakrepo \
             flatpak-repo "release-artifacts/orange-$ORANGE_VERSION-$ORANGE_ARCH.flatpak" com.goshapps.Orange stable
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: .flatpak-builder
+          key: flatpak-${{ matrix.arch }}-${{ hashFiles('dist/flatpak/com.goshapps.Orange.yml') }}-${{ github.sha }}
       - name: Verify exported application
         run: |
           flatpak install --user --noninteractive "release-artifacts/orange-$ORANGE_VERSION-$ORANGE_ARCH.flatpak"

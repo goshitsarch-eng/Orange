@@ -536,6 +536,10 @@ void FileView::keyPressEvent(QKeyEvent *e) {
       break;
     case Qt::Key_Enter:
     case Qt::Key_Return:
+      if (ui_->path->hasFocus()) {
+        e->accept();
+        return;
+      }
       ItemActivated(tree_view_active_ ? ui_->tree->currentIndex() : ui_->list->currentIndex());
       e->accept();
       return;

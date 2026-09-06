@@ -2,7 +2,7 @@ Orange Music Player
 =======================
 ChangeLog
 
-Version 2.1.6 (2026.09.05):
+Version 2.1.6 (2026.09.06):
 
   Bugfixes:
     * Apply radio search settings without restarting, cancel obsolete requests, share server discovery and retry failed result pages without skipping stations.
