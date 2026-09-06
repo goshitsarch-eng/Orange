@@ -42,7 +42,7 @@ Third-party services can require accounts, credentials or subscriptions and can 
 
 ## Build from source
 
-Required: CMake 3.13+, a C++17 compiler, pkg-config, Boost, GLib, Qt 6.4+ (Core, Concurrent, Gui, Widgets, Network, SQL and applicable D-Bus support), SQLite 3.9+, GStreamer, TagLib 1.12+, ICU and KDSingleApplication 1.1.0+. Linux also requires ALSA development files.
+Required: CMake 3.13+, a C++17 compiler, pkg-config, Boost, GLib, Qt 6.4+ (Core, Concurrent, Gui, Widgets, Network, SQL and applicable D-Bus support), SQLite 3.9+, GStreamer, TagLib 1.12+, ICU and KDSingleApplication 1.1.0+. The default stream tag reader also requires sparsehash. Linux also requires ALSA development files.
 
 Optional dependencies include Chromaprint, FFTW3, PulseAudio, libcdio, libmtp, libgpod and libebur128. Install GStreamer base and good plugins, plus bad, ugly or libav as needed for your codecs. CMake prints the enabled and disabled features during configuration.
 

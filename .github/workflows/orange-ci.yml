@@ -64,7 +64,7 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build libboost-dev libicu-dev libasound2-dev \
+          sudo apt-get install -y ninja-build libsparsehash-dev libboost-dev libicu-dev libasound2-dev \
             libglib2.0-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
             libsqlite3-dev libtag1-dev qt6-base-dev qt6-base-private-dev qt6-tools-dev \
             libgtest-dev libgmock-dev libfftw3-dev \

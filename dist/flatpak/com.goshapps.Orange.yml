@@ -4,6 +4,7 @@ runtime: org.kde.Platform
 runtime-version: '6.11'
 sdk: org.kde.Sdk
 command: orange
+separate-locales: false
 cleanup:
 - /include
 - /lib/cmake
