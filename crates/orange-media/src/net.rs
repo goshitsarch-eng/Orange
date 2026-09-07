@@ -9,7 +9,6 @@
 use serde::Deserialize;
 
 use crate::online::Secret;
-use crate::radio::RADIO_BROWSER_API_BASE;
 use crate::scrobble::{canonical_param_string, lastfm_scrobble_params};
 
 /// Required contact User-Agent for the Radio Browser / MusicBrainz APIs.
@@ -59,7 +58,8 @@ pub struct Station {
     pub bitrate: i64,
 }
 
-/// Search stations by name. `base` defaults to [`RADIO_BROWSER_API_BASE`];
+/// Search stations by name. `base` defaults to
+/// [`crate::radio::RADIO_BROWSER_API_BASE`];
 /// tests inject a local server.
 pub async fn search_stations(
     client: &reqwest::Client,
@@ -417,6 +417,7 @@ pub async fn submit_subsonic(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::radio::RADIO_BROWSER_API_BASE;
 
     const STATION_JSON: &str = r#"[{
         "stationuuid": "9617a7b9-0601-11e8-8d8a-52543be04c81",
