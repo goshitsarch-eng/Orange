@@ -5,5 +5,6 @@
 pub mod appearance;
 pub mod codecs;
 pub mod identity;
+pub mod paths;
 pub mod song;
 pub mod version;

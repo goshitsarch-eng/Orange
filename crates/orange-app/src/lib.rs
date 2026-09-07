@@ -4,6 +4,8 @@
 
 pub mod about;
 pub mod dialogs;
+pub mod files;
+pub mod library;
 #[cfg(feature = "dbus")]
 pub mod mpris_host;
 pub mod nav;

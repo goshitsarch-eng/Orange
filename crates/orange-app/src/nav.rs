@@ -1,16 +1,16 @@
-//! Navigation: Collection / Playlists / Now Playing / Lyrics / Devices /
-//! Radio / Settings. One enum drives the libcosmic nav bar, the headless
-//! shell, and MPRIS-adjacent routing.
+//! Navigation: Collection / Playlists / Files / Radio / Devices / Settings.
+//! One enum drives the libcosmic nav bar (the Strawberry-style source
+//! sidebar). The playlist table stays visible for every source except
+//! Settings.
 
-/// Every top-level page, in nav-bar order.
+/// Every top-level source, in nav-bar order (Strawberry's left tabs).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Page {
     Collection,
     Playlists,
-    NowPlaying,
-    Lyrics,
-    Devices,
+    Files,
     Radio,
+    Devices,
     Settings,
 }
 
@@ -18,10 +18,9 @@ impl Page {
     pub const ALL: &[Page] = &[
         Self::Collection,
         Self::Playlists,
-        Self::NowPlaying,
-        Self::Lyrics,
-        Self::Devices,
+        Self::Files,
         Self::Radio,
+        Self::Devices,
         Self::Settings,
     ];
 
@@ -29,10 +28,9 @@ impl Page {
         match self {
             Self::Collection => "Collection",
             Self::Playlists => "Playlists",
-            Self::NowPlaying => "Now Playing",
-            Self::Lyrics => "Lyrics",
-            Self::Devices => "Devices",
+            Self::Files => "Files",
             Self::Radio => "Radio",
+            Self::Devices => "Devices",
             Self::Settings => "Settings",
         }
     }
@@ -42,10 +40,9 @@ impl Page {
         match self {
             Self::Collection => "collection",
             Self::Playlists => "playlists",
-            Self::NowPlaying => "now-playing",
-            Self::Lyrics => "lyrics",
-            Self::Devices => "devices",
+            Self::Files => "files",
             Self::Radio => "radio",
+            Self::Devices => "devices",
             Self::Settings => "settings",
         }
     }
@@ -63,10 +60,9 @@ mod tests {
             [
                 "Collection",
                 "Playlists",
-                "Now Playing",
-                "Lyrics",
-                "Devices",
+                "Files",
                 "Radio",
+                "Devices",
                 "Settings"
             ]
         );

@@ -51,6 +51,38 @@ impl PlayerBarLayout {
     }
 }
 
+/// Analyzer bar heights in 0.0–1.0. Live spectrum values win; otherwise a
+/// resting floor (stopped) or a phase-shifted placeholder (playing).
+pub fn analyzer_bars(playing: bool, phase: u32, live: &[f32], bands: usize) -> Vec<f32> {
+    if bands == 0 {
+        return Vec::new();
+    }
+    if !live.is_empty() {
+        return (0..bands)
+            .map(|i| live.get(i).copied().unwrap_or(0.08).clamp(0.04, 1.0))
+            .collect();
+    }
+    if !playing {
+        return vec![0.08; bands];
+    }
+    (0..bands)
+        .map(|i| {
+            let t = (phase as f32).mul_add(0.17, i as f32 * 0.55);
+            let wave = (t.sin() * 0.5 + 0.5) * ((i as f32 * 0.31).cos().mul_add(0.25, 0.55));
+            wave.clamp(0.06, 1.0)
+        })
+        .collect()
+}
+
+/// Seek slider position 0.0–1.0 from elapsed / duration.
+pub fn seek_ratio(position_secs: i64, duration_secs: i64) -> f32 {
+    if duration_secs <= 0 {
+        0.0
+    } else {
+        (position_secs as f32 / duration_secs as f32).clamp(0.0, 1.0)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -81,5 +113,16 @@ mod tests {
         let narrow = PlayerBarLayout { width: 200.0 };
         assert!((0.0..=200.0).contains(&narrow.info_width()));
         assert!(!narrow.analyzer_visible());
+    }
+
+    #[test]
+    fn analyzer_rests_when_stopped() {
+        let bars = analyzer_bars(false, 0, &[], 8);
+        assert_eq!(bars.len(), 8);
+        assert!(bars.iter().all(|&b| (b - 0.08).abs() < f32::EPSILON));
+        let live = analyzer_bars(true, 3, &[0.2, 0.9], 2);
+        assert!((live[1] - 0.9).abs() < f32::EPSILON);
+        assert!((seek_ratio(30, 120) - 0.25).abs() < f32::EPSILON);
+        assert_eq!(seek_ratio(10, 0), 0.0);
     }
 }

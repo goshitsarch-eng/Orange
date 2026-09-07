@@ -44,6 +44,7 @@ pub fn apply_command(player: &mut Player, command: &MprisCommand) -> bool {
             player.enqueue(QueuedTrack {
                 url: uri.clone(),
                 title,
+                ..QueuedTrack::default()
             });
             player.play_at(player.queue_len().saturating_sub(1));
         }
@@ -152,7 +153,11 @@ pub fn serve_forever(initial_uris: Vec<String>) -> i32 {
     let mut player = Player::new();
     for uri in initial_uris {
         let title = uri.rsplit('/').next().unwrap_or(&uri).to_string();
-        player.enqueue(QueuedTrack { url: uri, title });
+        player.enqueue(QueuedTrack {
+            url: uri,
+            title,
+            ..QueuedTrack::default()
+        });
     }
     if player.queue_len() > 0 {
         player.play_at(0);
@@ -333,6 +338,7 @@ mod tests {
         player.enqueue(QueuedTrack {
             url: format!("file:///music/{title}.flac"),
             title: title.to_string(),
+            ..QueuedTrack::default()
         });
         player
     }
@@ -347,6 +353,7 @@ mod tests {
         player.enqueue(QueuedTrack {
             url: "file:///music/b.flac".to_string(),
             title: "b".to_string(),
+            ..QueuedTrack::default()
         });
         assert!(player.play_at(0));
         assert!(!apply_command(&mut player, &MprisCommand::Next));

@@ -60,6 +60,42 @@ impl CollectionFilter {
         }
         (sql, params)
     }
+
+    /// In-memory match used by the collection tree (same fields as the SQL).
+    pub fn matches(&self, song: &orange_core::song::Song) -> bool {
+        fn contains_ci(hay: &str, needle: &str) -> bool {
+            hay.to_ascii_lowercase()
+                .contains(&needle.to_ascii_lowercase())
+        }
+        for word in &self.words {
+            if !(contains_ci(&song.title, word)
+                || contains_ci(&song.artist, word)
+                || contains_ci(&song.album, word)
+                || contains_ci(&song.albumartist, word)
+                || contains_ci(&song.genre, word)
+                || contains_ci(&song.composer, word))
+            {
+                return false;
+            }
+        }
+        for (field, value) in &self.terms {
+            let ok = match field.as_str() {
+                "artist" => {
+                    contains_ci(&song.artist, value) || contains_ci(&song.albumartist, value)
+                }
+                "album" => contains_ci(&song.album, value),
+                "albumartist" => contains_ci(&song.albumartist, value),
+                "genre" => contains_ci(&song.genre, value),
+                "composer" => contains_ci(&song.composer, value),
+                "year" => song.year.to_string() == *value,
+                _ => true,
+            };
+            if !ok {
+                return false;
+            }
+        }
+        true
+    }
 }
 
 #[cfg(test)]
@@ -87,5 +123,20 @@ mod tests {
         assert!(sql.contains("title LIKE ?"));
         assert!(sql.contains("AND artist LIKE ?"));
         assert_eq!(params.len(), 4);
+    }
+
+    #[test]
+    fn matches_words_against_tags() {
+        let song = orange_core::song::Song {
+            title: "So What".into(),
+            artist: "Miles Davis".into(),
+            album: "Kind of Blue".into(),
+            year: 1959,
+            ..Default::default()
+        };
+        assert!(CollectionFilter::parse("miles").matches(&song));
+        assert!(CollectionFilter::parse("artist:davis").matches(&song));
+        assert!(!CollectionFilter::parse("coltrane").matches(&song));
+        assert!(CollectionFilter::parse("year:1959").matches(&song));
     }
 }

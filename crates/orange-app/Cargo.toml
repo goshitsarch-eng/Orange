@@ -35,12 +35,15 @@ dbus = ["dep:zbus", "dep:tokio", "orange-media/dbus"]
 notify = ["dep:notify-rust"]
 # Real audio in `orange --serve` (GStreamer backend, Flatpak SDK/CI only).
 gst = ["orange-media/gst"]
+# Tag reading while scanning a collection folder.
+tags = ["orange-media/tags"]
 # Everything the Flatpak and `just test-full` enable.
 full = [
     "ui",
     "dbus",
     "notify",
     "gst",
+    "tags",
     "orange-media/full",
 ]
 

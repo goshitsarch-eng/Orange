@@ -59,7 +59,8 @@ impl CollectionQuery {
             params.push(QueryParam::Text(artist.clone()));
         }
         if !self.album.is_empty() {
-            // No-op guard kept explicit: empty album means "no album filter".
+            sql.push_str(" AND album = ?");
+            params.push(QueryParam::Text(self.album.clone()));
         }
         if let Some(albumartist) = &self.albumartist {
             sql.push_str(" AND albumartist = ?");
@@ -155,5 +156,16 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(q.build().0, "SELECT * FROM songs WHERE 1=1");
+    }
+
+    #[test]
+    fn album_filter_binds() {
+        let q = CollectionQuery {
+            album: "Kind of Blue".into(),
+            ..Default::default()
+        };
+        let (sql, params) = q.build();
+        assert!(sql.contains("AND album = ?"));
+        assert_eq!(params, vec![QueryParam::Text("Kind of Blue".into())]);
     }
 }

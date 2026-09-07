@@ -34,7 +34,9 @@ finish-args:
   - --socket=fallback-x11
   - --device=dri
   - --device=all
+  - --filesystem=home
   - --filesystem=xdg-music
+  - --filesystem=xdg-download
   - --talk-name=org.freedesktop.Notifications
   - --own-name=org.mpris.MediaPlayer2.orange
   - --talk-name=org.mpris.MediaPlayer2.*

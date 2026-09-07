@@ -17,6 +17,8 @@ use orange_core::identity;
 use rusqlite::{Connection, OpenFlags};
 use std::path::Path;
 
+pub mod library;
+
 /// Current schema version, mirroring `Database::kSchemaVersion`.
 pub const SCHEMA_VERSION: i32 = 23;
 /// Minimum openable version, mirroring `kMinSupportedSchemaVersion`.

@@ -1,12 +1,14 @@
-//! `orange` binary: headless summary by default, COSMIC window with `--ui`,
-//! MPRIS daemon with `--serve`, one-shot remotes for the desktop actions.
+//! `orange` binary: native COSMIC window by default (Strawberry-style
+//! collection + playlist), MPRIS daemon with `--serve`, one-shot remotes
+//! for the desktop actions.
 //!
 //! - `orange --version` prints `orange 3.0.0`.
-//! - `orange` (no flags) launches headless: opens the existing Orange
-//!   collection read-only and prints a library summary. No Qt is involved
-//!   at any point, and Strawberry data is never touched.
-//! - `orange --ui` opens the native libcosmic window (requires the `ui`
-//!   feature; always enabled in the Flatpak).
+//! - `orange` (and `orange FILES...`) opens the native libcosmic window
+//!   (requires the `ui` feature; always enabled in the Flatpak). Matches
+//!   `Exec=orange %U` in the desktop file.
+//! - `orange --headless` opens the existing Orange collection read-only
+//!   and prints a library summary. Strawberry data is never touched.
+//! - `orange --ui` is accepted as an alias for the default window.
 //! - `orange --serve [FILES...]` publishes MPRIS and plays the queue,
 //!   driving real audio when the `gst` backend can start (requires `dbus`).
 //! - `orange --play-pause|--stop|--stop-after-current|--previous|--next`
@@ -20,7 +22,7 @@ use orange_core::version::{self, MAKER};
 enum Command {
     Version,
     Help,
-    Ui,
+    Ui { uris: Vec<String> },
     Serve { uris: Vec<String> },
     MediaKey(String),
     Headless,
@@ -35,8 +37,12 @@ fn parse_args(args: &[String]) -> Command {
     if args.iter().any(|a| a == "--help" || a == "-h") {
         return Command::Help;
     }
+    if args.iter().any(|a| a == "--headless") {
+        return Command::Headless;
+    }
     if args.iter().any(|a| a == "--ui") {
-        return Command::Ui;
+        let uris = collect_uris(args);
+        return Command::Ui { uris };
     }
     if let Some(position) = args.iter().position(|a| a == "--serve") {
         let uris = args[position + 1..]
@@ -59,7 +65,17 @@ fn parse_args(args: &[String]) -> Command {
             return Command::MediaKey(flag.to_string());
         }
     }
-    Command::Headless
+    Command::Ui {
+        uris: collect_uris(args),
+    }
+}
+
+/// Non-flag arguments as `file://` (or pass-through) URIs.
+fn collect_uris(args: &[String]) -> Vec<String> {
+    args.iter()
+        .filter(|arg| !arg.starts_with("--") && *arg != "-V" && *arg != "-h")
+        .map(|arg| path_to_uri(arg))
+        .collect()
 }
 
 /// CLI path to `file://` URI. Remote URLs pass through untouched.
@@ -83,7 +99,7 @@ fn main() {
     match parse_args(&args) {
         Command::Version => println!("{}", version::version_line()),
         Command::Help => print_help(),
-        Command::Ui => run_ui(),
+        Command::Ui { uris } => run_ui(uris),
         Command::Serve { uris } => {
             std::process::exit(run_serve(uris));
         }
@@ -101,30 +117,33 @@ fn print_help() {
      Options:\n  \
      --version   print version and exit\n  \
      --help      print this help and exit\n  \
-     --ui        open the native COSMIC window (needs the `ui` feature)\n  \
+     --ui        open the native window (default; needs the `ui` feature)\n  \
+     --headless  print a read-only collection summary and exit\n  \
      --serve     publish MPRIS and play FILES/the queue (needs `dbus`)\n  \
      --play-pause/--play/--pause/--stop/--previous/--next\n                 control the running instance over MPRIS\n  \
      --stop-after-current\n                 stop when the current track ends\n\n\
-     With no option, orange launches headless: it opens your existing\n\
-     collection read-only and prints a summary. Your Strawberry data is\n\
-     left untouched.",
+     With no option, orange opens the collection window. Your Strawberry\n\
+     data is left untouched.",
         version::VERSION,
         MAKER
     );
 }
 
-fn run_ui() {
+fn run_ui(uris: Vec<String>) {
     #[cfg(feature = "ui")]
     {
-        if let Err(e) = orange_app::ui::run() {
+        if let Err(e) = orange_app::ui::run(uris) {
             eprintln!("orange: failed to start COSMIC shell: {e}");
             std::process::exit(1);
         }
     }
     #[cfg(not(feature = "ui"))]
     {
-        eprintln!("orange: this build has no COSMIC UI; rebuild with --features orange-app/ui.");
-        std::process::exit(2);
+        let _ = uris;
+        eprintln!(
+            "orange: this build has no window; printing a collection summary. Rebuild with --features orange-app/ui (Flatpak builds include it)."
+        );
+        run_headless();
     }
 }
 
@@ -235,7 +254,9 @@ mod tests {
         assert_eq!(parse_args(&args(&["--version"])), Command::Version);
         assert_eq!(parse_args(&args(&["-V"])), Command::Version);
         assert_eq!(parse_args(&args(&["--help"])), Command::Help);
-        assert_eq!(parse_args(&args(&["--ui"])), Command::Ui);
+        assert_eq!(parse_args(&args(&["--ui"])), Command::Ui { uris: vec![] });
+        assert_eq!(parse_args(&args(&["--headless"])), Command::Headless);
+        assert_eq!(parse_args(&args(&[])), Command::Ui { uris: vec![] });
         assert_eq!(
             parse_args(&args(&["--play-pause"])),
             Command::MediaKey("--play-pause".to_string())
@@ -244,7 +265,12 @@ mod tests {
             parse_args(&args(&["--stop-after-current"])),
             Command::MediaKey("--stop-after-current".to_string())
         );
-        assert_eq!(parse_args(&args(&[])), Command::Headless);
+        let opened = parse_args(&args(&["/music/a.flac"]));
+        let Command::Ui { uris } = opened else {
+            panic!("expected Ui, got {opened:?}");
+        };
+        assert_eq!(uris.len(), 1);
+        assert!(uris[0].ends_with("/music/a.flac"));
     }
 
     #[test]

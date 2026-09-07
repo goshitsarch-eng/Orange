@@ -5,4 +5,6 @@
 
 pub mod filter;
 pub mod query;
+pub mod scan;
+pub mod tree;
 pub mod watcher;

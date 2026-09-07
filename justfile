@@ -13,9 +13,10 @@ test-full:
 # Headless launch: opens the existing collection read-only, prints a summary.
 # No Qt required. Strawberry data is never touched.
 run *args:
-    cargo run --offline -p orange-app -- {{args}}
+    cargo run --offline -p orange-app -- --headless {{args}}
 
 # COSMIC window (needs a Wayland/X11 session; same binary, UI enabled).
+# Default `orange` (no flags) also opens this window when built with `ui`.
 run-ui *args:
     cargo run --offline -p orange-app --features orange-app/ui -- {{args}}
 

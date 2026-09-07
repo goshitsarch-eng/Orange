@@ -29,11 +29,40 @@ pub enum StopBehaviour {
     StopAfterCurrent,
 }
 
-/// Minimal track reference for the queue.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// One playlist/queue row, with the columns the playlist table shows.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct QueuedTrack {
     pub url: String,
     pub title: String,
+    pub artist: String,
+    pub album: String,
+    pub genre: String,
+    pub length_ns: i64,
+    pub year: i64,
+    pub track: i64,
+}
+
+impl QueuedTrack {
+    pub fn from_song(song: &orange_core::song::Song) -> Self {
+        Self {
+            url: song.url.clone(),
+            title: song.display_title(),
+            artist: song.display_artist().to_string(),
+            album: song.display_album().to_string(),
+            genre: song.genre.clone(),
+            length_ns: song.length_ns,
+            year: song.year,
+            track: song.track,
+        }
+    }
+
+    pub fn length_secs(&self) -> i64 {
+        self.length_ns / 1_000_000_000
+    }
+
+    pub fn format_length(&self) -> String {
+        orange_core::song::format_duration_secs(self.length_secs())
+    }
 }
 
 /// The player: queue + cursor + state. UI-agnostic.
@@ -66,8 +95,58 @@ impl Player {
         self.queue.push(track);
     }
 
+    pub fn enqueue_many(&mut self, tracks: impl IntoIterator<Item = QueuedTrack>) {
+        self.queue.extend(tracks);
+    }
+
+    pub fn queue(&self) -> &[QueuedTrack] {
+        &self.queue
+    }
+
+    pub fn cursor(&self) -> Option<usize> {
+        self.cursor
+    }
+
     pub fn queue_len(&self) -> usize {
         self.queue.len()
+    }
+
+    pub fn clear_queue(&mut self) {
+        self.queue.clear();
+        self.cursor = None;
+        self.state = EngineState::Empty;
+    }
+
+    pub fn remove_at(&mut self, index: usize) -> Option<QueuedTrack> {
+        if index >= self.queue.len() {
+            return None;
+        }
+        let removed = self.queue.remove(index);
+        self.cursor = match self.cursor {
+            Some(cursor) if cursor == index => {
+                if self.queue.is_empty() {
+                    self.state = EngineState::Empty;
+                    None
+                } else {
+                    let next = index.min(self.queue.len() - 1);
+                    Some(next)
+                }
+            }
+            Some(cursor) if cursor > index => Some(cursor - 1),
+            other => other,
+        };
+        Some(removed)
+    }
+
+    /// Replace the queue and start playing at `start`. Empty input stops.
+    pub fn replace_and_play(&mut self, tracks: Vec<QueuedTrack>, start: usize) -> bool {
+        self.queue = tracks;
+        if self.queue.is_empty() {
+            self.cursor = None;
+            self.state = EngineState::Empty;
+            return false;
+        }
+        self.play_at(start.min(self.queue.len() - 1))
     }
 
     pub fn play_at(&mut self, index: usize) -> bool {
@@ -161,6 +240,7 @@ mod tests {
         QueuedTrack {
             url: format!("file:///m/{name}"),
             title: name.into(),
+            ..QueuedTrack::default()
         }
     }
 
@@ -240,5 +320,16 @@ mod tests {
         // Still armed: the natural end of track "b" stops.
         assert_eq!(player.track_ended(), None);
         assert_eq!(player.state(), EngineState::Idle);
+    }
+
+    #[test]
+    fn replace_and_clear_queue() {
+        let mut player = Player::new();
+        assert!(player.replace_and_play(vec![track("a"), track("b")], 1));
+        assert_eq!(player.current().unwrap().title, "b");
+        assert_eq!(player.queue_len(), 2);
+        player.clear_queue();
+        assert_eq!(player.queue_len(), 0);
+        assert_eq!(player.state(), EngineState::Empty);
     }
 }

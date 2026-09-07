@@ -138,6 +138,7 @@ pub fn nav_icon_name(page: &str) -> &'static str {
     match page {
         "collection" => "folder-music-symbolic",
         "playlists" => "view-media-playlist-symbolic",
+        "files" => "folder-symbolic",
         "now-playing" => "media-playback-start-symbolic",
         "lyrics" => "document-text-symbolic",
         "devices" => "drive-removable-media-symbolic",
@@ -196,6 +197,7 @@ mod tests {
         for page in [
             "collection",
             "playlists",
+            "files",
             "now-playing",
             "lyrics",
             "devices",
