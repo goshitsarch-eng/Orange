@@ -378,14 +378,69 @@ fn counted_names(songs: Vec<&Song>, name: impl Fn(&Song) -> String) -> Vec<(Stri
     counts
 }
 
-/// Status-bar summary like Rhythmbox: `12 songs, 48:12`.
+/// Status-bar summary like Rhythmbox: `181 songs, 10 hours and 56 minutes, 1.5 GB`.
 pub fn track_list_summary(songs: &[Song]) -> String {
+    let n = songs.len();
+    let word = if n == 1 { "song" } else { "songs" };
     let secs: i64 = songs.iter().map(|s| s.length_secs().max(0)).sum();
+    let bytes: i64 = songs.iter().map(|s| s.filesize.max(0)).sum();
     format!(
-        "{} songs, {}",
-        songs.len(),
-        orange_core::song::format_duration_secs(secs)
+        "{n} {word}, {}, {}",
+        format_duration_words(secs),
+        format_bytes(bytes)
     )
+}
+
+fn format_duration_words(secs: i64) -> String {
+    let secs = secs.max(0);
+    let days = secs / 86_400;
+    let hours = (secs % 86_400) / 3_600;
+    let minutes = (secs % 3_600) / 60;
+    fn unit(n: i64, one: &str, many: &str) -> String {
+        if n == 1 {
+            format!("1 {one}")
+        } else {
+            format!("{n} {many}")
+        }
+    }
+    match (days, hours, minutes) {
+        (0, 0, m) => unit(m, "minute", "minutes"),
+        (0, h, 0) => unit(h, "hour", "hours"),
+        (0, h, m) => format!(
+            "{} and {}",
+            unit(h, "hour", "hours"),
+            unit(m, "minute", "minutes")
+        ),
+        (d, 0, 0) => unit(d, "day", "days"),
+        (d, h, 0) => format!("{}, {}", unit(d, "day", "days"), unit(h, "hour", "hours")),
+        (d, 0, m) => format!(
+            "{}, {}",
+            unit(d, "day", "days"),
+            unit(m, "minute", "minutes")
+        ),
+        (d, h, m) => format!(
+            "{}, {} and {}",
+            unit(d, "day", "days"),
+            unit(h, "hour", "hours"),
+            unit(m, "minute", "minutes")
+        ),
+    }
+}
+
+fn format_bytes(bytes: i64) -> String {
+    let bytes = bytes.max(0) as f64;
+    const KB: f64 = 1024.0;
+    const MB: f64 = KB * 1024.0;
+    const GB: f64 = MB * 1024.0;
+    if bytes >= GB {
+        format!("{:.1} GB", bytes / GB)
+    } else if bytes >= MB {
+        format!("{:.1} MB", bytes / MB)
+    } else if bytes >= KB {
+        format!("{:.0} KB", bytes / KB)
+    } else {
+        format!("{} bytes", bytes as i64)
+    }
 }
 
 /// Built-in smart playlists that run against the loaded collection.
@@ -406,6 +461,20 @@ pub fn smart_highest_rated(songs: &[Song]) -> Vec<Song> {
 pub fn smart_most_played(songs: &[Song]) -> Vec<Song> {
     let mut out = songs.to_vec();
     out.sort_by_key(|a| std::cmp::Reverse(a.playcount));
+    out.truncate(50);
+    out
+}
+
+pub fn smart_recently_added(songs: &[Song]) -> Vec<Song> {
+    let mut out = songs.to_vec();
+    out.sort_by_key(|s| std::cmp::Reverse(s.mtime));
+    out.truncate(50);
+    out
+}
+
+pub fn smart_recently_played(songs: &[Song]) -> Vec<Song> {
+    let mut out: Vec<Song> = songs.iter().filter(|s| s.lastplayed > 0).cloned().collect();
+    out.sort_by_key(|s| std::cmp::Reverse(s.lastplayed));
     out.truncate(50);
     out
 }
@@ -570,7 +639,13 @@ mod tests {
         let tracks = browser.tracks(&songs, "");
         assert_eq!(tracks.len(), 2);
         assert_eq!(tracks[0].title, "So What");
-        assert_eq!(track_list_summary(&tracks), "2 songs, 2:00");
+        assert_eq!(track_list_summary(&tracks), "2 songs, 2 minutes, 0 bytes");
+        assert_eq!(format_duration_words(39_120), "10 hours and 52 minutes");
+        assert_eq!(
+            format_duration_words(127_440),
+            "1 day, 11 hours and 24 minutes"
+        );
+        assert_eq!(format_bytes(1_610_612_736), "1.5 GB");
 
         browser.select_genre(Some("Rock".into()));
         assert!(browser.artist.is_none());

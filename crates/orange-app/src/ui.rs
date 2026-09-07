@@ -1,11 +1,11 @@
-//! Rhythmbox window: source list, Genre/Artist/Album browser, track table,
-//! top transport. No COSMIC nav bar or header chrome.
+//! Rhythmbox window: dark transport, icon source list, Artist/Album browse,
+//! track table. No COSMIC nav bar or header chrome.
 
 use std::path::PathBuf;
 use std::time::Duration;
 
 use cosmic::app::Settings;
-use cosmic::iced::{Alignment, Length, Size};
+use cosmic::iced::{Alignment, Background, Border, Color, Length, Shadow, Size};
 use cosmic::{executor, widget, Application, ApplicationExt, Core, Element};
 
 use orange_core::appearance::AppearanceMode;
@@ -19,7 +19,8 @@ use orange_playlist::model::{RepeatMode, ShuffleMode};
 use crate::about;
 use crate::files::FileBrowser;
 use crate::library::{
-    smart_highest_rated, smart_most_played, smart_never_played, track_list_summary, CollectionState,
+    smart_highest_rated, smart_most_played, smart_never_played, smart_recently_added,
+    smart_recently_played, track_list_summary, CollectionState,
 };
 use crate::nav::Page;
 use crate::playerbar::{fit_title, seek_ratio};
@@ -70,12 +71,31 @@ pub enum Message {
     SmartNeverPlayed,
     SmartHighestRated,
     SmartMostPlayed,
+    SmartRecentlyAdded,
+    SmartRecentlyPlayed,
     RepeatToggle,
     ShuffleToggle,
     ToggleLyrics,
+    ToggleAppMenu,
+    SetBrowseMode(BrowseMode),
     EqBand { band: usize, db: f32 },
     Tick,
     Noop,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BrowseMode {
+    Browse,
+    ViewAll,
+    Import,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LibraryFilter {
+    All,
+    TopRated,
+    RecentlyAdded,
+    RecentlyPlayed,
 }
 
 pub struct OrangeApp {
@@ -99,6 +119,11 @@ pub struct OrangeApp {
     #[allow(dead_code)]
     spectrum: Vec<f32>,
     show_lyrics: bool,
+    show_app_menu: bool,
+    browse_mode: BrowseMode,
+    library_filter: LibraryFilter,
+    shown_playlist: Option<i64>,
+    playlist_songs: Vec<Song>,
     #[cfg(feature = "dbus")]
     mpris: Option<MprisShell>,
     #[cfg(feature = "gst")]
@@ -148,6 +173,56 @@ impl OrangeApp {
             Some(track) => format!("{} — {}", track.artist, track.title),
             None => String::from("Not playing"),
         }
+    }
+
+    fn window_title(&self) -> String {
+        match self.player.current() {
+            Some(track) if !track.title.is_empty() && !track.artist.is_empty() => {
+                format!("{} - {}", track.artist, track.title)
+            }
+            Some(track) if !track.title.is_empty() => track.title.clone(),
+            _ => String::from("Orange Music Player"),
+        }
+    }
+
+    fn now_playing_subtitle(&self) -> String {
+        match self.player.current() {
+            Some(track) if !track.artist.is_empty() && !track.album.is_empty() => {
+                format!("by {} from {}", track.artist, track.album)
+            }
+            Some(track) if !track.artist.is_empty() => format!("by {}", track.artist),
+            _ => String::new(),
+        }
+    }
+
+    fn catalog_songs(&self) -> Vec<Song> {
+        if self.shown_playlist.is_some() {
+            return self.playlist_songs.clone();
+        }
+        match self.library_filter {
+            LibraryFilter::All => self.collection.songs.clone(),
+            LibraryFilter::TopRated => smart_highest_rated(&self.collection.songs),
+            LibraryFilter::RecentlyAdded => smart_recently_added(&self.collection.songs),
+            LibraryFilter::RecentlyPlayed => smart_recently_played(&self.collection.songs),
+        }
+    }
+
+    fn catalog_tracks(&self) -> Vec<Song> {
+        let songs = self.catalog_songs();
+        self.collection
+            .browser
+            .tracks(&songs, &self.collection.search)
+    }
+
+    fn show_music_filter(&mut self, filter: LibraryFilter) {
+        self.page = Page::Library;
+        self.library_filter = filter;
+        self.shown_playlist = None;
+        self.playlist_songs.clear();
+        self.selected_index = None;
+        self.collection.browser = crate::library::LibraryBrowser::default();
+        self.browse_mode = BrowseMode::Browse;
+        self.show_app_menu = false;
     }
 
     fn duration_secs(&self) -> i64 {
@@ -233,7 +308,7 @@ impl OrangeApp {
                     self.sync_engine();
                     return;
                 }
-                let tracks = self.collection.visible_tracks();
+                let tracks = self.catalog_tracks();
                 if tracks.is_empty() {
                     self.status = String::from("Nothing to play.");
                     return;
@@ -249,7 +324,7 @@ impl OrangeApp {
 
     fn status_text(&self) -> String {
         let summary = match self.page {
-            Page::Library => track_list_summary(&self.collection.visible_tracks()),
+            Page::Library => track_list_summary(&self.catalog_tracks()),
             Page::Queue => format!("{} in queue", self.player.queue_len()),
             Page::Playlists => format!("{} playlists", self.collection.playlists.len()),
             _ => String::new(),
@@ -393,139 +468,225 @@ impl OrangeApp {
         } else {
             "media-playback-start-symbolic"
         };
-        let title = fit_title(&self.now_playing_label(), 56);
+        let title = match self.player.current() {
+            Some(track) if !track.title.is_empty() => fit_title(&track.title, 42),
+            Some(_) => fit_title(&self.now_playing_label(), 42),
+            None => String::from("Not playing"),
+        };
+        let subtitle = fit_title(&self.now_playing_subtitle(), 48);
         let duration = self.duration_secs();
         let ratio = seek_ratio(self.position_secs, duration);
-        let elapsed = orange_core::song::format_duration_secs(self.position_secs);
-        let total = orange_core::song::format_duration_secs(duration);
-        let repeat = match self.repeat {
-            RepeatMode::Off => "Repeat",
-            RepeatMode::Track => "Repeat one",
-            RepeatMode::Album => "Repeat album",
-            RepeatMode::Playlist => "Repeat all",
+        let remaining = if duration > 0 {
+            format!(
+                "-{} / {}",
+                orange_core::song::format_duration_secs((duration - self.position_secs).max(0)),
+                orange_core::song::format_duration_secs(duration)
+            )
+        } else {
+            String::from("0:00")
         };
-        let shuffle = match self.shuffle {
-            ShuffleMode::Off => "Shuffle",
-            ShuffleMode::All => "Shuffle on",
-            ShuffleMode::InsideAlbum => "Shuffle album",
-        };
-        widget::column::with_capacity(2)
+        let transport = widget::row::with_capacity(3)
             .push(
-                widget::row::with_capacity(8)
-                    .push(
-                        widget::button::icon(widget::icon::from_name(
-                            "media-skip-backward-symbolic",
-                        ))
-                        .on_press(Message::Previous),
-                    )
-                    .push(
-                        widget::button::icon(widget::icon::from_name(play_icon))
-                            .on_press(Message::PlayPause),
-                    )
-                    .push(
-                        widget::button::icon(widget::icon::from_name(
-                            "media-skip-forward-symbolic",
-                        ))
-                        .on_press(Message::Next),
-                    )
-                    .push(widget::text(title).width(Length::Fill))
-                    .push(widget::button::text(repeat).on_press(Message::RepeatToggle))
-                    .push(widget::button::text(shuffle).on_press(Message::ShuffleToggle))
-                    .push(widget::button::text("Lyrics").on_press(Message::ToggleLyrics))
-                    .push(widget::text(format!("{}%", self.volume as u8)))
-                    .push(
-                        widget::slider(0.0..=100.0, self.volume, Message::VolumeChanged)
-                            .width(Length::Fixed(90.0)),
-                    )
-                    .spacing(6)
-                    .align_y(Alignment::Center),
+                widget::button::icon(widget::icon::from_name("media-skip-backward-symbolic"))
+                    .on_press(Message::Previous),
             )
             .push(
-                widget::row::with_capacity(3)
-                    .push(widget::text(elapsed).width(Length::Fixed(48.0)))
-                    .push(widget::slider(0.0..=1.0, ratio, Message::Seek).width(Length::Fill))
-                    .push(widget::text(total).width(Length::Fixed(48.0)))
-                    .spacing(8)
-                    .align_y(Alignment::Center),
+                widget::button::icon(widget::icon::from_name(play_icon))
+                    .on_press(Message::PlayPause),
             )
-            .spacing(4)
-            .padding(8)
+            .push(
+                widget::button::icon(widget::icon::from_name("media-skip-forward-symbolic"))
+                    .on_press(Message::Next),
+            )
+            .spacing(2)
+            .align_y(Alignment::Center);
+        let modes = widget::row::with_capacity(2)
+            .push(
+                widget::button::icon(widget::icon::from_name("media-playlist-repeat-symbolic"))
+                    .selected(self.repeat != RepeatMode::Off)
+                    .on_press(Message::RepeatToggle),
+            )
+            .push(
+                widget::button::icon(widget::icon::from_name("media-playlist-shuffle-symbolic"))
+                    .selected(self.shuffle != ShuffleMode::Off)
+                    .on_press(Message::ShuffleToggle),
+            )
+            .spacing(2)
+            .align_y(Alignment::Center);
+        let cover = widget::container(widget::icon::from_name("folder-music-symbolic").size(28))
+            .center(Length::Fixed(48.0))
+            .class(style_cover());
+        let info = widget::column::with_capacity(2)
+            .push(widget::text::heading(title))
+            .push(widget::text::caption(subtitle))
+            .width(Length::Fill);
+        let bar = widget::row::with_capacity(8)
+            .push(transport)
+            .push(modes)
+            .push(cover)
+            .push(info)
+            .push(widget::text(remaining).width(Length::Shrink))
+            .push(widget::slider(0.0..=1.0, ratio, Message::Seek).width(Length::Fixed(220.0)))
+            .push(widget::icon::from_name("audio-volume-high-symbolic").size(16))
+            .push(
+                widget::slider(0.0..=100.0, self.volume, Message::VolumeChanged)
+                    .width(Length::Fixed(80.0)),
+            )
+            .push(
+                widget::button::icon(widget::icon::from_name("open-menu-symbolic"))
+                    .on_press(Message::ToggleAppMenu),
+            )
+            .spacing(10)
+            .padding([8, 12])
+            .align_y(Alignment::Center);
+        let mut col = widget::column::with_capacity(2).push(bar);
+        if self.show_app_menu {
+            col = col.push(
+                widget::container(
+                    widget::row::with_capacity(5)
+                        .push(widget::space::horizontal())
+                        .push(
+                            widget::button::text("Add Music")
+                                .on_press(Message::SetBrowseMode(BrowseMode::Import)),
+                        )
+                        .push(
+                            widget::button::text("Preferences")
+                                .on_press(Message::SelectPage(Page::Settings)),
+                        )
+                        .push(widget::button::text("Lyrics").on_press(Message::ToggleLyrics))
+                        .push(
+                            widget::button::text("About")
+                                .on_press(Message::SelectPage(Page::Settings)),
+                        )
+                        .spacing(4)
+                        .padding(6),
+                )
+                .width(Length::Fill)
+                .class(cosmic::theme::Container::Background),
+            );
+        }
+        widget::container(col)
+            .width(Length::Fill)
+            .class(style_player_bar())
             .into()
     }
 
     fn source_list(&self) -> Element<'_, Message> {
-        let mut col = widget::column::with_capacity(16).push(widget::text::heading("Library"));
-        for page in [Page::Library, Page::Queue] {
-            col = col.push(Self::select_row(
-                page.title().to_string(),
-                self.page == page,
-                Message::SelectPage(page),
-            ));
-        }
-        col = col
-            .push(widget::text::heading("Playlists"))
-            .push(Self::select_row(
-                Page::Playlists.title().to_string(),
-                self.page == Page::Playlists,
-                Message::SelectPage(Page::Playlists),
+        let music_sel = self.page == Page::Library
+            && self.library_filter == LibraryFilter::All
+            && self.shown_playlist.is_none();
+        let mut col = widget::column::with_capacity(20)
+            .push(section_label("Library"))
+            .push(source_item(
+                orange_theme::nav_icon_name("queue"),
+                "Play Queue",
+                self.page == Page::Queue,
+                Message::SelectPage(Page::Queue),
+            ))
+            .push(source_item(
+                orange_theme::nav_icon_name("collection"),
+                "Music",
+                music_sel,
+                Message::SelectPage(Page::Library),
+            ))
+            .push(source_item(
+                orange_theme::nav_icon_name("radio"),
+                "Radio",
+                self.page == Page::Radio,
+                Message::SelectPage(Page::Radio),
+            ))
+            .push(source_item(
+                orange_theme::nav_icon_name("files"),
+                "Files",
+                self.page == Page::Files,
+                Message::SelectPage(Page::Files),
+            ))
+            .push(source_item(
+                orange_theme::nav_icon_name("devices"),
+                "Devices",
+                self.page == Page::Devices,
+                Message::SelectPage(Page::Devices),
+            ))
+            .push(section_label("Playlists"))
+            .push(source_item(
+                orange_theme::nav_icon_name("smart"),
+                "My Top Rated",
+                self.page == Page::Library && self.library_filter == LibraryFilter::TopRated,
+                Message::SmartHighestRated,
+            ))
+            .push(source_item(
+                orange_theme::nav_icon_name("smart"),
+                "Recently Added",
+                self.page == Page::Library && self.library_filter == LibraryFilter::RecentlyAdded,
+                Message::SmartRecentlyAdded,
+            ))
+            .push(source_item(
+                orange_theme::nav_icon_name("smart"),
+                "Recently Played",
+                self.page == Page::Library && self.library_filter == LibraryFilter::RecentlyPlayed,
+                Message::SmartRecentlyPlayed,
             ));
         for list in &self.collection.playlists {
-            let star = if list.favorite { "★ " } else { "" };
-            col = col.push(Self::select_row(
-                format!("{star}{}", list.name),
-                false,
+            col = col.push(source_item(
+                orange_theme::nav_icon_name("playlists"),
+                &list.name,
+                self.shown_playlist == Some(list.id),
                 Message::LoadSavedPlaylist(list.id),
             ));
         }
-        col = col.push(widget::text::heading("Other"));
-        for page in [Page::Radio, Page::Files, Page::Devices, Page::Settings] {
-            col = col.push(Self::select_row(
-                page.title().to_string(),
-                self.page == page,
-                Message::SelectPage(page),
-            ));
-        }
-        widget::container(widget::scrollable(col.spacing(2).padding(8)))
-            .width(Length::Fixed(180.0))
+        let add = widget::row::with_capacity(2)
+            .push(
+                widget::button::icon(widget::icon::from_name("list-add-symbolic"))
+                    .on_press(Message::SetBrowseMode(BrowseMode::Import)),
+            )
+            .push(
+                widget::button::icon(widget::icon::from_name("list-remove-symbolic"))
+                    .on_press(Message::Noop),
+            )
+            .spacing(4)
+            .padding(6);
+        widget::column::with_capacity(2)
+            .push(
+                widget::scrollable(col.spacing(0).padding([8, 0]))
+                    .height(Length::Fill)
+                    .width(Length::Fill),
+            )
+            .push(widget::divider::horizontal::default())
+            .push(add)
+            .width(Length::Fixed(200.0))
             .height(Length::Fill)
             .into()
     }
 
     fn browser_column(
         title: &'static str,
+        kind: &'static str,
         selected: Option<String>,
         rows: Vec<(String, usize)>,
         all: Message,
         pick: impl Fn(String) -> Message,
     ) -> Element<'static, Message> {
         let total: usize = rows.iter().map(|(_, n)| *n).sum();
-        let mut col = widget::column::with_capacity(rows.len() + 2)
-            .push(widget::text::heading(title))
-            .push(Self::select_row(
-                format!("All ({total})"),
-                selected.is_none(),
-                all,
-            ));
-        for (name, count) in rows {
+        let count = rows.len();
+        let mut col = widget::column::with_capacity(rows.len() + 2).push(
+            widget::container(widget::text::caption(title))
+                .padding([4, 8])
+                .width(Length::Fill)
+                .class(style_header()),
+        );
+        col = col.push(list_row(
+            format!("All {count} {kind} ({total})"),
+            selected.is_none(),
+            all,
+        ));
+        for (name, n) in rows {
             let is_sel = selected.as_deref() == Some(name.as_str());
-            col = col.push(Self::select_row(
-                format!("{name} ({count})"),
-                is_sel,
-                pick(name),
-            ));
+            col = col.push(list_row(format!("{name} ({n})"), is_sel, pick(name)));
         }
-        widget::container(widget::scrollable(col.spacing(2)).height(Length::Fill))
+        widget::container(widget::scrollable(col.spacing(0)).height(Length::Fill))
             .width(Length::Fill)
             .height(Length::Fill)
             .into()
-    }
-
-    fn select_row(label: String, selected: bool, message: Message) -> Element<'static, Message> {
-        if selected {
-            widget::button::suggested(label).on_press(message).into()
-        } else {
-            widget::button::text(label).on_press(message).into()
-        }
     }
 
     fn song_table(
@@ -537,35 +698,44 @@ impl OrangeApp {
         extra_label: &'static str,
         extra: impl Fn(usize) -> Message,
     ) -> Element<'static, Message> {
-        let mut header = widget::row::with_capacity(6)
-            .push(widget::text("#").width(Length::Fixed(36.0)))
+        let mut header = widget::row::with_capacity(8)
+            .push(widget::text("").width(Length::Fixed(22.0)))
+            .push(widget::text("Track").width(Length::Fixed(48.0)))
             .push(widget::text("Title").width(Length::Fill))
+            .push(widget::text("Genre").width(Length::FillPortion(1)))
             .push(widget::text("Artist").width(Length::Fill))
             .push(widget::text("Album").width(Length::Fill))
             .push(widget::text("Time").width(Length::Fixed(56.0)));
         if !extra_label.is_empty() {
             header = header.push(widget::text("").width(Length::Fixed(28.0)));
         }
-        let mut col = widget::column::with_capacity(songs.len() + 2).push(header.spacing(8));
+        let mut col = widget::column::with_capacity(songs.len() + 2).push(
+            widget::container(header.spacing(8).padding([4, 8]))
+                .width(Length::Fill)
+                .class(style_header()),
+        );
         if songs.is_empty() {
             col = col.push(widget::text::caption("No songs in this view."));
         } else {
             for (index, song) in songs.into_iter().enumerate() {
-                let marker = if cursor_url.as_deref() == Some(song.url.as_str()) {
-                    "▶"
-                } else if selected == Some(index) {
-                    "•"
-                } else {
-                    ""
-                };
+                let playing = cursor_url.as_deref() == Some(song.url.as_str());
+                let highlighted = playing || selected == Some(index);
+                let marker = if playing { "▶" } else { "" };
                 let number = if song.track > 0 {
-                    format!("{marker}{}", song.track)
+                    song.track.to_string()
                 } else {
-                    format!("{marker}{}", index + 1)
+                    (index + 1).to_string()
                 };
-                let mut row = widget::row::with_capacity(6)
-                    .push(widget::text(number).width(Length::Fixed(36.0)))
+                let genre = if song.genre.trim().is_empty() {
+                    String::from("Unknown")
+                } else {
+                    song.genre.clone()
+                };
+                let mut row = widget::row::with_capacity(8)
+                    .push(widget::text(marker).width(Length::Fixed(22.0)))
+                    .push(widget::text(number).width(Length::Fixed(48.0)))
                     .push(widget::text(song.display_title()).width(Length::Fill))
+                    .push(widget::text(genre).width(Length::FillPortion(1)))
                     .push(widget::text(song.display_artist().to_string()).width(Length::Fill))
                     .push(widget::text(song.display_album().to_string()).width(Length::Fill))
                     .push(widget::text(song.format_length()).width(Length::Fixed(56.0)));
@@ -576,104 +746,126 @@ impl OrangeApp {
                             .width(Length::Fixed(28.0)),
                     );
                 }
+                let body = widget::container(row.spacing(8).align_y(Alignment::Center))
+                    .padding([3, 8])
+                    .width(Length::Fill)
+                    .class(if highlighted {
+                        style_accent()
+                    } else {
+                        style_transparent()
+                    });
                 col = col.push(
-                    widget::mouse_area(row.spacing(8).padding(2).align_y(Alignment::Center))
+                    widget::mouse_area(body)
                         .on_press(select(index))
                         .on_double_click(play(index)),
                 );
             }
         }
-        widget::scrollable(col.spacing(2))
+        widget::scrollable(col.spacing(0))
             .height(Length::Fill)
             .into()
     }
 
-    fn library_page(&self) -> Element<'_, Message> {
-        if self.collection.songs.is_empty() {
-            return widget::column::with_capacity(6)
-                .push(widget::text::heading("Music library"))
-                .push(widget::text(
-                    "The library is empty. Add a music folder to import tracks. Files stay where they are.",
-                ))
-                .push(
-                    widget::row::with_capacity(3)
-                        .push(
-                            widget::text_input("Music folder path", &self.collection.add_path)
-                                .on_input(Message::AddPathChanged),
-                        )
-                        .push(widget::button::suggested("Import").on_press(Message::AddFolder))
-                        .spacing(8),
-                )
-                .spacing(8)
-                .padding(12)
-                .into();
-        }
-        let search = &self.collection.search;
-        let genres = self
-            .collection
-            .browser
-            .genres(&self.collection.songs, search);
-        let artists = self
-            .collection
-            .browser
-            .artists(&self.collection.songs, search);
-        let albums = self
-            .collection
-            .browser
-            .albums(&self.collection.songs, search);
-        let tracks = self.collection.visible_tracks();
-        let cursor = self.player.current().map(|t| t.url.as_str());
-        widget::column::with_capacity(4)
+    fn library_toolbar(&self) -> Element<'_, Message> {
+        let tab = |mode: BrowseMode, label: &'static str| {
+            let active = self.browse_mode == mode
+                || (mode == BrowseMode::Browse && self.collection.songs.is_empty());
+            if active {
+                widget::button::suggested(label).on_press(Message::SetBrowseMode(mode))
+            } else {
+                widget::button::standard(label).on_press(Message::SetBrowseMode(mode))
+            }
+        };
+        widget::row::with_capacity(6)
+            .push(tab(BrowseMode::Browse, "Browse"))
+            .push(tab(BrowseMode::ViewAll, "View All"))
+            .push(tab(BrowseMode::Import, "Import"))
+            .push(widget::space::horizontal())
+            .push(
+                widget::text_input::search_input("Search all fields", &self.collection.search)
+                    .on_input(Message::SearchChanged)
+                    .width(Length::Fixed(220.0)),
+            )
+            .spacing(6)
+            .padding([6, 8])
+            .align_y(Alignment::Center)
+            .into()
+    }
+
+    fn import_strip(&self) -> Element<'_, Message> {
+        widget::column::with_capacity(3)
+            .push(widget::text(
+                "Add a music folder. Files stay where they are; Orange only indexes them.",
+            ))
             .push(
                 widget::row::with_capacity(3)
                     .push(
-                        widget::text_input::search_input("Search library", search)
-                            .on_input(Message::SearchChanged),
+                        widget::text_input("Music folder path", &self.collection.add_path)
+                            .on_input(Message::AddPathChanged),
                     )
-                    .push(widget::button::standard("Import folder").on_press(Message::AddFolder))
+                    .push(widget::button::suggested("Import").on_press(Message::AddFolder))
+                    .push(widget::button::standard("Rescan").on_press(Message::Rescan))
                     .spacing(8),
             )
-            .push(
-                widget::row::with_capacity(3)
-                    .push(Self::browser_column(
-                        "Genre",
-                        self.collection.browser.genre.clone(),
-                        genres,
-                        Message::SelectGenre(None),
-                        |name| Message::SelectGenre(Some(name)),
-                    ))
+            .spacing(8)
+            .padding(12)
+            .into()
+    }
+
+    fn library_page(&self) -> Element<'_, Message> {
+        let empty = self.collection.songs.is_empty();
+        let mode = if empty {
+            BrowseMode::Import
+        } else {
+            self.browse_mode
+        };
+        let songs = self.catalog_songs();
+        let search = &self.collection.search;
+        let artists = self.collection.browser.artists(&songs, search);
+        let albums = self.collection.browser.albums(&songs, search);
+        let tracks = self.catalog_tracks();
+        let cursor = self.player.current().map(|t| t.url.as_str());
+        let table = widget::container(Self::song_table(
+            tracks,
+            cursor.map(str::to_string),
+            self.selected_index,
+            Message::PlayVisibleIndex,
+            Message::SelectVisibleIndex,
+            "+",
+            Message::EnqueueVisibleIndex,
+        ))
+        .height(Length::Fill);
+        let mut col = widget::column::with_capacity(4).push(self.library_toolbar());
+        if mode == BrowseMode::Import {
+            col = col.push(self.import_strip());
+        }
+        if mode == BrowseMode::Browse && !empty {
+            col = col.push(
+                widget::row::with_capacity(2)
                     .push(Self::browser_column(
                         "Artist",
+                        "artists",
                         self.collection.browser.artist.clone(),
                         artists,
                         Message::SelectArtist(None),
                         |name| Message::SelectArtist(Some(name)),
                     ))
+                    .push(widget::divider::vertical::default())
                     .push(Self::browser_column(
                         "Album",
+                        "albums",
                         self.collection.browser.album.clone(),
                         albums,
                         Message::SelectAlbum(None),
                         |name| Message::SelectAlbum(Some(name)),
                     ))
                     .height(Length::FillPortion(2)),
-            )
-            .push(
-                widget::container(Self::song_table(
-                    tracks,
-                    cursor.map(str::to_string),
-                    self.selected_index,
-                    Message::PlayVisibleIndex,
-                    Message::SelectVisibleIndex,
-                    "+",
-                    Message::EnqueueVisibleIndex,
-                ))
-                .height(Length::FillPortion(3)),
-            )
-            .spacing(8)
-            .padding(8)
-            .height(Length::Fill)
-            .into()
+            );
+        }
+        if mode != BrowseMode::Import || !empty {
+            col = col.push(table.height(Length::FillPortion(3)));
+        }
+        col.spacing(0).height(Length::Fill).into()
     }
 
     fn queue_page(&self) -> Element<'_, Message> {
@@ -988,6 +1180,11 @@ impl Application for OrangeApp {
             position_secs: 0,
             spectrum: Vec::new(),
             show_lyrics: false,
+            show_app_menu: false,
+            browse_mode: BrowseMode::Browse,
+            library_filter: LibraryFilter::All,
+            shown_playlist: None,
+            playlist_songs: Vec::new(),
             #[cfg(feature = "dbus")]
             mpris,
             #[cfg(feature = "gst")]
@@ -1100,14 +1297,21 @@ impl Application for OrangeApp {
             Message::SelectPage(page) => {
                 self.page = page;
                 self.selected_index = None;
+                self.show_app_menu = false;
+                if page == Page::Library {
+                    self.library_filter = LibraryFilter::All;
+                    self.shown_playlist = None;
+                    self.playlist_songs.clear();
+                    self.collection.browser = crate::library::LibraryBrowser::default();
+                }
             }
             Message::SelectVisibleIndex(index) => self.selected_index = Some(index),
             Message::PlayVisibleIndex(index) => {
-                let tracks = self.collection.visible_tracks();
+                let tracks = self.catalog_tracks();
                 self.replace_songs_at(tracks, index);
             }
             Message::EnqueueVisibleIndex(index) => {
-                let tracks = self.collection.visible_tracks();
+                let tracks = self.catalog_tracks();
                 if let Some(song) = tracks.get(index).cloned() {
                     self.enqueue_songs(vec![song], self.player.state() != EngineState::Playing);
                 }
@@ -1171,22 +1375,30 @@ impl Application for OrangeApp {
             }
             Message::LoadSavedPlaylist(id) => match self.collection.load_saved_playlist(id) {
                 Ok(songs) => {
-                    self.page = Page::Queue;
-                    self.replace_songs_at(songs, 0);
+                    self.page = Page::Library;
+                    self.shown_playlist = Some(id);
+                    self.playlist_songs = songs;
+                    self.library_filter = LibraryFilter::All;
+                    self.selected_index = None;
+                    self.collection.browser = crate::library::LibraryBrowser::default();
+                    self.browse_mode = BrowseMode::Browse;
+                    self.status = track_list_summary(&self.playlist_songs);
                 }
                 Err(e) => self.status = e,
             },
             Message::SmartNeverPlayed => {
-                self.page = Page::Queue;
                 self.replace_songs_at(smart_never_played(&self.collection.songs), 0);
             }
-            Message::SmartHighestRated => {
-                self.page = Page::Queue;
-                self.replace_songs_at(smart_highest_rated(&self.collection.songs), 0);
-            }
+            Message::SmartHighestRated => self.show_music_filter(LibraryFilter::TopRated),
             Message::SmartMostPlayed => {
-                self.page = Page::Queue;
                 self.replace_songs_at(smart_most_played(&self.collection.songs), 0);
+            }
+            Message::SmartRecentlyAdded => self.show_music_filter(LibraryFilter::RecentlyAdded),
+            Message::SmartRecentlyPlayed => self.show_music_filter(LibraryFilter::RecentlyPlayed),
+            Message::SetBrowseMode(mode) => {
+                self.browse_mode = mode;
+                self.page = Page::Library;
+                self.show_app_menu = false;
             }
             Message::RepeatToggle => {
                 self.repeat = match self.repeat {
@@ -1205,6 +1417,10 @@ impl Application for OrangeApp {
             }
             Message::ToggleLyrics => {
                 self.show_lyrics = !self.show_lyrics;
+                self.show_app_menu = false;
+            }
+            Message::ToggleAppMenu => {
+                self.show_app_menu = !self.show_app_menu;
             }
             Message::EqBand { band, db } => {
                 self.equalizer.set_gain(band, db as f64);
@@ -1252,7 +1468,10 @@ impl Application for OrangeApp {
             }
             Message::Noop => {}
         }
-        cosmic::app::Task::none()
+        match self.core.main_window_id() {
+            Some(id) => self.set_window_title(self.window_title(), id),
+            None => cosmic::app::Task::none(),
+        }
     }
 
     fn view(&self) -> Element<'_, Self::Message> {
@@ -1287,9 +1506,10 @@ impl Application for OrangeApp {
                 .push(widget::divider::horizontal::default())
                 .push(body.height(Length::Fill))
                 .push(
-                    widget::container(widget::text::caption(self.status_text()))
-                        .padding([4, 8])
-                        .width(Length::Fill),
+                    widget::row::with_capacity(2)
+                        .push(widget::space::horizontal())
+                        .push(widget::text::caption(self.status_text()))
+                        .padding([4, 10]),
                 )
                 .width(Length::Fill)
                 .height(Length::Fill),
@@ -1299,4 +1519,95 @@ impl Application for OrangeApp {
         .height(Length::Fill)
         .into()
     }
+}
+
+fn rgb(r: u8, g: u8, b: u8) -> Color {
+    Color::from_rgb8(r, g, b)
+}
+
+fn pane_style(background: Option<Color>, text: Option<Color>) -> widget::container::Style {
+    widget::container::Style {
+        icon_color: text,
+        text_color: text,
+        background: background.map(Background::Color),
+        border: Border::default(),
+        shadow: Shadow::default(),
+        snap: true,
+    }
+}
+
+fn style_player_bar() -> cosmic::theme::Container<'static> {
+    cosmic::theme::Container::custom(|_| {
+        pane_style(Some(rgb(0x2E, 0x34, 0x36)), Some(rgb(0xF6, 0xF5, 0xF4)))
+    })
+}
+
+fn style_accent() -> cosmic::theme::Container<'static> {
+    cosmic::theme::Container::custom(|_| {
+        pane_style(Some(rgb(0xE8, 0x6A, 0x1B)), Some(Color::WHITE))
+    })
+}
+
+fn style_header() -> cosmic::theme::Container<'static> {
+    cosmic::theme::Container::custom(|_| {
+        pane_style(Some(rgb(0xEB, 0xEB, 0xEB)), Some(rgb(0x3D, 0x38, 0x36)))
+    })
+}
+
+fn style_cover() -> cosmic::theme::Container<'static> {
+    cosmic::theme::Container::custom(|_| {
+        pane_style(Some(rgb(0x1E, 0x22, 0x24)), Some(rgb(0xD3, 0xD7, 0xCF)))
+    })
+}
+
+fn style_transparent() -> cosmic::theme::Container<'static> {
+    cosmic::theme::Container::custom(|_| pane_style(None, None))
+}
+
+fn section_label(text: &'static str) -> Element<'static, Message> {
+    widget::container(widget::text::caption(text))
+        .padding([8, 10, 4, 10])
+        .width(Length::Fill)
+        .into()
+}
+
+fn source_item(
+    icon: &'static str,
+    label: impl Into<String>,
+    selected: bool,
+    message: Message,
+) -> Element<'static, Message> {
+    let row = widget::row::with_capacity(2)
+        .push(widget::icon::from_name(icon).size(16))
+        .push(widget::text(label.into()))
+        .spacing(8)
+        .padding([4, 10])
+        .align_y(Alignment::Center)
+        .width(Length::Fill);
+    widget::mouse_area(
+        widget::container(row)
+            .width(Length::Fill)
+            .class(if selected {
+                style_accent()
+            } else {
+                style_transparent()
+            }),
+    )
+    .on_press(message)
+    .into()
+}
+
+fn list_row(label: String, selected: bool, message: Message) -> Element<'static, Message> {
+    widget::mouse_area(
+        widget::container(widget::text(label))
+            .padding([4, 8])
+            .width(Length::Fill)
+            .class(if selected {
+                style_accent()
+            } else {
+                style_transparent()
+            }),
+    )
+    .on_press(message)
+    .into()
 }

@@ -52,7 +52,8 @@ impl Palette {
             text_secondary: Color::new(0x5A, 0x5A, 0x5A),
             accent: Self::ACCENT,
             accent_text: Color::new(0xFF, 0xFF, 0xFF),
-            player_bar: Color::new(0xF0, 0xED, 0xE8),
+            // Rhythmbox keeps a dark transport even in a light window.
+            player_bar: Color::new(0x2E, 0x34, 0x36),
         }
     }
 
@@ -64,7 +65,7 @@ impl Palette {
             text_secondary: Color::new(0xA8, 0xA4, 0x9C),
             accent: Self::ACCENT,
             accent_text: Color::new(0xFF, 0xFF, 0xFF),
-            player_bar: Color::new(0x24, 0x24, 0x2B),
+            player_bar: Color::new(0x2E, 0x34, 0x36),
         }
     }
 }
@@ -139,6 +140,7 @@ pub fn nav_icon_name(page: &str) -> &'static str {
         "collection" => "folder-music-symbolic",
         "queue" => "media-playlist-consecutive-symbolic",
         "playlists" => "view-media-playlist-symbolic",
+        "smart" => "folder-saved-search-symbolic",
         "files" => "folder-symbolic",
         "now-playing" => "media-playback-start-symbolic",
         "lyrics" => "document-text-symbolic",
@@ -199,6 +201,7 @@ mod tests {
             "collection",
             "queue",
             "playlists",
+            "smart",
             "files",
             "now-playing",
             "lyrics",
