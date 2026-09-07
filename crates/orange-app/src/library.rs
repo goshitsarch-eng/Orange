@@ -25,7 +25,7 @@ pub struct ScanReport {
     pub songs: usize,
 }
 
-/// Live collection shown in the Strawberry-style sidebar.
+/// Live collection shown in the Rhythmbox-style browser.
 #[derive(Debug, Clone)]
 pub struct CollectionState {
     pub db_path: PathBuf,

@@ -298,7 +298,6 @@ impl GstEngine {
             _ => None,
         }
     }
-
 }
 
 impl Drop for GstEngine {
@@ -492,7 +491,7 @@ pub fn render_test_wav(path: &str, secs: u32) -> Result<(), GstError> {
     // Defaults are already sine at 440 Hz; 1024 samples per buffer at
     // 44.1 kHz, so this many buffers make roughly `secs` seconds.
     let src = gst::ElementFactory::make("audiotestsrc")
-        .property("num-buffers", ((secs * 44_100 + 1023) / 1024) as i32)
+        .property("num-buffers", (secs * 44_100).div_ceil(1024) as i32)
         .build()?;
     let enc = gst::ElementFactory::make("wavenc").build()?;
     let sink = gst::ElementFactory::make("filesink")

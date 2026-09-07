@@ -18,7 +18,7 @@ run *args:
 # COSMIC window (needs a Wayland/X11 session; same binary, UI enabled).
 # Default `orange` (no flags) also opens this window when built with `ui`.
 run-ui *args:
-    cargo run --offline -p orange-app --features orange-app/ui -- {{args}}
+    cargo run --offline -p orange-app --features orange-app/ui,orange-app/gst -- {{args}}
 
 lint:
     cargo clippy --workspace --all-targets --offline -- -D warnings

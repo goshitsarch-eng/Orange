@@ -33,7 +33,7 @@ ui = ["dep:cosmic", "orange-theme/ui"]
 dbus = ["dep:zbus", "dep:tokio", "orange-media/dbus"]
 # Native desktop notifications (track changes, sync reports).
 notify = ["dep:notify-rust"]
-# Real audio in `orange --serve` (GStreamer backend, Flatpak SDK/CI only).
+# Real audio output via GStreamer (UI transport and `orange --serve`).
 gst = ["orange-media/gst"]
 # Tag reading while scanning a collection folder.
 tags = ["orange-media/tags"]

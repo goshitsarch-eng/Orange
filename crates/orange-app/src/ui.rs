@@ -309,9 +309,9 @@ impl OrangeApp {
         let mut fx = FxChain::default();
         let mut gains = [0.0; 10];
         let mut any_eq = false;
-        for band in 0..Equalizer::BANDS {
+        for (band, gain) in gains.iter_mut().enumerate().take(Equalizer::BANDS) {
             if let Some(db) = self.equalizer.gain(band) {
-                gains[band] = db;
+                *gain = db;
                 if db.abs() > f64::EPSILON {
                     any_eq = true;
                 }
@@ -462,11 +462,13 @@ impl OrangeApp {
                 Message::SelectPage(page),
             ));
         }
-        col = col.push(widget::text::heading("Playlists")).push(Self::select_row(
-            Page::Playlists.title().to_string(),
-            self.page == Page::Playlists,
-            Message::SelectPage(Page::Playlists),
-        ));
+        col = col
+            .push(widget::text::heading("Playlists"))
+            .push(Self::select_row(
+                Page::Playlists.title().to_string(),
+                self.page == Page::Playlists,
+                Message::SelectPage(Page::Playlists),
+            ));
         for list in &self.collection.playlists {
             let star = if list.favorite { "★ " } else { "" };
             col = col.push(Self::select_row(
@@ -575,13 +577,9 @@ impl OrangeApp {
                     );
                 }
                 col = col.push(
-                    widget::mouse_area(
-                        row.spacing(8)
-                            .padding(2)
-                            .align_y(Alignment::Center),
-                    )
-                    .on_press(select(index))
-                    .on_double_click(play(index)),
+                    widget::mouse_area(row.spacing(8).padding(2).align_y(Alignment::Center))
+                        .on_press(select(index))
+                        .on_double_click(play(index)),
                 );
             }
         }
@@ -1270,28 +1268,35 @@ impl Application for OrangeApp {
         let mut body = widget::row::with_capacity(4)
             .push(self.source_list())
             .push(widget::divider::vertical::default())
-            .push(widget::container(page).width(Length::Fill).height(Length::Fill));
-        if self.show_lyrics {
-            body = body
-                .push(widget::divider::vertical::default())
-                .push(
-                    widget::container(widget::scrollable(self.lyrics_body()).height(Length::Fill))
-                        .width(Length::Fixed(260.0))
-                        .height(Length::Fill)
-                        .padding(8),
-                );
-        }
-        widget::column::with_capacity(4)
-            .push(self.player_strip())
-            .push(widget::divider::horizontal::default())
-            .push(body.height(Length::Fill))
             .push(
-                widget::container(widget::text::caption(self.status_text()))
-                    .padding([4, 8])
-                    .width(Length::Fill),
-            )
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .into()
+                widget::container(page)
+                    .width(Length::Fill)
+                    .height(Length::Fill),
+            );
+        if self.show_lyrics {
+            body = body.push(widget::divider::vertical::default()).push(
+                widget::container(widget::scrollable(self.lyrics_body()).height(Length::Fill))
+                    .width(Length::Fixed(260.0))
+                    .height(Length::Fill)
+                    .padding(8),
+            );
+        }
+        widget::container(
+            widget::column::with_capacity(4)
+                .push(self.player_strip())
+                .push(widget::divider::horizontal::default())
+                .push(body.height(Length::Fill))
+                .push(
+                    widget::container(widget::text::caption(self.status_text()))
+                        .padding([4, 8])
+                        .width(Length::Fill),
+                )
+                .width(Length::Fill)
+                .height(Length::Fill),
+        )
+        .class(cosmic::theme::Container::Background)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .into()
     }
 }
