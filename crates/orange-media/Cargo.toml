@@ -1,0 +1,100 @@
+[package]
+name = "orange-media"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+description = "Orange 3.0 playback state, GStreamer backend, tags, online services, devices, MPRIS"
+
+[dependencies]
+orange-core = { version = "3.0.0", path = "../orange-core" }
+
+[features]
+default = []
+# Real GStreamer audio output (base/good/bad/ugly/libav). Needs GStreamer 1.x
+# dev files (present in the Flatpak SDK); always enabled in the Flatpak
+# manifest and CI. Without it the state machine still runs (used by tests).
+gst = ["dep:gstreamer", "dep:gstreamer-audio"]
+# Network clients: Radio Browser, ListenBrainz/Last.fm/Subsonic submission,
+# lyrics/covers fetch, MusicBrainz/AcoustID lookup. Pure Rust (rustls).
+online = [
+    "dep:reqwest",
+    "dep:serde",
+    "dep:serde_json",
+    "dep:tokio",
+    "dep:url",
+    "crypto",
+]
+# Session-bus integration: MPRIS2 server/client, UDisks2 drive enumeration.
+dbus = ["dep:zbus", "dep:tokio"]
+# Tag reading/writing (pure Rust, no TagLib needed).
+tags = ["dep:lofty"]
+# Checksums for Last.fm signatures and MusicBrainz DiscIDs.
+crypto = ["dep:md-5", "dep:sha1", "dep:hex", "dep:base64"]
+# Linux system integration: Audio CD TOC ioctls.
+sys = ["dep:libc"]
+# Everything the Flatpak and `just test-full` enable.
+full = ["gst", "online", "dbus", "tags", "crypto", "sys"]
+
+[dependencies.gstreamer]
+version = "0.24"
+optional = true
+
+[dependencies.gstreamer-audio]
+version = "0.24"
+optional = true
+
+[dependencies.reqwest]
+version = "0.12"
+optional = true
+default-features = false
+features = ["rustls-tls-webpki-roots", "json"]
+
+[dependencies.serde]
+version = "1"
+optional = true
+features = ["derive"]
+
+[dependencies.serde_json]
+version = "1"
+optional = true
+
+[dependencies.tokio]
+version = "1"
+optional = true
+features = ["rt", "time", "sync", "macros"]
+
+[dependencies.url]
+version = "2"
+optional = true
+
+[dependencies.zbus]
+version = "5"
+optional = true
+default-features = false
+features = ["tokio"]
+
+[dependencies.lofty]
+version = "0.22"
+optional = true
+
+[dependencies.md-5]
+version = "0.10"
+optional = true
+
+[dependencies.sha1]
+version = "0.10"
+optional = true
+
+[dependencies.hex]
+version = "0.4"
+optional = true
+
+[dependencies.base64]
+version = "0.22"
+optional = true
+
+[dependencies.libc]
+version = "0.2"
+optional = true

@@ -1,0 +1,81 @@
+name: Rust
+on:
+  push:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  release:
+    types: [published]
+
+jobs:
+  rust-test:
+    name: Cargo test + clippy + fmt (no Qt, no sysdeps)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Test default workspace (offline-safe, no libcosmic/GStreamer)
+        run: cargo test --workspace --locked
+      - name: Test MPRIS/notify units (needs only a Rust toolchain)
+        run: cargo test --locked -p orange-app --features orange-app/dbus,orange-app/notify
+      - name: Clippy (deny warnings)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Format check
+        run: cargo fmt --all -- --check
+      - name: DB compat (CPython-written 2.1.5-shaped fixture)
+        run: |
+          python3 scripts/compat/make_fixture_db.py /tmp/orange-compat-fixture.db
+          ORANGE_COMPAT_FIXTURE=/tmp/orange-compat-fixture.db cargo test -p orange-db
+      - name: Manifest contract
+        run: python3 scripts/compat/check_manifest.py data/com.goshapps.Orange.yml
+
+  rust-ui:
+    name: Full features (COSMIC UI + GStreamer + D-Bus)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Wayland and GStreamer dev libraries
+        run: >
+          sudo apt-get update &&
+          sudo apt-get install -y
+          libwayland-dev libxkbcommon-dev libfontconfig1-dev
+          libfreetype-dev libdbus-1-dev pkg-config
+          libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+      - name: Check full feature set (what the Flatpak ships)
+        run: cargo check -p orange-app --locked --features orange-app/full
+      - name: Test full feature set
+        run: cargo test --locked -p orange-app --features orange-app/full
+
+  flatpak-x64:
+    name: Flatpak x86_64
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install flatpak-builder
+        run: |
+          sudo apt-get update && sudo apt-get install -y flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08 org.freedesktop.Sdk.Extension.rust-stable//25.08
+      - name: Regenerate pinned cargo sources
+        run: |
+          pip install aiohttp tomlkit PyYAML
+          python3 scripts/flatpak/flatpak-cargo-generator.py Cargo.lock -o data/cargo-sources.json
+      - name: Build (x86_64)
+        run: flatpak-builder --force-clean --arch=x86_64 --repo=repo-x64 build-x64 data/com.goshapps.Orange.yml
+
+  flatpak-arm64:
+    name: Flatpak aarch64
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install flatpak-builder
+        run: |
+          sudo apt-get update && sudo apt-get install -y flatpak flatpak-builder
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08 org.freedesktop.Sdk.Extension.rust-stable//25.08
+      - name: Regenerate pinned cargo sources
+        run: |
+          pip install aiohttp tomlkit PyYAML
+          python3 scripts/flatpak/flatpak-cargo-generator.py Cargo.lock -o data/cargo-sources.json
+      - name: Build (aarch64)
+        run: flatpak-builder --force-clean --arch=aarch64 --repo=repo-arm64 build-arm64 data/com.goshapps.Orange.yml

@@ -1,0 +1,28 @@
+[package]
+name = "orange-theme"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+description = "Orange 3.0 theme manager: Orange light/dark palettes, System/Light/Dark, Breeze-first icons"
+
+[dependencies]
+orange-core = { version = "3.0.0", path = "../orange-core" }
+
+[features]
+default = []
+# Live system-theme subscription via cosmic-config + portal ColorScheme.
+ui = ["dep:cosmic-config", "dep:cosmic-theme"]
+
+[dependencies.cosmic-config]
+git = "https://github.com/pop-os/libcosmic"
+rev = "d4d71fd53e5ed6bd3a430089114dffa2da3cd498"
+package = "cosmic-config"
+optional = true
+
+[dependencies.cosmic-theme]
+git = "https://github.com/pop-os/libcosmic"
+rev = "d4d71fd53e5ed6bd3a430089114dffa2da3cd498"
+package = "cosmic-theme"
+optional = true

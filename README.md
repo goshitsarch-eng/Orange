@@ -1,11 +1,13 @@
 # :tangerine: Orange Music Player
 
 Orange is a **music player and music collection organizer**, a fork of *Strawberry* (itself forked from *Clementine* in 2018).
-It’s written in **C++ using the Qt 6 framework**, designed for **audiophiles and music collectors**, and follows the KDE look and feel: it prefers the Breeze widget style and icon theme when available, and supports system, light and dark color schemes.
+Orange 3 is written in **Rust with libcosmic (COSMIC Epoch)**, designed for **audiophiles and music collectors**: it prefers Breeze icons when available (falling back to COSMIC icons), runs on Plasma/Breeze, COSMIC, and Bazzite, and supports system, light and dark color schemes with live switching. Audio is GStreamer (bit-perfect Linux output); the collection database opens existing Strawberry/Orange libraries read-compatible and never moves or deletes Strawberry data. No accounts, no telemetry.
 
-**Current release:** 2.1.5
+**Current release:** 3.0.0
 
 **Maker:** Gosh
+
+Made by Gosh.
 
 The permanent desktop and AppStream catalog identity is `com.goshapps.Orange`. This catalog identity does not rename Orange's existing application name, organization name, QSettings keys, library/database, configuration, or cache locations. Existing Strawberry data is likewise left in place rather than moved or deleted by the identity change.
 

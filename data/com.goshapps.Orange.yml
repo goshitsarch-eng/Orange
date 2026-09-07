@@ -1,0 +1,114 @@
+# Orange 3.0.0 Flatpak manifest (Rust + libcosmic, no Qt/KDE runtime).
+#
+# Single manifest builds BOTH architectures: pass the arch explicitly, never
+# hardcode one here (no arch-specific paths, no x86_64-only .so):
+#   flatpak-builder --arch=x86_64  --repo=repo-x64   build-x64   data/com.goshapps.Orange.yml
+#   flatpak-builder --arch=aarch64 --repo=repo-arm64 build-arm64 data/com.goshapps.Orange.yml
+# Run flatpak-builder from the repository root: the `dir` source below
+# points at `.` (the whole tree, including Cargo.lock for --locked builds).
+#
+# Toolchain notes:
+# - The pinned libcosmic needs rustc 1.93+, so the manifest rides runtime
+#   25.08 whose rust-stable SDK extension is newer than that (the 23.08
+#   extension is stuck at 1.81 and can no longer build the workspace).
+# - The 25.08 SDK/Runtime ship the full GStreamer set (base/good/bad/ugly and
+#   libav), which is what bit-perfect playback, Analyzer input, and the
+#   transcode targets (MP3/AAC/FLAC/Vorbis/Opus/Speex/WavPack/ASF) build
+#   against. No Qt Widgets/Network/SQL/D-Bus, Boost, GLib, or single-instance
+#   helper runtime remains.
+app-id: com.goshapps.Orange
+runtime: org.freedesktop.Platform
+runtime-version: "25.08"
+sdk: org.freedesktop.Sdk
+command: orange
+
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+
+finish-args:
+  - --share=ipc
+  - --share=network
+  - --socket=x11
+  - --socket=wayland
+  - --socket=pulseaudio
+  - --socket=fallback-x11
+  - --device=dri
+  - --device=all
+  - --filesystem=xdg-music
+  - --talk-name=org.freedesktop.Notifications
+  - --own-name=org.mpris.MediaPlayer2.orange
+  - --talk-name=org.mpris.MediaPlayer2.*
+
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+  env:
+    # Hermetic cargo build: all crates and git checkouts arrive as
+    # flatpak-builder sources (data/cargo-sources.json, generated from
+    # Cargo.lock by scripts/flatpak/flatpak-cargo-generator.py), so the
+    # build sandbox needs no network at all.
+    CARGO_NET_OFFLINE: "true"
+    RUST_BACKTRACE: "1"
+
+cleanup:
+  - /include
+  - /lib/pkgconfig
+  - /share/man
+  - "*.la"
+
+modules:
+  # Build-time gate: the freedesktop 25.08 SDK must provide the full
+  # GStreamer stack (base/good/bad/ugly/libav). Fails the build on either
+  # arch when an expected encoder is missing, so bit-perfect playback and
+  # every transcode target (MP3/AAC/FLAC/Vorbis/Opus/Speex/WavPack/ASF)
+  # stay covered without vendoring plugin sources here.
+  - name: check-gstreamer
+    buildsystem: simple
+    build-commands:
+      - pkg-config --exists gstreamer-1.0 gstreamer-base-1.0 gstreamer-audio-1.0 gstreamer-app-1.0
+      - for e in flacenc vorbisenc opusenc wavpackenc lamemp3enc voaacenc speexenc avdec_aac; do gst-inspect-1.0 "$e" > /dev/null || (echo "missing GStreamer element: $e (need base/good/bad/ugly/libav)" && exit 1); done
+      - gst-inspect-1.0 asfmux > /dev/null || echo "warning: asfmux (ASF muxer) not found; ASF transcode target degraded"
+    sources:
+      - type: shell
+        commands:
+          - echo "gating on SDK GStreamer full plugin set"
+  - name: orange
+    buildsystem: simple
+    build-options:
+      append-path: /usr/lib/sdk/rust-stable/bin
+      env:
+        CARGO_HOME: /run/build/orange/cargo
+        CARGO_NET_OFFLINE: "true"
+    build-commands:
+      - cargo --offline fetch --manifest-path Cargo.toml
+      - cargo --offline build --release --locked --features orange-app/full
+      - install -Dm755 target/release/orange /app/bin/orange
+      # Canonical Orange KDE icons (unchanged from 2.1.5) into the Flatpak.
+      - install -Dm644 data/icons/scalable/com.goshapps.Orange.svg /app/share/icons/hicolor/scalable/apps/com.goshapps.Orange.svg
+      - install -Dm644 data/icons/16x16/com.goshapps.Orange.png /app/share/icons/hicolor/16x16/apps/com.goshapps.Orange.png
+      - install -Dm644 data/icons/22x22/com.goshapps.Orange.png /app/share/icons/hicolor/22x22/apps/com.goshapps.Orange.png
+      - install -Dm644 data/icons/32x32/com.goshapps.Orange.png /app/share/icons/hicolor/32x32/apps/com.goshapps.Orange.png
+      - install -Dm644 data/icons/48x48/com.goshapps.Orange.png /app/share/icons/hicolor/48x48/apps/com.goshapps.Orange.png
+      - install -Dm644 data/icons/64x64/com.goshapps.Orange.png /app/share/icons/hicolor/64x64/apps/com.goshapps.Orange.png
+      - install -Dm644 data/icons/128x128/com.goshapps.Orange.png /app/share/icons/hicolor/128x128/apps/com.goshapps.Orange.png
+      # Linux export identity: desktop entry + metainfo.
+      - install -Dm644 dist/unix/com.goshapps.Orange.desktop /app/share/applications/com.goshapps.Orange.desktop
+      - install -Dm644 dist/unix/com.goshapps.Orange.appdata.xml /app/share/metainfo/com.goshapps.Orange.appdata.xml
+    sources:
+      # `path` is relative to this manifest file (data/), so `..` is the
+      # repository root. Skip the local build cache, VCS metadata, and
+      # previous flatpak-builder outputs: the sandbox rebuilds from source.
+      - type: dir
+        path: ..
+        skip:
+          - target
+          - .git
+          - .flatpak-builder
+          - build-x64
+          - build-arm64
+          - repo-x64
+          - repo-arm64
+      # Pinned crate/git sources, generated from Cargo.lock (see
+      # scripts/flatpak/ + `just flatpak-vendor`). Downloaded with host
+      # network at the "Downloading sources" stage, then assembled into an
+      # offline vendor tree inside the sandbox.
+      - cargo-sources.json

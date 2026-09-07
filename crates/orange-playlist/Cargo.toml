@@ -1,0 +1,11 @@
+[package]
+name = "orange-playlist"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+description = "Orange 3.0 playlist model, undo stack, repeat/shuffle, M3U/XSPF/PLS parsing"
+
+[dependencies]
+orange-core = { version = "3.0.0", path = "../orange-core" }

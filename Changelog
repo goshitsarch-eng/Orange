@@ -2,6 +2,14 @@ Strawberry Music Player
 =======================
 ChangeLog
 
+Version 3.0.0 (2026.09.06):
+
+  New features:
+    * Full UI rewrite as a native libcosmic (COSMIC Epoch) app in Rust, made by Gosh: Collection / Playlists / Now Playing / Lyrics / Devices / Radio / Settings navigation, window-bound player bar with analyzer, and all dialogs (tag editor, transcoder, device sync, scrobbler auth) as cosmic dialogs.
+    * Settings > Appearance with System / Light / Dark in Orange's own palettes; System follows the portal ColorScheme and cosmic-config live with no restart; Breeze icons preferred when installed, COSMIC icons otherwise.
+    * Ships as Flatpak for x86_64 and aarch64 from a single freedesktop 23.08 manifest with Rust and the full GStreamer plugin set; Qt/KDE SDK runtime removed.
+    * Collection database opens existing Strawberry/Orange libraries read-compatible; Strawberry library, config, and cache locations are never moved, migrated, or deleted.
+
 Version 2.1.5 (2026.09.01):
 
   Bugfixes:

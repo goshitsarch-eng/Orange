@@ -1,0 +1,68 @@
+[package]
+name = "orange-app"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+description = "Orange 3.0 libcosmic shell (Made by Gosh): nav pages, player bar, dialogs, Settings/About"
+
+[[bin]]
+name = "orange"
+path = "src/main.rs"
+
+[lib]
+name = "orange_app"
+path = "src/lib.rs"
+
+[dependencies]
+orange-core = { version = "3.0.0", path = "../orange-core" }
+orange-db = { version = "3.0.0", path = "../orange-db" }
+orange-collection = { version = "3.0.0", path = "../orange-collection" }
+orange-playlist = { version = "3.0.0", path = "../orange-playlist" }
+orange-smartplaylists = { version = "3.0.0", path = "../orange-smartplaylists" }
+orange-media = { version = "3.0.0", path = "../orange-media" }
+orange-theme = { version = "3.0.0", path = "../orange-theme" }
+
+[features]
+default = []
+# Native COSMIC window (cosmic::Application + cosmic::widget). Enabled in the
+# Flatpak manifest and CI; local `cargo test`/`cargo run` work without it.
+ui = ["dep:cosmic", "orange-theme/ui"]
+# Session-bus remote control: MPRIS2 server/client + serve/headless daemon.
+dbus = ["dep:zbus", "dep:tokio", "orange-media/dbus"]
+# Native desktop notifications (track changes, sync reports).
+notify = ["dep:notify-rust"]
+# Real audio in `orange --serve` (GStreamer backend, Flatpak SDK/CI only).
+gst = ["orange-media/gst"]
+# Everything the Flatpak and `just test-full` enable.
+full = [
+    "ui",
+    "dbus",
+    "notify",
+    "gst",
+    "orange-media/full",
+]
+
+[dependencies.cosmic]
+git = "https://github.com/pop-os/libcosmic"
+rev = "d4d71fd53e5ed6bd3a430089114dffa2da3cd498"
+package = "libcosmic"
+optional = true
+
+[dependencies.zbus]
+version = "5"
+optional = true
+default-features = false
+features = ["tokio"]
+
+[dependencies.tokio]
+version = "1"
+optional = true
+features = ["rt", "time", "sync", "macros"]
+
+[dependencies.notify-rust]
+version = "4"
+optional = true
+default-features = false
+features = ["z-with-tokio"]

@@ -1,0 +1,12 @@
+[package]
+name = "orange-collection"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+description = "Orange 3.0 collection query builder, filter, and watcher diff (no external deps)"
+
+[dependencies]
+orange-core = { version = "3.0.0", path = "../orange-core" }
+orange-db = { version = "3.0.0", path = "../orange-db" }

@@ -1,0 +1,10 @@
+[package]
+name = "orange-smartplaylists"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+description = "Orange 3.0 smart/dynamic playlist search terms and SQL generation (no external deps)"
+
+[dependencies]

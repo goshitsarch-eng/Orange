@@ -1,0 +1,12 @@
+[package]
+name = "orange-db"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+description = "Orange 3.0 collection database: read-compatible with 2.1.5, never touches Strawberry data"
+
+[dependencies]
+orange-core = { version = "3.0.0", path = "../orange-core" }
+rusqlite = { version = "0.40", features = ["bundled"] }

@@ -11,6 +11,14 @@
 /.vs
 /out
 /CMakeSettings.json
+# Rust workspace (Orange 3)
+/target
+/crates/*/target
+build-x64
+build-arm64
+repo-x64
+repo-arm64
+*.flatpak
 /dist/scripts/maketarball.sh
 /debian/changelog
 _codeql_detected_source_root

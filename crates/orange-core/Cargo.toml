@@ -1,0 +1,10 @@
+[package]
+name = "orange-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+description = "Orange 3.0 core identity, version, codecs, song model, appearance mode (no external deps)"
+
+[dependencies]
