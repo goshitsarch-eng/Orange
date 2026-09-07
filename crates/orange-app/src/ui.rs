@@ -1320,9 +1320,21 @@ impl Application for OrangeApp {
         widget::column::with_capacity(2)
             .push(
                 widget::row::with_capacity(3)
-                    .push(self.source_pane(page).width(Length::FillPortion(3)))
-                    .push(self.playlist_pane().width(Length::FillPortion(5)))
-                    .push(self.context_pane().width(Length::FillPortion(2)))
+                    .push(
+                        widget::container(self.source_pane(page))
+                            .width(Length::FillPortion(3))
+                            .height(Length::Fill),
+                    )
+                    .push(
+                        widget::container(self.playlist_pane())
+                            .width(Length::FillPortion(5))
+                            .height(Length::Fill),
+                    )
+                    .push(
+                        widget::container(self.context_pane())
+                            .width(Length::FillPortion(2))
+                            .height(Length::Fill),
+                    )
                     .height(Length::Fill),
             )
             .push(self.player_bar())
