@@ -213,6 +213,12 @@ impl GstEngine {
         Ok(())
     }
 
+    /// Live software volume 0.0–1.0. The volume element is always in the
+    /// UI playback chain so the header slider can move without a rebuild.
+    pub fn set_output_volume(&self, level: f64) -> Result<(), GstError> {
+        self.set_software_volume(level)
+    }
+
     pub fn play(&self) -> Result<(), GstError> {
         self.pipeline.set_state(gst::State::Playing)?;
         Ok(())
@@ -293,6 +299,15 @@ impl GstEngine {
         }
     }
 
+}
+
+impl Drop for GstEngine {
+    fn drop(&mut self) {
+        let _ = self.pipeline.set_state(gst::State::Null);
+    }
+}
+
+impl GstEngine {
     /// Run until EOS or error. Returns on the first terminal event.
     pub fn run_until_terminal(&self, timeout: Duration) -> Result<EngineEvent, GstError> {
         let deadline = Instant::now() + timeout;

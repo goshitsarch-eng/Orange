@@ -1,35 +1,36 @@
-//! Navigation: Collection / Playlists / Files / Radio / Devices / Settings.
-//! One enum drives the libcosmic nav bar (the Strawberry-style source
-//! sidebar). The playlist table stays visible for every source except
-//! Settings.
+//! Rhythmbox-style sources: Music / Play Queue / Playlists / Radio / Files /
+//! Devices / Settings. The main window draws these as a left source list.
 
-/// Every top-level source, in nav-bar order (Strawberry's left tabs).
+/// Every top-level source, in nav-bar order.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Page {
-    Collection,
+    Library,
+    Queue,
     Playlists,
-    Files,
     Radio,
+    Files,
     Devices,
     Settings,
 }
 
 impl Page {
     pub const ALL: &[Page] = &[
-        Self::Collection,
+        Self::Library,
+        Self::Queue,
         Self::Playlists,
-        Self::Files,
         Self::Radio,
+        Self::Files,
         Self::Devices,
         Self::Settings,
     ];
 
     pub fn title(self) -> &'static str {
         match self {
-            Self::Collection => "Collection",
+            Self::Library => "Music",
+            Self::Queue => "Play Queue",
             Self::Playlists => "Playlists",
-            Self::Files => "Files",
             Self::Radio => "Radio",
+            Self::Files => "Files",
             Self::Devices => "Devices",
             Self::Settings => "Settings",
         }
@@ -38,10 +39,11 @@ impl Page {
     /// Icon key resolved through [`orange_theme::nav_icon_name`].
     pub fn icon_key(self) -> &'static str {
         match self {
-            Self::Collection => "collection",
+            Self::Library => "collection",
+            Self::Queue => "queue",
             Self::Playlists => "playlists",
-            Self::Files => "files",
             Self::Radio => "radio",
+            Self::Files => "files",
             Self::Devices => "devices",
             Self::Settings => "settings",
         }
@@ -58,10 +60,11 @@ mod tests {
         assert_eq!(
             titles,
             [
-                "Collection",
+                "Music",
+                "Play Queue",
                 "Playlists",
-                "Files",
                 "Radio",
+                "Files",
                 "Devices",
                 "Settings"
             ]

@@ -1,16 +1,13 @@
-//! Native COSMIC window: Strawberry-style source sidebar + playlist table +
-//! context pane + player bar. Collection folders can be added, scanned, and
-//! browsed as Album artist → Album → track, then queued and played.
+//! Rhythmbox window: source list, Genre/Artist/Album browser, track table,
+//! top transport. No COSMIC nav bar or header chrome.
 
 use std::path::PathBuf;
 use std::time::Duration;
 
 use cosmic::app::Settings;
 use cosmic::iced::{Alignment, Length, Size};
-use cosmic::widget::nav_bar;
-use cosmic::{executor, widget, Application, Core, Element};
+use cosmic::{executor, widget, Application, ApplicationExt, Core, Element};
 
-use orange_collection::tree::GroupBy;
 use orange_core::appearance::AppearanceMode;
 use orange_core::song::Song;
 use orange_media::audio_fx::Equalizer;
@@ -21,9 +18,11 @@ use orange_playlist::model::{RepeatMode, ShuffleMode};
 
 use crate::about;
 use crate::files::FileBrowser;
-use crate::library::{smart_highest_rated, smart_most_played, smart_never_played, CollectionState};
+use crate::library::{
+    smart_highest_rated, smart_most_played, smart_never_played, track_list_summary, CollectionState,
+};
 use crate::nav::Page;
-use crate::playerbar::{analyzer_bars, fit_title, seek_ratio, PlayerBarLayout};
+use crate::playerbar::{fit_title, seek_ratio};
 
 #[cfg(feature = "gst")]
 use orange_media::backend::{AudioSink, FxChain, PlaybackChain};
@@ -34,7 +33,6 @@ use orange_media::mpris::BUS_NAME;
 #[cfg(feature = "dbus")]
 use orange_media::mpris_server::MprisCommand;
 
-/// Messages for the Orange shell.
 #[derive(Debug, Clone)]
 pub enum Message {
     PlayPause,
@@ -49,18 +47,16 @@ pub enum Message {
     AddFolder,
     RemoveFolder(i64),
     Rescan,
-    ToggleArtist(String),
-    ToggleAlbum { artist: String, album: String },
-    PlaySong(String),
-    EnqueueSong(String),
-    PlayArtist(String),
-    EnqueueArtist(String),
-    PlayAlbum { artist: String, album: String },
-    EnqueueAlbum { artist: String, album: String },
+    SelectGenre(Option<String>),
+    SelectArtist(Option<String>),
+    SelectAlbum(Option<String>),
+    SelectPage(Page),
+    SelectVisibleIndex(usize),
+    PlayVisibleIndex(usize),
+    EnqueueVisibleIndex(usize),
     PlayQueueIndex(usize),
-    ClearPlaylist,
+    ClearQueue,
     RemoveQueueIndex(usize),
-    GroupBySelected(usize),
     PlayRadio { name: String, url: String },
     CustomName(String),
     CustomUrl(String),
@@ -76,6 +72,7 @@ pub enum Message {
     SmartMostPlayed,
     RepeatToggle,
     ShuffleToggle,
+    ToggleLyrics,
     EqBand { band: usize, db: f32 },
     Tick,
     Noop,
@@ -83,7 +80,8 @@ pub enum Message {
 
 pub struct OrangeApp {
     core: Core,
-    nav: nav_bar::Model,
+    page: Page,
+    selected_index: Option<usize>,
     player: Player,
     collection: CollectionState,
     files: FileBrowser,
@@ -98,7 +96,9 @@ pub struct OrangeApp {
     shuffle: ShuffleMode,
     phase: u32,
     position_secs: i64,
+    #[allow(dead_code)]
     spectrum: Vec<f32>,
+    show_lyrics: bool,
     #[cfg(feature = "dbus")]
     mpris: Option<MprisShell>,
     #[cfg(feature = "gst")]
@@ -113,10 +113,12 @@ struct MprisShell {
     commands: std::sync::mpsc::Receiver<MprisCommand>,
 }
 
-/// Launch the COSMIC window. `uris` are files/streams passed on the CLI.
 pub fn run(uris: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
     prefer_breeze_icons();
-    let settings = Settings::default().size(Size::new(1280.0, 800.0));
+    let settings = Settings::default()
+        .size(Size::new(1100.0, 720.0))
+        .client_decorations(false)
+        .transparent(false);
     cosmic::app::run::<OrangeApp>(settings, uris)?;
     Ok(())
 }
@@ -136,44 +138,34 @@ fn songs_to_tracks(songs: impl IntoIterator<Item = Song>) -> Vec<QueuedTrack> {
 
 impl OrangeApp {
     fn active_page(&self) -> Page {
-        self.nav
-            .active_data::<Page>()
-            .copied()
-            .unwrap_or(Page::Collection)
+        self.page
     }
 
     fn now_playing_label(&self) -> String {
         match self.player.current() {
             Some(track) if track.title.is_empty() => track.url.clone(),
-            Some(track) => {
-                if track.artist.is_empty() {
-                    track.title.clone()
-                } else {
-                    format!("{} — {}", track.artist, track.title)
-                }
-            }
+            Some(track) if track.artist.is_empty() => track.title.clone(),
+            Some(track) => format!("{} — {}", track.artist, track.title),
             None => String::from("Not playing"),
         }
     }
 
     fn duration_secs(&self) -> i64 {
-        self.player
+        let tagged = self
+            .player
             .current()
             .map(QueuedTrack::length_secs)
-            .filter(|&s| s > 0)
-            .unwrap_or(self.position_secs)
-    }
-
-    fn status_line(&self) -> String {
-        let stats = self.collection.stats();
-        format!(
-            "{} · {} songs · {} albums · {} artists · {}",
-            about::footer(),
-            stats.songs,
-            stats.albums,
-            stats.artists,
-            self.status
-        )
+            .unwrap_or(0);
+        if tagged > 0 {
+            return tagged;
+        }
+        #[cfg(feature = "gst")]
+        if let Some(engine) = self.engine.as_ref() {
+            if let Some(ns) = engine.duration_nanos() {
+                return (ns / 1_000_000_000) as i64;
+            }
+        }
+        0
     }
 
     fn enqueue_songs(&mut self, songs: Vec<Song>, play: bool) {
@@ -182,9 +174,8 @@ impl OrangeApp {
             return;
         }
         let start = self.player.queue_len();
-        let tracks = songs_to_tracks(songs);
-        let n = tracks.len();
-        self.player.enqueue_many(tracks);
+        let n = songs.len();
+        self.player.enqueue_many(songs_to_tracks(songs));
         if play {
             self.player.play_at(start);
             self.sync_engine();
@@ -192,39 +183,16 @@ impl OrangeApp {
         self.status = format!("Queued {n} track(s).");
     }
 
-    fn replace_songs(&mut self, songs: Vec<Song>) {
+    fn replace_songs_at(&mut self, songs: Vec<Song>, index: usize) {
         if songs.is_empty() {
             self.status = String::from("Nothing to play.");
             return;
         }
         let n = songs.len();
-        self.player.replace_and_play(songs_to_tracks(songs), 0);
+        self.player
+            .replace_and_play(songs_to_tracks(songs), index.min(n.saturating_sub(1)));
         self.sync_engine();
         self.status = format!("Playing {n} track(s).");
-    }
-
-    fn play_url(&mut self, url: &str) {
-        if let Some(song) = self.collection.song_by_url(url).cloned() {
-            if let Some(idx) = self.player.queue().iter().position(|t| t.url == url) {
-                self.player.play_at(idx);
-            } else {
-                let start = self.player.queue_len();
-                self.player.enqueue(QueuedTrack::from_song(&song));
-                self.player.play_at(start);
-            }
-            self.sync_engine();
-            self.status = format!("Playing {}", song.display_title());
-            return;
-        }
-        let title = orange_core::paths::url_file_stem(url);
-        let start = self.player.queue_len();
-        self.player.enqueue(QueuedTrack {
-            url: url.to_string(),
-            title,
-            ..QueuedTrack::default()
-        });
-        self.player.play_at(start);
-        self.sync_engine();
     }
 
     fn skip_next(&mut self) {
@@ -242,14 +210,57 @@ impl OrangeApp {
                         next = (next + 1) % len;
                     }
                     self.player.play_at(next);
-                } else if !self.player.next() {
-                    if self.repeat == RepeatMode::Playlist && self.player.queue_len() > 0 {
-                        self.player.play_at(0);
-                    }
+                } else if !self.player.next()
+                    && self.repeat == RepeatMode::Playlist
+                    && self.player.queue_len() > 0
+                {
+                    self.player.play_at(0);
                 }
             }
         }
         self.sync_engine();
+    }
+
+    fn play_or_resume(&mut self) {
+        match self.player.state() {
+            EngineState::Playing | EngineState::Paused => {
+                self.player.toggle_play_pause();
+                self.sync_engine();
+            }
+            EngineState::Idle | EngineState::Empty => {
+                if self.player.queue_len() > 0 {
+                    self.player.toggle_play_pause();
+                    self.sync_engine();
+                    return;
+                }
+                let tracks = self.collection.visible_tracks();
+                if tracks.is_empty() {
+                    self.status = String::from("Nothing to play.");
+                    return;
+                }
+                let index = self
+                    .selected_index
+                    .unwrap_or(0)
+                    .min(tracks.len().saturating_sub(1));
+                self.replace_songs_at(tracks, index);
+            }
+        }
+    }
+
+    fn status_text(&self) -> String {
+        let summary = match self.page {
+            Page::Library => track_list_summary(&self.collection.visible_tracks()),
+            Page::Queue => format!("{} in queue", self.player.queue_len()),
+            Page::Playlists => format!("{} playlists", self.collection.playlists.len()),
+            _ => String::new(),
+        };
+        if summary.is_empty() || summary == self.status {
+            self.status.clone()
+        } else if self.status.is_empty() {
+            summary
+        } else {
+            format!("{summary} — {}", self.status)
+        }
     }
 
     fn sync_engine(&mut self) {
@@ -294,15 +305,8 @@ impl OrangeApp {
             let _ = engine.stop();
         }
         let volume = self.player.volume();
-        let software_volume = if volume >= 100 {
-            None
-        } else {
-            Some(volume as f64 / 100.0)
-        };
-        let mut fx = FxChain {
-            spectrum_bands: Some(16),
-            ..FxChain::default()
-        };
+        let software_volume = Some(volume as f64 / 100.0);
+        let mut fx = FxChain::default();
         let mut gains = [0.0; 10];
         let mut any_eq = false;
         for band in 0..Equalizer::BANDS {
@@ -382,37 +386,32 @@ impl OrangeApp {
         }
     }
 
-    fn player_bar(&self) -> Element<'_, Message> {
+    fn player_strip(&self) -> Element<'_, Message> {
         let playing = self.player.state() == EngineState::Playing;
         let play_icon = if playing {
             "media-playback-pause-symbolic"
         } else {
             "media-playback-start-symbolic"
         };
-        let title = fit_title(&self.now_playing_label(), 42);
+        let title = fit_title(&self.now_playing_label(), 56);
         let duration = self.duration_secs();
         let ratio = seek_ratio(self.position_secs, duration);
-        let layout = PlayerBarLayout { width: 1100.0 };
-        let spark = if layout.analyzer_visible() {
-            let bars = analyzer_bars(playing, self.phase, &self.spectrum, 16);
-            analyzer_sparkline(&bars)
-        } else {
-            String::new()
-        };
+        let elapsed = orange_core::song::format_duration_secs(self.position_secs);
+        let total = orange_core::song::format_duration_secs(duration);
         let repeat = match self.repeat {
-            RepeatMode::Off => "Repeat: off",
-            RepeatMode::Track => "Repeat: track",
-            RepeatMode::Album => "Repeat: album",
-            RepeatMode::Playlist => "Repeat: playlist",
+            RepeatMode::Off => "Repeat",
+            RepeatMode::Track => "Repeat one",
+            RepeatMode::Album => "Repeat album",
+            RepeatMode::Playlist => "Repeat all",
         };
         let shuffle = match self.shuffle {
-            ShuffleMode::Off => "Shuffle: off",
-            ShuffleMode::All => "Shuffle: all",
-            ShuffleMode::InsideAlbum => "Shuffle: album",
+            ShuffleMode::Off => "Shuffle",
+            ShuffleMode::All => "Shuffle on",
+            ShuffleMode::InsideAlbum => "Shuffle album",
         };
         widget::column::with_capacity(2)
             .push(
-                widget::row::with_capacity(12)
+                widget::row::with_capacity(8)
                     .push(
                         widget::button::icon(widget::icon::from_name(
                             "media-skip-backward-symbolic",
@@ -425,243 +424,312 @@ impl OrangeApp {
                     )
                     .push(
                         widget::button::icon(widget::icon::from_name(
-                            "media-playback-stop-symbolic",
-                        ))
-                        .on_press(Message::Stop),
-                    )
-                    .push(
-                        widget::button::icon(widget::icon::from_name(
                             "media-skip-forward-symbolic",
                         ))
                         .on_press(Message::Next),
                     )
                     .push(widget::text(title).width(Length::Fill))
-                    .push(widget::text(orange_core::song::format_duration_secs(
-                        self.position_secs,
-                    )))
-                    .push(
-                        widget::slider(0.0..=1.0, ratio, Message::Seek).width(Length::Fixed(180.0)),
-                    )
-                    .push(widget::text(orange_core::song::format_duration_secs(
-                        duration,
-                    )))
+                    .push(widget::button::text(repeat).on_press(Message::RepeatToggle))
+                    .push(widget::button::text(shuffle).on_press(Message::ShuffleToggle))
+                    .push(widget::button::text("Lyrics").on_press(Message::ToggleLyrics))
                     .push(widget::text(format!("{}%", self.volume as u8)))
                     .push(
                         widget::slider(0.0..=100.0, self.volume, Message::VolumeChanged)
                             .width(Length::Fixed(90.0)),
                     )
-                    .push(widget::text(spark))
-                    .spacing(8)
-                    .padding(8)
+                    .spacing(6)
                     .align_y(Alignment::Center),
             )
             .push(
                 widget::row::with_capacity(3)
-                    .push(widget::button::text(repeat).on_press(Message::RepeatToggle))
-                    .push(widget::button::text(shuffle).on_press(Message::ShuffleToggle))
+                    .push(widget::text(elapsed).width(Length::Fixed(48.0)))
+                    .push(widget::slider(0.0..=1.0, ratio, Message::Seek).width(Length::Fill))
+                    .push(widget::text(total).width(Length::Fixed(48.0)))
                     .spacing(8)
-                    .padding(8),
+                    .align_y(Alignment::Center),
             )
+            .spacing(4)
+            .padding(8)
             .into()
     }
 
-    fn source_pane(&self, page: Page) -> Element<'_, Message> {
-        match page {
-            Page::Collection => self.collection_pane(),
-            Page::Playlists => self.playlists_pane(),
-            Page::Files => self.files_pane(),
-            Page::Radio => self.radio_pane(),
-            Page::Devices => self.devices_pane(),
-            Page::Settings => self.settings_page(),
+    fn source_list(&self) -> Element<'_, Message> {
+        let mut col = widget::column::with_capacity(16).push(widget::text::heading("Library"));
+        for page in [Page::Library, Page::Queue] {
+            col = col.push(Self::select_row(
+                page.title().to_string(),
+                self.page == page,
+                Message::SelectPage(page),
+            ));
         }
+        col = col.push(widget::text::heading("Playlists")).push(Self::select_row(
+            Page::Playlists.title().to_string(),
+            self.page == Page::Playlists,
+            Message::SelectPage(Page::Playlists),
+        ));
+        for list in &self.collection.playlists {
+            let star = if list.favorite { "★ " } else { "" };
+            col = col.push(Self::select_row(
+                format!("{star}{}", list.name),
+                false,
+                Message::LoadSavedPlaylist(list.id),
+            ));
+        }
+        col = col.push(widget::text::heading("Other"));
+        for page in [Page::Radio, Page::Files, Page::Devices, Page::Settings] {
+            col = col.push(Self::select_row(
+                page.title().to_string(),
+                self.page == page,
+                Message::SelectPage(page),
+            ));
+        }
+        widget::container(widget::scrollable(col.spacing(2).padding(8)))
+            .width(Length::Fixed(180.0))
+            .height(Length::Fill)
+            .into()
     }
 
-    fn collection_pane(&self) -> Element<'_, Message> {
-        let stats = self.collection.stats();
-        let mut col = widget::column::with_capacity(8)
-            .push(widget::text::heading("Collection"))
-            .push(
-                widget::text_input::search_input("Search collection", &self.collection.search)
-                    .on_input(Message::SearchChanged),
-            )
-            .push(widget::dropdown(
-                GroupBy::ALL.iter().map(|g| g.label()).collect::<Vec<_>>(),
-                GroupBy::ALL
-                    .iter()
-                    .position(|g| *g == self.collection.group_by),
-                Message::GroupBySelected,
-            ))
-            .push(widget::text::caption(format!(
-                "{} songs · {} albums · {} artists",
-                stats.songs, stats.albums, stats.artists
-            )));
-
-        col = col.push(
-            widget::row::with_capacity(3)
-                .push(
-                    widget::text_input("Music folder path", &self.collection.add_path)
-                        .on_input(Message::AddPathChanged),
-                )
-                .push(widget::button::suggested("Add folder").on_press(Message::AddFolder))
-                .push(widget::button::standard("Rescan").on_press(Message::Rescan))
-                .spacing(8),
-        );
-
-        if !self.collection.directories.is_empty() {
-            let mut dirs = widget::column::with_capacity(self.collection.directories.len() + 1)
-                .push(widget::text::caption("Music folders"));
-            for dir in &self.collection.directories {
-                dirs = dirs.push(
-                    widget::row::with_capacity(2)
-                        .push(widget::text(&dir.path).width(Length::Fill))
-                        .push(
-                            widget::button::destructive("Remove")
-                                .on_press(Message::RemoveFolder(dir.id)),
-                        )
-                        .spacing(8)
-                        .align_y(Alignment::Center),
-                );
-            }
-            col = col.push(dirs);
+    fn browser_column(
+        title: &'static str,
+        selected: Option<String>,
+        rows: Vec<(String, usize)>,
+        all: Message,
+        pick: impl Fn(String) -> Message,
+    ) -> Element<'static, Message> {
+        let total: usize = rows.iter().map(|(_, n)| *n).sum();
+        let mut col = widget::column::with_capacity(rows.len() + 2)
+            .push(widget::text::heading(title))
+            .push(Self::select_row(
+                format!("All ({total})"),
+                selected.is_none(),
+                all,
+            ));
+        for (name, count) in rows {
+            let is_sel = selected.as_deref() == Some(name.as_str());
+            col = col.push(Self::select_row(
+                format!("{name} ({count})"),
+                is_sel,
+                pick(name),
+            ));
         }
-
-        if self.collection.songs.is_empty() {
-            col = col
-                .push(widget::text("Your collection is empty."))
-                .push(widget::text::caption(
-                    "Add a music folder (for example ~/Music) and Orange will scan it into the library. Files stay where they are; Orange never moves or deletes them, and never touches Strawberry’s data.",
-                ));
-        } else {
-            let tree = self.collection.tree();
-            let mut tree_col = widget::column::with_capacity(tree.len().saturating_mul(4) + 1);
-            for artist in &tree {
-                let expanded = self.collection.artist_expanded(&artist.name);
-                let chevron = if expanded { "▾" } else { "▸" };
-                let name = artist.name.clone();
-                tree_col = tree_col.push(
-                    widget::row::with_capacity(3)
-                        .push(
-                            widget::button::text(format!(
-                                "{chevron} {} ({})",
-                                artist.name,
-                                artist.song_count()
-                            ))
-                            .on_press(Message::ToggleArtist(name.clone())),
-                        )
-                        .push(
-                            widget::button::text("Play")
-                                .on_press(Message::PlayArtist(name.clone())),
-                        )
-                        .push(
-                            widget::button::text("Enqueue").on_press(Message::EnqueueArtist(name)),
-                        )
-                        .spacing(4),
-                );
-                if expanded {
-                    for album in &artist.albums {
-                        let album_expanded =
-                            self.collection.album_expanded(&artist.name, &album.name);
-                        let chevron = if album_expanded { "▾" } else { "▸" };
-                        let year = if album.year > 0 {
-                            format!(" ({})", album.year)
-                        } else {
-                            String::new()
-                        };
-                        let artist_name = artist.name.clone();
-                        let album_name = album.name.clone();
-                        tree_col = tree_col.push(
-                            widget::row::with_capacity(3)
-                                .push(
-                                    widget::button::text(format!(
-                                        "    {chevron} {}{year} ({})",
-                                        album.name,
-                                        album.songs.len()
-                                    ))
-                                    .on_press(
-                                        Message::ToggleAlbum {
-                                            artist: artist_name.clone(),
-                                            album: album_name.clone(),
-                                        },
-                                    ),
-                                )
-                                .push(widget::button::text("Play").on_press(Message::PlayAlbum {
-                                    artist: artist_name.clone(),
-                                    album: album_name.clone(),
-                                }))
-                                .push(widget::button::text("Enqueue").on_press(
-                                    Message::EnqueueAlbum {
-                                        artist: artist_name,
-                                        album: album_name,
-                                    },
-                                ))
-                                .spacing(4),
-                        );
-                        if album_expanded {
-                            for song in &album.songs {
-                                let track = if song.track > 0 {
-                                    format!("{:02}  ", song.track)
-                                } else {
-                                    String::from("    ")
-                                };
-                                let url = song.url.clone();
-                                tree_col = tree_col.push(
-                                    widget::row::with_capacity(2)
-                                        .push(
-                                            widget::button::text(format!(
-                                                "        {track}{}",
-                                                song.display_title()
-                                            ))
-                                            .on_press(Message::PlaySong(url.clone())),
-                                        )
-                                        .push(
-                                            widget::button::text("+")
-                                                .on_press(Message::EnqueueSong(url)),
-                                        )
-                                        .spacing(4),
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-            col = col.push(widget::scrollable(tree_col.spacing(2)).height(Length::Fill));
-        }
-
-        if let Some(err) = &self.collection.last_error {
-            col = col.push(widget::text(format!("Error: {err}")));
-        }
-        if let Some(scan) = &self.collection.last_scan {
-            col = col.push(widget::text::caption(format!(
-                "Last scan: {} songs ({} added, {} removed) in {}",
-                scan.songs, scan.added, scan.removed, scan.path
-            )));
-        }
-
-        widget::container(col.spacing(8).padding(8))
+        widget::container(widget::scrollable(col.spacing(2)).height(Length::Fill))
             .width(Length::Fill)
             .height(Length::Fill)
             .into()
     }
 
-    fn playlists_pane(&self) -> Element<'_, Message> {
+    fn select_row(label: String, selected: bool, message: Message) -> Element<'static, Message> {
+        if selected {
+            widget::button::suggested(label).on_press(message).into()
+        } else {
+            widget::button::text(label).on_press(message).into()
+        }
+    }
+
+    fn song_table(
+        songs: Vec<Song>,
+        cursor_url: Option<String>,
+        selected: Option<usize>,
+        play: impl Fn(usize) -> Message,
+        select: impl Fn(usize) -> Message,
+        extra_label: &'static str,
+        extra: impl Fn(usize) -> Message,
+    ) -> Element<'static, Message> {
+        let mut header = widget::row::with_capacity(6)
+            .push(widget::text("#").width(Length::Fixed(36.0)))
+            .push(widget::text("Title").width(Length::Fill))
+            .push(widget::text("Artist").width(Length::Fill))
+            .push(widget::text("Album").width(Length::Fill))
+            .push(widget::text("Time").width(Length::Fixed(56.0)));
+        if !extra_label.is_empty() {
+            header = header.push(widget::text("").width(Length::Fixed(28.0)));
+        }
+        let mut col = widget::column::with_capacity(songs.len() + 2).push(header.spacing(8));
+        if songs.is_empty() {
+            col = col.push(widget::text::caption("No songs in this view."));
+        } else {
+            for (index, song) in songs.into_iter().enumerate() {
+                let marker = if cursor_url.as_deref() == Some(song.url.as_str()) {
+                    "▶"
+                } else if selected == Some(index) {
+                    "•"
+                } else {
+                    ""
+                };
+                let number = if song.track > 0 {
+                    format!("{marker}{}", song.track)
+                } else {
+                    format!("{marker}{}", index + 1)
+                };
+                let mut row = widget::row::with_capacity(6)
+                    .push(widget::text(number).width(Length::Fixed(36.0)))
+                    .push(widget::text(song.display_title()).width(Length::Fill))
+                    .push(widget::text(song.display_artist().to_string()).width(Length::Fill))
+                    .push(widget::text(song.display_album().to_string()).width(Length::Fill))
+                    .push(widget::text(song.format_length()).width(Length::Fixed(56.0)));
+                if !extra_label.is_empty() {
+                    row = row.push(
+                        widget::button::text(extra_label)
+                            .on_press(extra(index))
+                            .width(Length::Fixed(28.0)),
+                    );
+                }
+                col = col.push(
+                    widget::mouse_area(
+                        row.spacing(8)
+                            .padding(2)
+                            .align_y(Alignment::Center),
+                    )
+                    .on_press(select(index))
+                    .on_double_click(play(index)),
+                );
+            }
+        }
+        widget::scrollable(col.spacing(2))
+            .height(Length::Fill)
+            .into()
+    }
+
+    fn library_page(&self) -> Element<'_, Message> {
+        if self.collection.songs.is_empty() {
+            return widget::column::with_capacity(6)
+                .push(widget::text::heading("Music library"))
+                .push(widget::text(
+                    "The library is empty. Add a music folder to import tracks. Files stay where they are.",
+                ))
+                .push(
+                    widget::row::with_capacity(3)
+                        .push(
+                            widget::text_input("Music folder path", &self.collection.add_path)
+                                .on_input(Message::AddPathChanged),
+                        )
+                        .push(widget::button::suggested("Import").on_press(Message::AddFolder))
+                        .spacing(8),
+                )
+                .spacing(8)
+                .padding(12)
+                .into();
+        }
+        let search = &self.collection.search;
+        let genres = self
+            .collection
+            .browser
+            .genres(&self.collection.songs, search);
+        let artists = self
+            .collection
+            .browser
+            .artists(&self.collection.songs, search);
+        let albums = self
+            .collection
+            .browser
+            .albums(&self.collection.songs, search);
+        let tracks = self.collection.visible_tracks();
+        let cursor = self.player.current().map(|t| t.url.as_str());
+        widget::column::with_capacity(4)
+            .push(
+                widget::row::with_capacity(3)
+                    .push(
+                        widget::text_input::search_input("Search library", search)
+                            .on_input(Message::SearchChanged),
+                    )
+                    .push(widget::button::standard("Import folder").on_press(Message::AddFolder))
+                    .spacing(8),
+            )
+            .push(
+                widget::row::with_capacity(3)
+                    .push(Self::browser_column(
+                        "Genre",
+                        self.collection.browser.genre.clone(),
+                        genres,
+                        Message::SelectGenre(None),
+                        |name| Message::SelectGenre(Some(name)),
+                    ))
+                    .push(Self::browser_column(
+                        "Artist",
+                        self.collection.browser.artist.clone(),
+                        artists,
+                        Message::SelectArtist(None),
+                        |name| Message::SelectArtist(Some(name)),
+                    ))
+                    .push(Self::browser_column(
+                        "Album",
+                        self.collection.browser.album.clone(),
+                        albums,
+                        Message::SelectAlbum(None),
+                        |name| Message::SelectAlbum(Some(name)),
+                    ))
+                    .height(Length::FillPortion(2)),
+            )
+            .push(
+                widget::container(Self::song_table(
+                    tracks,
+                    cursor.map(str::to_string),
+                    self.selected_index,
+                    Message::PlayVisibleIndex,
+                    Message::SelectVisibleIndex,
+                    "+",
+                    Message::EnqueueVisibleIndex,
+                ))
+                .height(Length::FillPortion(3)),
+            )
+            .spacing(8)
+            .padding(8)
+            .height(Length::Fill)
+            .into()
+    }
+
+    fn queue_page(&self) -> Element<'_, Message> {
+        let songs: Vec<Song> = self
+            .player
+            .queue()
+            .iter()
+            .map(|track| Song {
+                title: track.title.clone(),
+                artist: track.artist.clone(),
+                album: track.album.clone(),
+                url: track.url.clone(),
+                length_ns: track.length_ns,
+                track: track.track,
+                year: track.year,
+                genre: track.genre.clone(),
+                ..Song::default()
+            })
+            .collect();
+        let cursor = self.player.current().map(|t| t.url.as_str());
+        widget::column::with_capacity(3)
+            .push(
+                widget::row::with_capacity(2)
+                    .push(widget::text::heading("Play Queue").width(Length::Fill))
+                    .push(widget::button::text("Clear").on_press(Message::ClearQueue)),
+            )
+            .push(Self::song_table(
+                songs,
+                cursor.map(str::to_string),
+                self.selected_index,
+                Message::PlayQueueIndex,
+                Message::SelectVisibleIndex,
+                "−",
+                Message::RemoveQueueIndex,
+            ))
+            .spacing(8)
+            .padding(8)
+            .height(Length::Fill)
+            .into()
+    }
+
+    fn playlists_page(&self) -> Element<'_, Message> {
         let mut col = widget::column::with_capacity(8)
             .push(widget::text::heading("Playlists"))
-            .push(widget::text::caption(format!(
-                "Current playlist: {} track(s).",
-                self.player.queue_len()
-            )))
+            .push(widget::text::caption(
+                "Smart playlists fill the Play Queue from the library. Saved playlists load from the Orange database.",
+            ))
             .push(
                 widget::row::with_capacity(3)
                     .push(widget::button::text("Never played").on_press(Message::SmartNeverPlayed))
-                    .push(
-                        widget::button::text("Highest rated").on_press(Message::SmartHighestRated),
-                    )
+                    .push(widget::button::text("Highest rated").on_press(Message::SmartHighestRated))
                     .push(widget::button::text("Most played").on_press(Message::SmartMostPlayed))
                     .spacing(8),
-            )
-            .push(widget::text::caption(
-                "Smart playlists generate from the collection. Saved playlists from the Orange database appear below.",
-            ));
+            );
         if self.collection.playlists.is_empty() {
             col = col.push(widget::text::caption("No saved playlists yet."));
         } else {
@@ -673,13 +741,43 @@ impl OrangeApp {
                 );
             }
         }
-        widget::container(widget::scrollable(col.spacing(8).padding(8)))
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .into()
+        widget::scrollable(col.spacing(8).padding(8)).into()
     }
 
-    fn files_pane(&self) -> Element<'_, Message> {
+    fn radio_page(&self) -> Element<'_, Message> {
+        let mut col = widget::column::with_capacity(8)
+            .push(widget::text::heading("Radio"))
+            .push(widget::text::caption(
+                "Click a station to play it. Custom streams need an http(s) URL.",
+            ));
+        for service in [radio_paradise(), somafm()] {
+            col = col.push(widget::text::heading(service.name));
+            for stream in service.streams {
+                col = col.push(widget::button::text(stream.name.clone()).on_press(
+                    Message::PlayRadio {
+                        name: format!("{} — {}", service.name, stream.name),
+                        url: stream.url,
+                    },
+                ));
+            }
+        }
+        col = col
+            .push(widget::text::heading("Your streams"))
+            .push(widget::text_input("Name", &self.custom_name).on_input(Message::CustomName))
+            .push(widget::text_input("https://…", &self.custom_url).on_input(Message::CustomUrl))
+            .push(widget::button::suggested("Add stream").on_press(Message::AddCustomStream));
+        for stream in &self.custom_streams {
+            col = col.push(widget::button::text(stream.name.clone()).on_press(
+                Message::PlayRadio {
+                    name: stream.name.clone(),
+                    url: stream.url.clone(),
+                },
+            ));
+        }
+        widget::scrollable(col.spacing(8).padding(8)).into()
+    }
+
+    fn files_page(&self) -> Element<'_, Message> {
         let mut col = widget::column::with_capacity(6)
             .push(widget::text::heading("Files"))
             .push(widget::text::caption(self.files.cwd.display().to_string()))
@@ -715,53 +813,14 @@ impl OrangeApp {
             }
         }
         col = col.push(widget::scrollable(list.spacing(2)).height(Length::Fill));
-        widget::container(col.spacing(8).padding(8))
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .into()
+        col.spacing(8).padding(8).into()
     }
 
-    fn radio_pane(&self) -> Element<'_, Message> {
-        let mut col = widget::column::with_capacity(8)
-            .push(widget::text::heading("Internet radio"))
-            .push(widget::text::caption(
-                "Radio Paradise · SomaFM · custom streams. Click a channel to play.",
-            ));
-        for service in [radio_paradise(), somafm()] {
-            col = col.push(widget::text::heading(service.name));
-            for stream in service.streams {
-                col = col.push(widget::button::text(stream.name.clone()).on_press(
-                    Message::PlayRadio {
-                        name: format!("{} — {}", service.name, stream.name),
-                        url: stream.url,
-                    },
-                ));
-            }
-        }
-        col = col
-            .push(widget::text::heading("Your streams"))
-            .push(widget::text_input("Name", &self.custom_name).on_input(Message::CustomName))
-            .push(widget::text_input("https://…", &self.custom_url).on_input(Message::CustomUrl))
-            .push(widget::button::suggested("Add stream").on_press(Message::AddCustomStream));
-        for stream in &self.custom_streams {
-            col = col.push(widget::button::text(stream.name.clone()).on_press(
-                Message::PlayRadio {
-                    name: stream.name.clone(),
-                    url: stream.url.clone(),
-                },
-            ));
-        }
-        widget::container(widget::scrollable(col.spacing(8).padding(8)))
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .into()
-    }
-
-    fn devices_pane(&self) -> Element<'_, Message> {
-        let mut col = widget::column::with_capacity(8)
+    fn devices_page(&self) -> Element<'_, Message> {
+        let mut col = widget::column::with_capacity(6)
             .push(widget::text::heading("Devices"))
             .push(widget::text::caption(
-                "USB mass-storage, MTP, and iPod Classic. Connect a player to copy music from the playlist. Orange never writes into Strawberry’s device databases.",
+                "USB mass-storage, MTP, and iPod Classic. Connect a player to copy music from the Play Queue.",
             ));
         for family in [
             DeviceFamily::UsbMassStorage,
@@ -770,132 +829,41 @@ impl OrangeApp {
         ] {
             col = col.push(widget::text(format!("• {} — supported", family.name())));
         }
-        col = col.push(widget::text::caption(
-            "No removable device is connected in this session. Plug in a USB / MTP / iPod player and reopen Devices to sync.",
-        ));
-        widget::container(col.spacing(8).padding(8))
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .into()
-    }
-
-    fn playlist_pane(&self) -> Element<'_, Message> {
-        let mut col = widget::column::with_capacity(4)
-            .push(
-                widget::row::with_capacity(3)
-                    .push(widget::text::heading("Playlist").width(Length::Fill))
-                    .push(widget::button::text("Clear").on_press(Message::ClearPlaylist))
-                    .spacing(8)
-                    .align_y(Alignment::Center),
-            )
-            .push(
-                widget::row::with_capacity(6)
-                    .push(widget::text("#").width(Length::Fixed(36.0)))
-                    .push(widget::text("Title").width(Length::Fill))
-                    .push(widget::text("Artist").width(Length::Fill))
-                    .push(widget::text("Album").width(Length::Fill))
-                    .push(widget::text("Time").width(Length::Fixed(56.0)))
-                    .push(widget::text("").width(Length::Fixed(28.0)))
-                    .spacing(8),
-            );
-        let cursor = self.player.cursor();
-        let mut rows = widget::column::with_capacity(self.player.queue_len().max(1));
-        if self.player.queue().is_empty() {
-            rows = rows.push(widget::text::caption(
-                "The playlist is empty. Play a song from Collection, Files, or Radio.",
-            ));
-        } else {
-            for (index, track) in self.player.queue().iter().enumerate() {
-                let marker = if Some(index) == cursor { "▶" } else { "" };
-                let number = if track.track > 0 {
-                    format!("{}", track.track)
-                } else {
-                    format!("{}", index + 1)
-                };
-                rows = rows.push(
-                    widget::row::with_capacity(6)
-                        .push(
-                            widget::button::text(format!("{marker}{number}"))
-                                .on_press(Message::PlayQueueIndex(index))
-                                .width(Length::Fixed(36.0)),
-                        )
-                        .push(
-                            widget::button::text(track.title.clone())
-                                .on_press(Message::PlayQueueIndex(index))
-                                .width(Length::Fill),
-                        )
-                        .push(widget::text(track.artist.clone()).width(Length::Fill))
-                        .push(widget::text(track.album.clone()).width(Length::Fill))
-                        .push(widget::text(track.format_length()).width(Length::Fixed(56.0)))
-                        .push(
-                            widget::button::text("×")
-                                .on_press(Message::RemoveQueueIndex(index))
-                                .width(Length::Fixed(28.0)),
-                        )
-                        .spacing(8)
-                        .align_y(Alignment::Center),
-                );
-            }
-        }
-        col = col.push(widget::scrollable(rows.spacing(2)).height(Length::Fill));
-        widget::container(col.spacing(8).padding(8))
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .into()
-    }
-
-    fn context_pane(&self) -> Element<'_, Message> {
-        let (title, artist, album, lyrics) = match self.player.current() {
-            Some(track) => {
-                let lyrics = self
-                    .collection
-                    .song_by_url(&track.url)
-                    .map(|s| s.lyrics.clone())
-                    .filter(|l| !l.trim().is_empty())
-                    .unwrap_or_else(|| {
-                        String::from(
-                            "No lyrics stored for this track. Providers (Genius, Musixmatch, lrclib, lyrics.ovh) fetch when configured.",
-                        )
-                    });
-                (
-                    track.title.clone(),
-                    track.artist.clone(),
-                    track.album.clone(),
-                    lyrics,
-                )
-            }
-            None => (
-                String::from("Not playing"),
-                String::new(),
-                String::new(),
-                String::from("Lyrics appear here when a track is playing."),
-            ),
-        };
-        widget::container(
-            widget::scrollable(
-                widget::column::with_capacity(8)
-                    .push(widget::text::heading("Now playing"))
-                    .push(widget::text(title))
-                    .push(widget::text(artist))
-                    .push(widget::text(album))
-                    .push(widget::text::heading("Lyrics"))
-                    .push(widget::text(lyrics))
-                    .spacing(8)
-                    .padding(8),
-            )
-            .height(Length::Fill),
-        )
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .into()
+        col.spacing(8).padding(8).into()
     }
 
     fn settings_page(&self) -> Element<'_, Message> {
         let mode_button = |mode: AppearanceMode, label: &'static str| {
             widget::button::text(label).on_press(Message::AppearanceSelected(mode))
         };
+        let mut folders = widget::column::with_capacity(self.collection.directories.len() + 2)
+            .push(widget::text::heading("Music folders"));
+        if self.collection.directories.is_empty() {
+            folders = folders.push(widget::text::caption("No folders imported yet."));
+        }
+        for dir in &self.collection.directories {
+            folders = folders.push(
+                widget::row::with_capacity(2)
+                    .push(widget::text(&dir.path).width(Length::Fill))
+                    .push(
+                        widget::button::destructive("Remove")
+                            .on_press(Message::RemoveFolder(dir.id)),
+                    )
+                    .spacing(8),
+            );
+        }
+        folders = folders.push(
+            widget::row::with_capacity(3)
+                .push(
+                    widget::text_input("Folder path", &self.collection.add_path)
+                        .on_input(Message::AddPathChanged),
+                )
+                .push(widget::button::suggested("Add").on_press(Message::AddFolder))
+                .push(widget::button::standard("Rescan").on_press(Message::Rescan))
+                .spacing(8),
+        );
         let mut eq = widget::column::with_capacity(Equalizer::BANDS + 1)
-            .push(widget::text::heading("Equalizer (10-band)"));
+            .push(widget::text::heading("Equalizer"));
         for band in 0..Equalizer::BANDS {
             let db = self.equalizer.gain(band).unwrap_or(0.0) as f32;
             let freq = Equalizer::FREQUENCIES_HZ[band];
@@ -910,18 +878,9 @@ impl OrangeApp {
                     .align_y(Alignment::Center),
             );
         }
-        let codecs = orange_core::codecs::SUPPORTED_CODECS
-            .iter()
-            .map(|c| c.name)
-            .collect::<Vec<_>>()
-            .join(", ");
-        let targets = orange_core::codecs::TRANSCODE_TARGETS
-            .iter()
-            .map(|t| t.name)
-            .collect::<Vec<_>>()
-            .join(", ");
         widget::scrollable(
-            widget::column::with_capacity(10)
+            widget::column::with_capacity(8)
+                .push(folders.spacing(8))
                 .push(widget::text::heading("Appearance"))
                 .push(
                     widget::row::with_capacity(3)
@@ -930,41 +889,46 @@ impl OrangeApp {
                         .push(mode_button(AppearanceMode::Dark, "Dark"))
                         .spacing(8),
                 )
-                .push(widget::text::caption(format!(
-                    "Active: {}",
-                    self.appearance.as_str()
-                )))
-                .push(widget::text::heading("Collection"))
-                .push(widget::text::caption(
-                    "Manage music folders from the Collection tab: add a path, scan, and browse Album artist → Album → tracks. Orange writes only ~/.local/share/orange/orange/orange.db.",
-                ))
                 .push(eq.spacing(4))
-                .push(widget::text::heading("Playback"))
-                .push(widget::text::caption(
-                    "Bit-perfect by default (no resample or software volume unless you move the volume slider or equalizer).",
-                ))
-                .push(widget::text::heading("Formats"))
-                .push(widget::text::caption(format!("Plays: {codecs}")))
-                .push(widget::text::caption(format!("Transcode to: {targets}")))
                 .push(widget::text::heading("About"))
-                .push(widget::text(about::title()))
-                .push(widget::text(about::maker_line()))
                 .push(widget::text(about::body()))
-                .spacing(10)
+                .spacing(12)
                 .padding(16),
         )
         .into()
     }
-}
 
-fn analyzer_sparkline(bars: &[f32]) -> String {
-    const GLYPHS: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
-    bars.iter()
-        .map(|h| {
-            let idx = ((h * 7.0).round() as usize).min(7);
-            GLYPHS[idx]
-        })
-        .collect()
+    fn lyrics_body(&self) -> Element<'_, Message> {
+        let (title, artist, album, lyrics) = match self.player.current() {
+            Some(track) => {
+                let lyrics = self
+                    .collection
+                    .song_by_url(&track.url)
+                    .map(|s| s.lyrics.clone())
+                    .filter(|l| !l.trim().is_empty())
+                    .unwrap_or_else(|| String::from("No lyrics stored for this track."));
+                (
+                    track.title.clone(),
+                    track.artist.clone(),
+                    track.album.clone(),
+                    lyrics,
+                )
+            }
+            None => (
+                String::from("Not playing"),
+                String::new(),
+                String::new(),
+                String::from("Lyrics appear here when a track is playing."),
+            ),
+        };
+        widget::column::with_capacity(6)
+            .push(widget::text(title))
+            .push(widget::text(artist))
+            .push(widget::text(album))
+            .push(widget::text(lyrics))
+            .spacing(8)
+            .into()
+    }
 }
 
 impl Application for OrangeApp {
@@ -983,16 +947,10 @@ impl Application for OrangeApp {
     }
 
     fn init(core: Core, uris: Self::Flags) -> (Self, cosmic::app::Task<Self::Message>) {
-        let mut nav = nav_bar::Model::default();
-        for page in Page::ALL {
-            nav.insert()
-                .text(page.title())
-                .icon(widget::icon::from_name(orange_theme::nav_icon_name(
-                    page.icon_key(),
-                )))
-                .data(*page);
-        }
-        nav.activate_position(0);
+        let mut core = core;
+        core.window.use_template = false;
+        core.window.show_headerbar = false;
+        core.window.content_container = false;
         #[cfg(feature = "dbus")]
         let mpris = {
             let host = crate::mpris_host::MprisHost::new();
@@ -1014,7 +972,8 @@ impl Application for OrangeApp {
         }
         let mut app = Self {
             core,
-            nav,
+            page: Page::Library,
+            selected_index: None,
             player,
             collection: CollectionState::open(),
             files: FileBrowser::default(),
@@ -1030,6 +989,7 @@ impl Application for OrangeApp {
             phase: 0,
             position_secs: 0,
             spectrum: Vec::new(),
+            show_lyrics: false,
             #[cfg(feature = "dbus")]
             mpris,
             #[cfg(feature = "gst")]
@@ -1041,58 +1001,39 @@ impl Application for OrangeApp {
             app.sync_engine();
         }
         if let Some(err) = &app.collection.last_error {
-            app.status = format!("Collection: {err}");
+            app.status = format!("Library: {err}");
         } else if app.collection.songs.is_empty() {
-            app.status = String::from("Add a music folder in Collection to build your library.");
+            app.status = String::from("Import a music folder to build the library.");
         } else {
-            let stats = app.collection.stats();
-            app.status = format!("Loaded {} songs.", stats.songs);
+            app.status = track_list_summary(&app.collection.songs);
         }
-        (app, cosmic::app::Task::none())
-    }
-
-    fn nav_model(&self) -> Option<&nav_bar::Model> {
-        Some(&self.nav)
-    }
-
-    fn on_nav_select(&mut self, id: nav_bar::Id) -> cosmic::app::Task<Self::Message> {
-        self.nav.activate(id);
-        cosmic::app::Task::none()
-    }
-
-    fn header_end(&self) -> Vec<Element<'_, Self::Message>> {
-        vec![widget::button::standard("Rescan")
-            .on_press(Message::Rescan)
-            .into()]
-    }
-
-    fn footer(&self) -> Option<Element<'_, Self::Message>> {
-        Some(widget::text::caption(self.status_line()).into())
+        let title_task = match app.core.main_window_id() {
+            Some(id) => app.set_window_title(String::from("Orange Music Player"), id),
+            None => cosmic::app::Task::none(),
+        };
+        (app, title_task)
     }
 
     fn subscription(&self) -> cosmic::iced::Subscription<Self::Message> {
-        cosmic::iced::time::every(Duration::from_millis(100)).map(|_| Message::Tick)
+        if self.player.state() == EngineState::Playing {
+            cosmic::iced::time::every(Duration::from_millis(100)).map(|_| Message::Tick)
+        } else {
+            cosmic::iced::Subscription::none()
+        }
     }
 
     fn update(&mut self, message: Self::Message) -> cosmic::app::Task<Self::Message> {
         #[cfg(feature = "dbus")]
         self.poll_remotes();
         match message {
-            Message::PlayPause => {
-                self.player.toggle_play_pause();
-                self.status = format!("State: {:?}", self.player.state());
-                self.sync_engine();
-            }
+            Message::PlayPause => self.play_or_resume(),
             Message::Stop => {
                 self.player.stop();
                 self.position_secs = 0;
                 self.sync_engine();
                 self.status = String::from("Stopped.");
             }
-            Message::Next => {
-                self.skip_next();
-                self.status = String::from("Next track.");
-            }
+            Message::Next => self.skip_next(),
             Message::Previous => {
                 if !self.player.previous() {
                     if let Some(cursor) = self.player.cursor() {
@@ -1100,7 +1041,6 @@ impl Application for OrangeApp {
                     }
                 }
                 self.sync_engine();
-                self.status = String::from("Previous track.");
             }
             Message::Seek(ratio) => {
                 let duration = self.duration_secs();
@@ -1113,7 +1053,10 @@ impl Application for OrangeApp {
             Message::VolumeChanged(volume) => {
                 self.volume = volume.clamp(0.0, 100.0);
                 self.player.set_volume(self.volume as u8);
-                self.sync_engine();
+                #[cfg(feature = "gst")]
+                if let Some(engine) = self.engine.as_ref() {
+                    let _ = engine.set_output_volume(self.volume as f64 / 100.0);
+                }
             }
             Message::AppearanceSelected(mode) => {
                 self.appearance = mode;
@@ -1121,15 +1064,15 @@ impl Application for OrangeApp {
             }
             Message::SearchChanged(search) => {
                 self.collection.search = search;
+                self.selected_index = None;
             }
-            Message::AddPathChanged(path) => {
-                self.collection.add_path = path;
-            }
+            Message::AddPathChanged(path) => self.collection.add_path = path,
             Message::AddFolder => {
                 let path = self.collection.add_path.clone();
                 match self.collection.add_folder(&path) {
                     Ok(report) => {
-                        self.status = format!("Added {} ({} songs).", report.path, report.songs);
+                        self.status =
+                            format!("Imported {} songs from {}.", report.songs, report.path);
                     }
                     Err(e) => self.status = e,
                 }
@@ -1140,67 +1083,60 @@ impl Application for OrangeApp {
             },
             Message::Rescan => match self.collection.rescan_all() {
                 Ok(report) => {
-                    self.status = format!(
-                        "Rescan complete: {} songs ({} added, {} removed).",
-                        report.songs, report.added, report.removed
-                    );
+                    self.status = format!("Rescan complete: {} songs.", report.songs);
                 }
                 Err(e) => self.status = e,
             },
-            Message::ToggleArtist(name) => self.collection.toggle_artist(&name),
-            Message::ToggleAlbum { artist, album } => {
-                self.collection.toggle_album(&artist, &album);
+            Message::SelectGenre(genre) => {
+                self.collection.browser.select_genre(genre);
+                self.selected_index = None;
             }
-            Message::PlaySong(url) => self.play_url(&url),
-            Message::EnqueueSong(url) => {
-                if let Some(song) = self.collection.song_by_url(&url).cloned() {
+            Message::SelectArtist(artist) => {
+                self.collection.browser.select_artist(artist);
+                self.selected_index = None;
+            }
+            Message::SelectAlbum(album) => {
+                self.collection.browser.select_album(album);
+                self.selected_index = None;
+            }
+            Message::SelectPage(page) => {
+                self.page = page;
+                self.selected_index = None;
+            }
+            Message::SelectVisibleIndex(index) => self.selected_index = Some(index),
+            Message::PlayVisibleIndex(index) => {
+                let tracks = self.collection.visible_tracks();
+                self.replace_songs_at(tracks, index);
+            }
+            Message::EnqueueVisibleIndex(index) => {
+                let tracks = self.collection.visible_tracks();
+                if let Some(song) = tracks.get(index).cloned() {
                     self.enqueue_songs(vec![song], self.player.state() != EngineState::Playing);
                 }
-            }
-            Message::PlayArtist(name) => {
-                let songs = self.collection.songs_for_artist(&name);
-                self.replace_songs(songs);
-            }
-            Message::EnqueueArtist(name) => {
-                let songs = self.collection.songs_for_artist(&name);
-                self.enqueue_songs(songs, false);
-            }
-            Message::PlayAlbum { artist, album } => {
-                let songs = self.collection.songs_for_album(&artist, &album);
-                self.replace_songs(songs);
-            }
-            Message::EnqueueAlbum { artist, album } => {
-                let songs = self.collection.songs_for_album(&artist, &album);
-                self.enqueue_songs(songs, false);
             }
             Message::PlayQueueIndex(index) => {
                 if self.player.play_at(index) {
                     self.sync_engine();
                 }
             }
-            Message::ClearPlaylist => {
+            Message::ClearQueue => {
                 self.player.clear_queue();
                 self.sync_engine();
-                self.status = String::from("Playlist cleared.");
+                self.status = String::from("Play Queue cleared.");
             }
             Message::RemoveQueueIndex(index) => {
                 self.player.remove_at(index);
             }
-            Message::GroupBySelected(index) => {
-                if let Some(group) = GroupBy::ALL.get(index) {
-                    self.collection.group_by = *group;
-                }
-            }
             Message::PlayRadio { name, url } => {
-                let start = self.player.queue_len();
-                self.player.enqueue(QueuedTrack {
-                    url,
-                    title: name.clone(),
-                    artist: String::from("Radio"),
-                    ..QueuedTrack::default()
-                });
-                self.player.play_at(start);
-                self.sync_engine();
+                self.replace_songs_at(
+                    vec![Song {
+                        title: name.clone(),
+                        artist: String::from("Radio"),
+                        url,
+                        ..Song::default()
+                    }],
+                    0,
+                );
                 self.status = format!("Playing {name}");
             }
             Message::CustomName(name) => self.custom_name = name,
@@ -1226,28 +1162,33 @@ impl Application for OrangeApp {
             Message::FilesUp => self.files.go_up(),
             Message::FilesPlay(path) => {
                 let song = orange_collection::scan::song_from_path(&path, &self.files.cwd, -1);
-                self.replace_songs(vec![song]);
+                self.replace_songs_at(vec![song], 0);
             }
             Message::FilesEnqueue(path) => {
                 let song = orange_collection::scan::song_from_path(&path, &self.files.cwd, -1);
                 self.enqueue_songs(vec![song], false);
             }
             Message::FilesPlayCwd => {
-                let songs = self.files.audio_in_cwd();
-                self.replace_songs(songs);
+                self.replace_songs_at(self.files.audio_in_cwd(), 0);
             }
             Message::LoadSavedPlaylist(id) => match self.collection.load_saved_playlist(id) {
-                Ok(songs) => self.replace_songs(songs),
+                Ok(songs) => {
+                    self.page = Page::Queue;
+                    self.replace_songs_at(songs, 0);
+                }
                 Err(e) => self.status = e,
             },
             Message::SmartNeverPlayed => {
-                self.replace_songs(smart_never_played(&self.collection.songs));
+                self.page = Page::Queue;
+                self.replace_songs_at(smart_never_played(&self.collection.songs), 0);
             }
             Message::SmartHighestRated => {
-                self.replace_songs(smart_highest_rated(&self.collection.songs));
+                self.page = Page::Queue;
+                self.replace_songs_at(smart_highest_rated(&self.collection.songs), 0);
             }
             Message::SmartMostPlayed => {
-                self.replace_songs(smart_most_played(&self.collection.songs));
+                self.page = Page::Queue;
+                self.replace_songs_at(smart_most_played(&self.collection.songs), 0);
             }
             Message::RepeatToggle => {
                 self.repeat = match self.repeat {
@@ -1264,8 +1205,15 @@ impl Application for OrangeApp {
                     ShuffleMode::InsideAlbum => ShuffleMode::Off,
                 };
             }
+            Message::ToggleLyrics => {
+                self.show_lyrics = !self.show_lyrics;
+            }
             Message::EqBand { band, db } => {
                 self.equalizer.set_gain(band, db as f64);
+                #[cfg(feature = "gst")]
+                {
+                    self.engine_url.clear();
+                }
                 self.sync_engine();
             }
             Message::Tick => {
@@ -1310,34 +1258,40 @@ impl Application for OrangeApp {
     }
 
     fn view(&self) -> Element<'_, Self::Message> {
-        let page = self.active_page();
-        if page == Page::Settings {
-            return widget::column::with_capacity(2)
-                .push(self.settings_page())
-                .push(self.player_bar())
-                .into();
+        let page = match self.active_page() {
+            Page::Library => self.library_page(),
+            Page::Queue => self.queue_page(),
+            Page::Playlists => self.playlists_page(),
+            Page::Radio => self.radio_page(),
+            Page::Files => self.files_page(),
+            Page::Devices => self.devices_page(),
+            Page::Settings => self.settings_page(),
+        };
+        let mut body = widget::row::with_capacity(4)
+            .push(self.source_list())
+            .push(widget::divider::vertical::default())
+            .push(widget::container(page).width(Length::Fill).height(Length::Fill));
+        if self.show_lyrics {
+            body = body
+                .push(widget::divider::vertical::default())
+                .push(
+                    widget::container(widget::scrollable(self.lyrics_body()).height(Length::Fill))
+                        .width(Length::Fixed(260.0))
+                        .height(Length::Fill)
+                        .padding(8),
+                );
         }
-        widget::column::with_capacity(2)
+        widget::column::with_capacity(4)
+            .push(self.player_strip())
+            .push(widget::divider::horizontal::default())
+            .push(body.height(Length::Fill))
             .push(
-                widget::row::with_capacity(3)
-                    .push(
-                        widget::container(self.source_pane(page))
-                            .width(Length::FillPortion(3))
-                            .height(Length::Fill),
-                    )
-                    .push(
-                        widget::container(self.playlist_pane())
-                            .width(Length::FillPortion(5))
-                            .height(Length::Fill),
-                    )
-                    .push(
-                        widget::container(self.context_pane())
-                            .width(Length::FillPortion(2))
-                            .height(Length::Fill),
-                    )
-                    .height(Length::Fill),
+                widget::container(widget::text::caption(self.status_text()))
+                    .padding([4, 8])
+                    .width(Length::Fill),
             )
-            .push(self.player_bar())
+            .width(Length::Fill)
+            .height(Length::Fill)
             .into()
     }
 }

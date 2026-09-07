@@ -39,6 +39,8 @@ pub struct CollectionState {
     pub add_path: String,
     pub last_error: Option<String>,
     pub last_scan: Option<ScanReport>,
+    /// Rhythmbox-style Genre / Artist / Album selection.
+    pub browser: LibraryBrowser,
 }
 
 impl Default for CollectionState {
@@ -55,6 +57,7 @@ impl Default for CollectionState {
             add_path: music_dir().display().to_string(),
             last_error: None,
             last_scan: None,
+            browser: LibraryBrowser::default(),
         }
     }
 }
@@ -238,6 +241,151 @@ impl CollectionState {
         let conn = open_collection(&self.db_path, OpenMode::ReadOnly).map_err(|e| e.to_string())?;
         library::load_playlist_songs(&conn, id).map_err(|e| e.to_string())
     }
+
+    /// Tracks in the current Rhythmbox browser view (search + genre/artist/album).
+    pub fn visible_tracks(&self) -> Vec<Song> {
+        self.browser.tracks(&self.songs, &self.search)
+    }
+}
+
+/// Rhythmbox library browser: Genre, then Artist, then Album, then tracks.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct LibraryBrowser {
+    pub genre: Option<String>,
+    pub artist: Option<String>,
+    pub album: Option<String>,
+}
+
+impl LibraryBrowser {
+    /// Selecting a genre clears artist and album, matching Rhythmbox.
+    pub fn select_genre(&mut self, genre: Option<String>) {
+        self.genre = genre.filter(|g| !g.is_empty());
+        self.artist = None;
+        self.album = None;
+    }
+
+    pub fn select_artist(&mut self, artist: Option<String>) {
+        self.artist = artist.filter(|a| !a.is_empty());
+        self.album = None;
+    }
+
+    pub fn select_album(&mut self, album: Option<String>) {
+        self.album = album.filter(|a| !a.is_empty());
+    }
+
+    pub fn genres(&self, songs: &[Song], search: &str) -> Vec<(String, usize)> {
+        counted_names(
+            self.scoped(songs, search, false, false, false),
+            display_genre,
+        )
+    }
+
+    pub fn artists(&self, songs: &[Song], search: &str) -> Vec<(String, usize)> {
+        counted_names(self.scoped(songs, search, true, false, false), |s| {
+            s.display_artist().to_string()
+        })
+    }
+
+    pub fn albums(&self, songs: &[Song], search: &str) -> Vec<(String, usize)> {
+        counted_names(self.scoped(songs, search, true, true, false), |s| {
+            s.display_album().to_string()
+        })
+    }
+
+    pub fn tracks(&self, songs: &[Song], search: &str) -> Vec<Song> {
+        let mut out: Vec<Song> = self
+            .scoped(songs, search, true, true, true)
+            .into_iter()
+            .cloned()
+            .collect();
+        out.sort_by(|a, b| {
+            a.display_album()
+                .to_ascii_lowercase()
+                .cmp(&b.display_album().to_ascii_lowercase())
+                .then(a.disc.cmp(&b.disc))
+                .then(a.track.cmp(&b.track))
+                .then(
+                    a.display_title()
+                        .to_ascii_lowercase()
+                        .cmp(&b.display_title().to_ascii_lowercase()),
+                )
+        });
+        out
+    }
+
+    fn scoped<'a>(
+        &self,
+        songs: &'a [Song],
+        search: &str,
+        use_genre: bool,
+        use_artist: bool,
+        use_album: bool,
+    ) -> Vec<&'a Song> {
+        let filter = CollectionFilter::parse(search);
+        songs
+            .iter()
+            .filter(|song| {
+                if !filter.matches(song) {
+                    return false;
+                }
+                if use_genre {
+                    if let Some(genre) = &self.genre {
+                        if display_genre(song) != *genre {
+                            return false;
+                        }
+                    }
+                }
+                if use_artist {
+                    if let Some(artist) = &self.artist {
+                        if song.display_artist() != artist {
+                            return false;
+                        }
+                    }
+                }
+                if use_album {
+                    if let Some(album) = &self.album {
+                        if song.display_album() != album {
+                            return false;
+                        }
+                    }
+                }
+                true
+            })
+            .collect()
+    }
+}
+
+fn display_genre(song: &Song) -> String {
+    let genre = song.genre.trim();
+    if genre.is_empty() {
+        String::from("Unknown")
+    } else {
+        song.genre.clone()
+    }
+}
+
+fn counted_names(songs: Vec<&Song>, name: impl Fn(&Song) -> String) -> Vec<(String, usize)> {
+    let mut counts: Vec<(String, usize)> = Vec::new();
+    for song in songs {
+        let key = name(song);
+        if let Some((_, count)) = counts.iter_mut().find(|(existing, _)| existing == &key) {
+            *count += 1;
+        } else {
+            counts.push((key, 1));
+        }
+    }
+    counts.sort_by_key(|a| a.0.to_ascii_lowercase());
+    counts
+}
+
+/// Status-bar summary like Rhythmbox: `12 songs, 48:12`.
+pub fn track_list_summary(songs: &[Song]) -> String {
+    let secs: i64 = songs.iter().map(|s| s.length_secs().max(0)).sum();
+    format!(
+        "{} songs, {}",
+        songs.len(),
+        orange_core::song::format_duration_secs(secs)
+    )
 }
 
 /// Built-in smart playlists that run against the loaded collection.
@@ -374,5 +522,58 @@ mod tests {
         assert_eq!(smart_never_played(&songs).len(), 1);
         assert_eq!(smart_highest_rated(&songs)[0].title, "A");
         assert_eq!(smart_most_played(&songs)[0].title, "B");
+    }
+
+    fn tagged(artist: &str, album: &str, title: &str, genre: &str, track: i64) -> Song {
+        Song {
+            artist: artist.into(),
+            albumartist: artist.into(),
+            album: album.into(),
+            title: title.into(),
+            genre: genre.into(),
+            track,
+            length_ns: 60_000_000_000,
+            url: format!("file:///m/{title}.flac"),
+            ..Song::default()
+        }
+    }
+
+    #[test]
+    fn rhythmbox_browser_narrows_genre_then_artist() {
+        let songs = vec![
+            tagged("Miles Davis", "Kind of Blue", "So What", "Jazz", 1),
+            tagged("Miles Davis", "Kind of Blue", "Freddie", "Jazz", 2),
+            tagged("John Coltrane", "Giant Steps", "Giant Steps", "Jazz", 1),
+            tagged("The Beatles", "Abbey Road", "Come Together", "Rock", 1),
+        ];
+        let mut browser = LibraryBrowser::default();
+        let genres = browser.genres(&songs, "");
+        assert_eq!(genres, vec![("Jazz".into(), 3), ("Rock".into(), 1)]);
+        assert_eq!(browser.tracks(&songs, "").len(), 4);
+
+        browser.select_genre(Some("Jazz".into()));
+        let artists: Vec<_> = browser
+            .artists(&songs, "")
+            .into_iter()
+            .map(|(n, _)| n)
+            .collect();
+        assert_eq!(artists, vec!["John Coltrane", "Miles Davis"]);
+        assert_eq!(browser.tracks(&songs, "").len(), 3);
+
+        browser.select_artist(Some("Miles Davis".into()));
+        let albums: Vec<_> = browser
+            .albums(&songs, "")
+            .into_iter()
+            .map(|(n, _)| n)
+            .collect();
+        assert_eq!(albums, vec!["Kind of Blue"]);
+        let tracks = browser.tracks(&songs, "");
+        assert_eq!(tracks.len(), 2);
+        assert_eq!(tracks[0].title, "So What");
+        assert_eq!(track_list_summary(&tracks), "2 songs, 2:00");
+
+        browser.select_genre(Some("Rock".into()));
+        assert!(browser.artist.is_none());
+        assert_eq!(browser.tracks(&songs, "").len(), 1);
     }
 }

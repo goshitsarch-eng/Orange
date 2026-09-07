@@ -137,6 +137,7 @@ pub fn find_breeze_icon_dir(bases: &[std::path::PathBuf]) -> Option<std::path::P
 pub fn nav_icon_name(page: &str) -> &'static str {
     match page {
         "collection" => "folder-music-symbolic",
+        "queue" => "media-playlist-consecutive-symbolic",
         "playlists" => "view-media-playlist-symbolic",
         "files" => "folder-symbolic",
         "now-playing" => "media-playback-start-symbolic",
@@ -196,6 +197,7 @@ mod tests {
     fn every_nav_page_has_an_icon() {
         for page in [
             "collection",
+            "queue",
             "playlists",
             "files",
             "now-playing",

@@ -164,7 +164,9 @@ impl Player {
             EngineState::Paused => self.state = EngineState::Playing,
             EngineState::Empty | EngineState::Idle => {
                 if !self.queue.is_empty() {
-                    self.cursor = Some(0);
+                    if self.cursor.is_none() {
+                        self.cursor = Some(0);
+                    }
                     self.state = EngineState::Playing;
                 }
             }
@@ -256,6 +258,18 @@ mod tests {
         assert_eq!(player.state(), EngineState::Paused);
         player.stop();
         assert_eq!(player.state(), EngineState::Idle);
+    }
+
+    #[test]
+    fn play_after_stop_resumes_cursor() {
+        let mut player = Player::new();
+        player.enqueue(track("a"));
+        player.enqueue(track("b"));
+        assert!(player.play_at(1));
+        player.stop();
+        player.toggle_play_pause();
+        assert_eq!(player.state(), EngineState::Playing);
+        assert_eq!(player.current().unwrap().title, "b");
     }
 
     #[test]
