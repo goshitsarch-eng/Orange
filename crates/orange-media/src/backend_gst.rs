@@ -169,7 +169,9 @@ impl GstEngine {
         }
 
         conv.link(&resample)?;
-        let bus = pipeline.bus().expect("pipeline bus");
+        let bus = pipeline
+            .bus()
+            .ok_or_else(|| GstError("Audio pipeline has no event bus".into()))?;
         let engine = Self { pipeline, bus };
         engine.apply_fx(fx, replaygain_album)?;
         if let Some(level) = software_volume {
@@ -217,6 +219,19 @@ impl GstEngine {
     /// UI playback chain so the header slider can move without a rebuild.
     pub fn set_output_volume(&self, level: f64) -> Result<(), GstError> {
         self.set_software_volume(level)
+    }
+
+    /// Update an existing equalizer without restarting or seeking playback.
+    pub fn set_equalizer_gain(&self, band: usize, gain: f64) -> Result<(), GstError> {
+        if band >= 10 || !gain.is_finite() {
+            return Err(GstError("Invalid equalizer gain".into()));
+        }
+        let eq = self
+            .pipeline
+            .by_name("orange-eq")
+            .ok_or_else(|| GstError("Equalizer unavailable".into()))?;
+        eq.set_property(&format!("band{band}"), gain.clamp(-12.0, 12.0));
+        Ok(())
     }
 
     pub fn play(&self) -> Result<(), GstError> {
@@ -344,7 +359,9 @@ fn link_audio_pad(pad: &gst::Pad, conv: &gst::glib::WeakRef<gst::Element>) {
     if !is_audio {
         return;
     }
-    let sink_pad = conv.static_pad("sink").expect("audioconvert sink pad");
+    let Some(sink_pad) = conv.static_pad("sink") else {
+        return;
+    };
     if !sink_pad.is_linked() {
         let _ = pad.link(&sink_pad);
     }
@@ -378,6 +395,9 @@ fn map_state(state: gst::State) -> EngineState {
 fn make_audio_sink(sink: &AudioSink) -> Result<gst::Element, GstError> {
     let element = match sink {
         AudioSink::Auto => gst::ElementFactory::make("autoaudiosink").build()?,
+        AudioSink::Null => gst::ElementFactory::make("fakesink")
+            .property("sync", true)
+            .build()?,
         AudioSink::Pulse { device } => {
             let builder = gst::ElementFactory::make("pulsesink");
             match device {
@@ -409,6 +429,14 @@ pub struct TranscodeReport {
 pub fn transcode_file(
     chain: &TranscodeChain,
     timeout: Duration,
+) -> Result<TranscodeReport, GstError> {
+    transcode_file_cancellable(chain, timeout, &|| false)
+}
+
+pub fn transcode_file_cancellable(
+    chain: &TranscodeChain,
+    timeout: Duration,
+    cancelled: &dyn Fn() -> bool,
 ) -> Result<TranscodeReport, GstError> {
     gst::init().map_err(|e| GstError(e.to_string()))?;
     let table = encoder_chain(&chain.target_name)
@@ -451,14 +479,20 @@ pub fn transcode_file(
     }
 
     pipeline.set_state(gst::State::Playing)?;
-    let bus = pipeline.bus().expect("pipeline bus");
+    let bus = pipeline
+        .bus()
+        .ok_or_else(|| GstError("Audio pipeline has no event bus".into()))?;
     let deadline = Instant::now() + timeout;
     let result = loop {
+        if cancelled() {
+            break Err(GstError("Conversion cancelled".into()));
+        }
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
             break Err(GstError("transcode timed out".to_string()));
         }
-        let Some(msg) = bus.timed_pop(clock_timeout(remaining)) else {
+        let Some(msg) = bus.timed_pop(clock_timeout(remaining.min(Duration::from_millis(100))))
+        else {
             continue;
         };
         match msg.view() {
@@ -501,7 +535,9 @@ pub fn render_test_wav(path: &str, secs: u32) -> Result<(), GstError> {
     src.link(&enc)?;
     enc.link(&sink)?;
     pipeline.set_state(gst::State::Playing)?;
-    let bus = pipeline.bus().expect("pipeline bus");
+    let bus = pipeline
+        .bus()
+        .ok_or_else(|| GstError("Audio pipeline has no event bus".into()))?;
     let deadline = Instant::now() + Duration::from_secs(30);
     loop {
         let remaining = deadline.saturating_duration_since(Instant::now());
@@ -509,7 +545,8 @@ pub fn render_test_wav(path: &str, secs: u32) -> Result<(), GstError> {
             let _ = pipeline.set_state(gst::State::Null);
             return Err(GstError("render timed out".to_string()));
         }
-        let Some(msg) = bus.timed_pop(clock_timeout(remaining)) else {
+        let Some(msg) = bus.timed_pop(clock_timeout(remaining.min(Duration::from_millis(100))))
+        else {
             continue;
         };
         match msg.view() {
@@ -562,7 +599,9 @@ pub fn probe_uri(uri: &str, timeout: Duration) -> Result<ProbeReport, GstError> 
                 return;
             }
             audio_seen_probe.store(true, std::sync::atomic::Ordering::SeqCst);
-            let sink_pad = sink.static_pad("sink").expect("fakesink sink pad");
+            let Some(sink_pad) = sink.static_pad("sink") else {
+                return;
+            };
             if !sink_pad.is_linked() {
                 let _ = pad.link(&sink_pad);
             }
@@ -573,7 +612,9 @@ pub fn probe_uri(uri: &str, timeout: Duration) -> Result<ProbeReport, GstError> 
         src.link(&sink)?;
     }
     pipeline.set_state(gst::State::Paused)?;
-    let bus = pipeline.bus().expect("pipeline bus");
+    let bus = pipeline
+        .bus()
+        .ok_or_else(|| GstError("Audio pipeline has no event bus".into()))?;
     let deadline = Instant::now() + timeout;
     let mut duration_nanos = None;
     loop {
@@ -581,7 +622,8 @@ pub fn probe_uri(uri: &str, timeout: Duration) -> Result<ProbeReport, GstError> 
         if remaining.is_zero() {
             break;
         }
-        let Some(msg) = bus.timed_pop(clock_timeout(remaining)) else {
+        let Some(msg) = bus.timed_pop(clock_timeout(remaining.min(Duration::from_millis(100))))
+        else {
             continue;
         };
         match msg.view() {
@@ -604,4 +646,37 @@ pub fn probe_uri(uri: &str, timeout: Duration) -> Result<ProbeReport, GstError> 
         duration_nanos,
         saw_audio_pad: audio_seen.load(std::sync::atomic::Ordering::SeqCst),
     })
+}
+
+/// Packaged plugin paths live beside immutable application resources. This
+/// runs before GStreamer initialization; user-specified overrides are retained.
+pub fn prepare_bundled_runtime() {
+    let Ok(exe) = std::env::current_exe() else {
+        return;
+    };
+    let Some(directory) = exe.parent() else {
+        return;
+    };
+    #[cfg(target_os = "macos")]
+    let (plugins, scanner) = (
+        directory.join("../Frameworks/gstreamer-1.0"),
+        directory.join("../Helpers/gst-plugin-scanner"),
+    );
+    #[cfg(not(target_os = "macos"))]
+    let (plugins, scanner) = (
+        directory.join("lib/gstreamer-1.0"),
+        directory.join("libexec/gstreamer-1.0/gst-plugin-scanner.exe"),
+    );
+    let gio = plugins.parent().map(|root| root.join("gio/modules"));
+    if let Some(gio) = gio.filter(|path| path.is_dir()) {
+        if std::env::var_os("GIO_MODULE_DIR").is_none() {
+            std::env::set_var("GIO_MODULE_DIR", gio);
+        }
+    }
+    if plugins.is_dir() && std::env::var_os("GST_PLUGIN_SYSTEM_PATH_1_0").is_none() {
+        std::env::set_var("GST_PLUGIN_SYSTEM_PATH_1_0", plugins);
+    }
+    if scanner.is_file() && std::env::var_os("GST_PLUGIN_SCANNER_1_0").is_none() {
+        std::env::set_var("GST_PLUGIN_SCANNER_1_0", scanner);
+    }
 }

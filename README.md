@@ -1,147 +1,89 @@
-# :tangerine: Orange Music Player
+# Orange Music Player
 
-Orange is a **music player and music collection organizer**, a fork of *Strawberry* (itself forked from *Clementine* in 2018).
-Orange 3 is written in **Rust with libcosmic (COSMIC Epoch)**, designed for **audiophiles and music collectors**: it prefers Breeze icons when available (falling back to COSMIC icons), runs on Plasma/Breeze, COSMIC, and Bazzite, and supports system, light and dark color schemes with live switching. Audio is GStreamer (bit-perfect Linux output); the collection database opens existing Strawberry/Orange libraries read-compatible and never moves or deletes Strawberry data. No accounts, no telemetry.
+Orange is a music player and collection organizer made by Gosh, based on
+Strawberry and Clementine. The canonical application is Rust + Dioxus Desktop,
+with GStreamer audio and the existing Orange SQLite collection format.
 
-**Current release:** 3.0.0
+**3.1.0-alpha.1 is a migration preview, not a completed cross-platform release.**
+Linux X11 builds and native WebView interaction have been exercised. Windows,
+macOS, Wayland, Flatpak sandbox operation and installer behavior remain
+unverified. See [PLATFORM_SUPPORT.md](PLATFORM_SUPPORT.md) for evidence and
+release gates and [MIGRATION_AUDIT.md](MIGRATION_AUDIT.md) for feature accounting.
+The legacy sources are retained while parity is established.
 
-**Maker:** Gosh
+The current interface provides collection import/search/filtering, a play queue,
+repeat/shuffle, saved playlists, M3U/PLS/XSPF import and M3U export, radio and saved
+stations, local folder browsing, tag editing, audio conversion, ten-band equalization, lyrics lookup,
+and copying tracks to a selected folder or mounted device. Physical audio,
+external services and remaining native-dialog operations need additional platform QA.
+Direct MTP/iPod transport, authenticated streaming/scrobbling accounts and several
+advanced Qt workflows have not been migrated into this interface.
 
-Made by Gosh.
+![Linux light appearance](docs/screenshots/linux-light.png)
+![Linux dark appearance](docs/screenshots/linux-dark.png)
 
-The permanent desktop and AppStream catalog identity is `com.goshapps.Orange`. This catalog identity does not rename Orange's existing application name, organization name, QSettings keys, library/database, configuration, or cache locations. Existing Strawberry data is likewise left in place rather than moved or deleted by the identity change.
+These are captures of the actual Linux Dioxus window, not mockups.
 
-The sections below are inherited from Strawberry, which Orange is based on; upstream resources apply to the Strawberry project.
+## Build and run
 
-![Screenshot of Strawberry Music Player](https://raw.githubusercontent.com/strawberrymusicplayer/strawberry/master/data/screenshot/screenshot.png)
+Install the native dependencies listed in [BUILDING.md](BUILDING.md), then:
 
----
+```sh
+cargo build -p orange-app --locked
+cargo run -p orange-app --locked
+cargo run -p orange-app --locked -- --headless
+```
 
-## :globe_with_meridians: Resources
+The default build includes the desktop, playback, tag and network capabilities.
+`--no-default-features` permits domain-only development without native GUI/audio
+libraries. No Dioxus CLI, Qt, Electron, Node or TypeScript runtime is required.
+GTK on Linux hosts the OS WebView; Dioxus renders the application UI. macOS uses
+WKWebView; Windows uses WebView2.
 
-- **Website:** https://www.strawberrymusicplayer.org
-- **Wiki:** https://wiki.strawberrymusicplayer.org
-- **Forum:** https://forum.strawberrymusicplayer.org
-- **GitHub:** https://github.com/strawberrymusicplayer/strawberry
-- **Latest builds:** https://builds.strawberrymusicplayer.org
-- **openSUSE Build Service:**
-  - Stable: https://build.opensuse.org/package/show/home:jonaski:strawberry/strawberry
-  - Unstable: https://build.opensuse.org/package/show/home:jonaski:strawberry-dev/strawberry
-- **Ubuntu PPAs:**
-  - Stable: https://launchpad.net/~jonaski/+archive/ubuntu/strawberry
-  - Unstable: https://launchpad.net/~jonaski/+archive/ubuntu/strawberry-unstable
-- **Translations:** https://crowdin.com/project/strawberrymusicplayer
+## Packages
 
----
+CI is configured to produce Windows x86_64 installer/ZIP, macOS Apple Silicon
+and Intel `.app`/DMG/ZIP, Linux x86_64/aarch64 archives, and Flatpak bundles for
+both Linux architectures. Each artifact has a SHA-256 sidecar. The first remote run was refused before any job started because GitHub reports
+an account billing lock; no native CI result is certified and no new release was published.
+A stable release must not be tagged until the platform and parity gates pass.
+Linux archives require the system libraries in BUILDING.md; they do not bundle
+a distribution's WebKit or C library. Windows packages include GStreamer and
+WebView2's signed installer; macOS bundling relocates native libraries and uses
+ad-hoc signing for local testing. Public signing/notarization is a separate gate.
 
-## :warning: Opening an Issue
+## Data and privacy
 
-Before creating a new GitHub issue:
+Linux retains `$XDG_DATA_HOME/orange/orange/orange.db`. Other platforms use
+native per-user data directories. Settings live in a versioned `orange/desktop.json`
+under the OS configuration directory, are replaced atomically, and import useful
+settings from the old `orange.conf` when the new file is absent. Corrupt or newer
+settings are preserved and reported rather than overwritten.
 
-1. **Read the [FAQ](https://wiki.strawberrymusicplayer.org/wiki/FAQ)**.
-2. **Search existing issues** to avoid duplicates. If one already exists, comment there with any additional information.
-3. **Use the [forum](https://forum.strawberrymusicplayer.org/)** for technical problems, discussions or feature suggestions — it’s better suited for back-and-forth conversation.
-4. **Feature requests are not accepted on GitHub.** Issues created for feature requests will be closed. You can still discuss ideas on the forum.
-5. **Flatpak users:** We do **not** maintain the Flatpak package. Report Flatpak-specific issues via [Flatpak support](https://flatpak.org/about/).
+Strawberry collections are never automatically moved or written. Take a backup
+of an existing Orange collection before testing a preview: the app uses the
+existing additive schema migrations up to version 23. Rescans preserve ratings,
+play counts and song identity and retain the last complete index on failure or
+cancellation. Audio tagging and conversion protect originals with temporary
+output and atomic replacement. Removing a collection folder or playlist leaves
+audio files on disk.
 
----
+There is no telemetry. Radio and optional online lookups make explicit network
+requests. Authenticated account UI is deferred until OS credential storage and
+real service workflows are verified. An absolute `ORANGE_PROFILE_DIR` selects
+an isolated profile for development/QA on every OS; it is never implicitly set
+to the executable directory.
 
-## :moneybag: Sponsoring
+## Development
 
-Strawberry is **free software released under the GPL**.
-If you enjoy using it, please consider **supporting development** through sponsorship or donation.
+```sh
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+cargo test --workspace --no-default-features --locked
+cargo test --workspace --all-features --locked
+```
 
-**Sponsorship options:**
-1. [Patreon](https://www.patreon.com/jonaskvinge)
-2. [GitHub](https://github.com/sponsors/jonaski)
-3. [Ko-fi](https://ko-fi.com/jonaskvinge)
-4. [PayPal](https://paypal.me/jonaskvinge)
-
-Supporting open-source developers helps ensure continued maintenance and improvements.
-
----
-
-## :white_check_mark: Features
-
-- Play and organize your music collection
-- Support for WAV, FLAC, Ogg FLAC, WavPack, Ogg Vorbis, Opus, Ogg Speex, MPC, TrueAudio, AIFF, MP4/AAC, ALAC, MP3, ASF, Monkey’s Audio, and DSD (DSF/DSDIFF)
-- Bit-perfect playback on Linux
-- MPRIS2 / D-Bus remote control on Linux
-- Native desktop notifications
-- Advanced playlist management
-- Smart and dynamic playlists
-- Audio analyzer, equalizer, moodbar, and waveform seek bar
-- Volume normalization with ReplayGain and EBU R128 loudness analysis
-- Editing tags, and fetching missing tags via acoustic fingerprinting using [AcoustID](https://acoustid.org/) and [MusicBrainz](https://musicbrainz.org/)
-- Album cover art from: [Last.fm](https://www.last.fm/), [MusicBrainz](https://musicbrainz.org/), [Discogs](https://www.discogs.com/), [Musixmatch](https://www.musixmatch.com/), [Deezer](https://www.deezer.com/), [Tidal](https://www.tidal.com/), [Qobuz](https://www.qobuz.com/), [Spotify](https://www.spotify.com/)
-- Lyrics from: [Genius](https://genius.com/), [Musixmatch](https://www.musixmatch.com/), [lyrics.ovh](https://lyrics.ovh/), [songlyrics](https://www.songlyrics.com/), [azlyrics](https://www.azlyrics.com/), [elyrics](https://www.elyrics.net/), [letras](https://www.letras.mus.br) and [lrclib.net](https://lrclib.net/)
-- Audio format conversion (transcoding) to MP3, AAC, FLAC, Ogg Vorbis, Opus, Speex, WavPack, and ASF
-- Music transfer to USB, MTP and iPod devices
-- Scrobbling to [Last.fm](https://www.last.fm/), [ListenBrainz](https://listenbrainz.org/), and Subsonic
-- Global keyboard shortcuts (Linux, macOS, and Windows)
-- Discord Rich Presence
-- Audio CD playback
-- Internet radio from [Radio Paradise](https://radioparadise.com/), [SomaFM](https://somafm.com/), [Radio Browser](https://www.radio-browser.info/), and custom streams
-- Streaming from Subsonic-compatible servers
-- Unofficial Tidal, Spotify, and Qobuz integration
-
----
-
-:white_check_mark: Tested on **Linux**, **OpenBSD**, **FreeBSD**, **macOS**, and **Windows**.
-
-> **Note:** macOS and Windows releases are currently **available to sponsors only**.
-> A monthly sponsorship via [Patreon](https://www.patreon.com/jonaskvinge) grants direct access to new releases.
-
----
-
-## :gear: Requirements
-
-To build Strawberry from source, you’ll need:
-
-**Dependencies:**
-- [CMake 3.13 or higher](https://cmake.org/)
-- C/C++ compiler ([GCC](https://gcc.gnu.org/), [Clang](https://clang.llvm.org/), or [MSVC](https://visualstudio.microsoft.com/vs/features/cplusplus/))
-- [pkg-config](https://www.freedesktop.org/wiki/Software/pkg-config/) or [pkgconf](https://github.com/pkgconf/pkgconf)
-- [Boost](https://www.boost.org/)
-- [GLib](https://developer.gnome.org/glib/)
-- [Qt 6.4 or higher](https://www.qt.io/) (Core, Concurrent, Gui, Widgets, Network, SQL, D-Bus)
-- [SQLite 3.9 or higher](https://www.sqlite.org)
-- [ALSA (Linux only)](https://www.alsa-project.org/)
-- [GStreamer](https://gstreamer.freedesktop.org/)
-- [TagLib 1.12 or higher](https://www.taglib.org/)
-- [ICU](https://unicode-org.github.io/icu/)
-- [KDSingleApplication 1.1.0 or higher](https://github.com/KDAB/KDSingleApplication)
-
-**Dependencies for optional features:**
-- Fingerprinting & tagging: [Chromaprint](https://acoustid.org/chromaprint)
-- Fast Spectrum Moodbar: [FFTW3](http://www.fftw.org/)
-- PulseAudio integration: [PulseAudio](https://www.freedesktop.org/wiki/Software/PulseAudio/)
-- Audio CD support: [libcdio](https://www.gnu.org/software/libcdio/)
-- MTP devices: [libmtp](http://libmtp.sourceforge.net/)
-- iPod Classic: [libgpod](http://www.gtkpod.org/libgpod/)
-- EBU R128 normalization: [libebur128](https://github.com/jiixyj/libebur128)
-
-Also install GStreamer plugins **base**, **good**, and optionally **bad**, **ugly** and **libav** for full codec support.
-
----
-
-## :wrench: Build from Source
-
-**Get the code:**
-
-    git clone --recursive https://github.com/strawberrymusicplayer/strawberry
-
-**Build and install:**
-
-    cd strawberry
-    cmake -S . -B build
-    cmake --build build --parallel $(nproc)
-    sudo cmake --install build
-
-For building on Windows with Visual Studio 2022, see: :point_right: https://github.com/strawberrymusicplayer/strawberry-msvc-build-tools
-
----
-
-## :package: Packaging status
-
-[![Packaging status](https://repology.org/badge/vertical-allrepos/strawberry.svg?columns=3&header=Strawberry&exclude_unsupported=1)](https://repology.org/metapackage/strawberry/versions)
+See [CONTRIBUTING.md](CONTRIBUTING.md), [ARCHITECTURE.md](ARCHITECTURE.md) and
+[CHANGELOG.md](CHANGELOG.md). GPL-3.0-or-later; original third-party notices and
+licenses remain in the tree. [vendor/PATCHES.md](vendor/PATCHES.md) explains the
+small GLib security backport required by the current desktop bindings.

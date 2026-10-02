@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 use orange_collection::filter::CollectionFilter;
-use orange_collection::scan::{scan_directory, song_from_scanned};
+use orange_collection::scan::{scan_directory_checked, song_from_scanned};
 use orange_collection::tree::{self, ArtistNode, CollectionStats, GroupBy};
 use orange_collection::watcher::{diff_scan, KnownFile};
 use orange_core::identity;
@@ -39,6 +39,7 @@ pub struct CollectionState {
     pub add_path: String,
     pub last_error: Option<String>,
     pub last_scan: Option<ScanReport>,
+    pub cancellation: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
     /// Rhythmbox-style Genre / Artist / Album selection.
     pub browser: LibraryBrowser,
 }
@@ -57,6 +58,7 @@ impl Default for CollectionState {
             add_path: music_dir().display().to_string(),
             last_error: None,
             last_scan: None,
+            cancellation: None,
             browser: LibraryBrowser::default(),
         }
     }
@@ -65,7 +67,7 @@ impl Default for CollectionState {
 impl CollectionState {
     /// Open (or create) the Orange collection database and load it.
     pub fn open() -> Self {
-        let db_path = PathBuf::from(identity::collection_db_path(&paths::data_home()));
+        let db_path = identity::collection_db_path(paths::data_home());
         let mut state = Self {
             db_path,
             add_path: music_dir().display().to_string(),
@@ -79,15 +81,21 @@ impl CollectionState {
         self.last_error = None;
         match open_collection(&self.db_path, OpenMode::ReadWrite) {
             Ok(conn) => {
-                self.directories = library::list_directories(&conn).unwrap_or_default();
-                self.songs = library::load_songs(&conn).unwrap_or_default();
-                self.playlists = library::list_playlists(&conn).unwrap_or_default();
+                let result = (|| -> Result<(), orange_db::DbError> {
+                    let directories = library::list_directories(&conn)?;
+                    let songs = library::load_songs(&conn)?;
+                    let playlists = library::list_playlists(&conn)?;
+                    self.directories = directories;
+                    self.songs = songs;
+                    self.playlists = playlists;
+                    Ok(())
+                })();
+                if let Err(error) = result {
+                    self.last_error = Some(error.to_string());
+                }
             }
             Err(e) => {
                 self.last_error = Some(e.to_string());
-                self.directories.clear();
-                self.songs.clear();
-                self.playlists.clear();
             }
         }
     }
@@ -134,7 +142,7 @@ impl CollectionState {
 
     /// Add `path` as a collection folder and scan it.
     pub fn add_folder(&mut self, path: &str) -> Result<ScanReport, String> {
-        let trimmed = path.trim();
+        let trimmed = path;
         if trimmed.is_empty() {
             return Err("Enter a folder path.".into());
         }
@@ -142,7 +150,15 @@ impl CollectionState {
         if !root.is_dir() {
             return Err(format!("Not a folder: {trimmed}"));
         }
-        let canonical = root.canonicalize().unwrap_or(root);
+        let canonical = root
+            .canonicalize()
+            .map_err(|error| format!("Cannot access folder: {error}"))?;
+        scan_directory_checked(&canonical, &|| {
+            self.cancellation
+                .as_ref()
+                .is_some_and(|flag| flag.load(std::sync::atomic::Ordering::Relaxed))
+        })
+        .map_err(|e| e.to_string())?;
         let conn =
             open_collection(&self.db_path, OpenMode::ReadWrite).map_err(|e| e.to_string())?;
         let id = library::add_directory(&conn, &canonical.display().to_string())
@@ -185,10 +201,15 @@ impl CollectionState {
     }
 
     fn scan_directory_id(&mut self, directory_id: i64, root: &Path) -> Result<ScanReport, String> {
-        let scanned = scan_directory(root);
+        let scanned = scan_directory_checked(root, &|| {
+            self.cancellation
+                .as_ref()
+                .is_some_and(|flag| flag.load(std::sync::atomic::Ordering::Relaxed))
+        })
+        .map_err(|e| format!("Cannot complete scan of {}: {e}", root.display()))?;
         let conn =
             open_collection(&self.db_path, OpenMode::ReadWrite).map_err(|e| e.to_string())?;
-        let known = library::known_files(&conn, directory_id).unwrap_or_default();
+        let known = library::known_files(&conn, directory_id).map_err(|e| e.to_string())?;
         let known_files: Vec<KnownFile> = known
             .iter()
             .map(|s| KnownFile {
@@ -205,6 +226,13 @@ impl CollectionState {
                 song
             })
             .collect();
+        if self
+            .cancellation
+            .as_ref()
+            .is_some_and(|flag| flag.load(std::sync::atomic::Ordering::Relaxed))
+        {
+            return Err("Scan cancelled; previous index preserved".into());
+        }
         library::replace_directory_songs(&conn, directory_id, &songs).map_err(|e| e.to_string())?;
         Ok(ScanReport {
             path: root.display().to_string(),

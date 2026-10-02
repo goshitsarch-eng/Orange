@@ -1,81 +1,173 @@
-name: Rust
+name: Rust desktop
 on:
   push:
   pull_request:
-    types: [opened, synchronize, reopened]
-  release:
-    types: [published]
-
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: desktop-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
-  rust-test:
-    name: Cargo test + clippy + fmt (no Qt, no sysdeps)
-    runs-on: ubuntu-latest
+  desktop:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            platform: linux-x86_64
+          - os: ubuntu-24.04-arm
+            platform: linux-aarch64
+          - os: windows-2022
+            platform: windows-x86_64
+          - os: macos-15
+            platform: macos-aarch64
+          - os: macos-15-intel
+            platform: macos-x86_64
+    runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
-      - name: Test default workspace (offline-safe, no libcosmic/GStreamer)
-        run: cargo test --workspace --locked
-      - name: Test MPRIS/notify units (needs only a Rust toolchain)
-        run: cargo test --locked -p orange-app --features orange-app/dbus,orange-app/notify
-      - name: Clippy (deny warnings)
-        run: cargo clippy --workspace --all-targets -- -D warnings
-      - name: Format check
+        with:
+          components: rustfmt, clippy
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Linux native dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libxdo-dev libayatana-appindicator3-dev libssl-dev libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav xvfb xdg-desktop-portal xdg-desktop-portal-gtk desktop-file-utils appstream
+      - name: macOS native dependencies
+        if: runner.os == 'macOS'
+        run: brew install pkg-config gstreamer
+      - name: Windows native dependencies
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          ./scripts/package/windows-sdk.ps1
+          choco install nsis -y --no-progress
+      - name: Format
         run: cargo fmt --all -- --check
-      - name: DB compat (CPython-written 2.1.5-shaped fixture)
+      - name: Portable regression tests
+        run: cargo test --workspace --no-default-features --locked
+      - name: Full Linux tests with live session bus
+        if: runner.os == 'Linux'
+        run: dbus-run-session -- cargo test --workspace --all-features --locked
+      - name: Full Windows and macOS tests
+        if: runner.os != 'Linux'
+        run: cargo test --workspace --all-features --locked
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - name: Optimized GLib safety regression
+        run: cargo test -p orange-media --release --features gst --test glib_variant --locked
+      - name: Dependency security audit
+        if: runner.os == 'Linux' && matrix.platform == 'linux-x86_64'
         run: |
-          python3 scripts/compat/make_fixture_db.py /tmp/orange-compat-fixture.db
-          ORANGE_COMPAT_FIXTURE=/tmp/orange-compat-fixture.db cargo test -p orange-db
-      - name: Manifest contract
+          cargo install cargo-audit --version 0.22.2 --locked
+          cargo audit
+      - name: Database compatibility oracle
+        shell: bash
+        run: |
+          python scripts/compat/make_fixture_db.py "$RUNNER_TEMP/orange-compat.db"
+          ORANGE_COMPAT_FIXTURE="$RUNNER_TEMP/orange-compat.db" cargo test -p orange-db --locked
+      - name: Linux native WebView QA
+        if: runner.os == 'Linux'
+        run: bash scripts/qa/run-linux.sh
+      - name: Windows and macOS native WebView QA
+        if: runner.os != 'Linux'
+        run: python scripts/qa/run-native.py
+      - name: Release build
+        run: cargo build -p orange-app --release --locked
+      - name: Linux metadata and archive
+        if: runner.os == 'Linux'
+        run: |
+          desktop-file-validate dist/unix/com.goshapps.Orange.desktop
+          appstreamcli validate --no-net dist/unix/com.goshapps.Orange.appdata.xml
+          target/release/orange --version
+          bash scripts/package/linux.sh
+      - name: macOS app, signing verification and DMG
+        if: runner.os == 'macOS'
+        run: python scripts/package/macos.py
+      - name: Windows archive and installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          ./scripts/package/windows.ps1 -GStreamerRoot 'C:\gstreamer\1.0\msvc_x86_64'
+          $installer=Get-ChildItem target/packages/*-setup.exe | Select-Object -First 1
+          $process=Start-Process $installer.FullName -ArgumentList '/S' -Wait -PassThru
+          if ($process.ExitCode -ne 0) {throw 'Installer smoke test failed'}
+          & "$env:LOCALAPPDATA/Programs/Orange/orange.exe" --version
+          $process=Start-Process "$env:LOCALAPPDATA/Programs/Orange/Uninstall.exe" -ArgumentList '/S' -Wait -PassThru
+          if ($process.ExitCode -ne 0) {throw 'Uninstaller smoke test failed'}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: orange-${{ matrix.platform }}
+          path: |
+            target/packages/*.zip
+            target/packages/*.dmg
+            target/packages/*.exe
+            target/packages/*.tar.gz
+            target/packages/*.sha256
+          if-no-files-found: error
+  flatpak:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            arch: x86_64
+          - os: ubuntu-24.04-arm
+            arch: aarch64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Runtime and builder
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder xvfb dbus-x11 python3-venv
+          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y flathub org.gnome.Platform//49 org.gnome.Sdk//49 org.freedesktop.Sdk.Extension.rust-stable//25.08
+      - name: Manifest and source contract
         run: python3 scripts/compat/check_manifest.py data/com.goshapps.Orange.yml
-
-  rust-ui:
-    name: Full features (COSMIC UI + GStreamer + D-Bus)
-    runs-on: ubuntu-latest
+      - name: Build and install in sandbox
+        run: |
+          flatpak-builder --user --install --force-clean --arch=${{ matrix.arch }} --repo=flatpak-repo flatpak-build data/com.goshapps.Orange.yml
+          flatpak run com.goshapps.Orange --version
+          flatpak run com.goshapps.Orange --headless
+      - name: Sandbox GUI launch
+        run: |
+          xvfb-run -a dbus-run-session -- bash -c 'flatpak run com.goshapps.Orange > /tmp/orange-flatpak.log 2>&1 & app_pid=$!; sleep 15; kill -0 "$app_pid"; kill "$app_pid"; wait "$app_pid" || test "$?" = 143'
+          cat /tmp/orange-flatpak.log
+      - name: Export bundle and checksum
+        run: |
+          version=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml","rb"))["workspace"]["package"]["version"])')
+          file="orange-$version-${{ matrix.arch }}.flatpak"
+          flatpak build-bundle flatpak-repo "$file" com.goshapps.Orange
+          sha256sum "$file" > "$file.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: orange-flatpak-${{ matrix.arch }}
+          path: '*.flatpak*'
+          if-no-files-found: error
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [desktop, flatpak]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install Wayland and GStreamer dev libraries
-        run: >
-          sudo apt-get update &&
-          sudo apt-get install -y
-          libwayland-dev libxkbcommon-dev libfontconfig1-dev
-          libfreetype-dev libdbus-1-dev pkg-config
-          libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
-      - name: Check full feature set (what the Flatpak ships)
-        run: cargo check -p orange-app --locked --features orange-app/full
-      - name: Test full feature set
-        run: cargo test --locked -p orange-app --features orange-app/full
-
-  flatpak-x64:
-    name: Flatpak x86_64
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-      - name: Install flatpak-builder
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+      - name: Verify version and publish prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          sudo apt-get update && sudo apt-get install -y flatpak flatpak-builder
-          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-          flatpak install --user -y flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08 org.freedesktop.Sdk.Extension.rust-stable//25.08
-      - name: Regenerate pinned cargo sources
-        run: |
-          pip install aiohttp tomlkit PyYAML
-          python3 scripts/flatpak/flatpak-cargo-generator.py Cargo.lock -o data/cargo-sources.json
-      - name: Build (x86_64)
-        run: flatpak-builder --force-clean --arch=x86_64 --repo=repo-x64 build-x64 data/com.goshapps.Orange.yml
-
-  flatpak-arm64:
-    name: Flatpak aarch64
-    runs-on: ubuntu-24.04-arm
-    steps:
-      - uses: actions/checkout@v7
-      - name: Install flatpak-builder
-        run: |
-          sudo apt-get update && sudo apt-get install -y flatpak flatpak-builder
-          flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-          flatpak install --user -y flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08 org.freedesktop.Sdk.Extension.rust-stable//25.08
-      - name: Regenerate pinned cargo sources
-        run: |
-          pip install aiohttp tomlkit PyYAML
-          python3 scripts/flatpak/flatpak-cargo-generator.py Cargo.lock -o data/cargo-sources.json
-      - name: Build (aarch64)
-        run: flatpak-builder --force-clean --arch=aarch64 --repo=repo-arm64 build-arm64 data/com.goshapps.Orange.yml
+          version=$(python3 -c 'import tomllib; print(tomllib.load(open("Cargo.toml","rb"))["workspace"]["package"]["version"])')
+          test "$GITHUB_REF_NAME" = "v$version"
+          prerelease=()
+          if [[ "$version" == *-* ]]; then prerelease=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes "${prerelease[@]}" artifacts/*

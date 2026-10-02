@@ -90,18 +90,32 @@ impl TranscodeJob {
 }
 
 fn sanitize_filename(title: &str) -> String {
-    title
+    let value: String = title
         .chars()
+        .take(120)
         .map(|c| {
-            if matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') {
+            if c.is_control() || matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') {
                 '_'
             } else {
                 c
             }
         })
-        .collect::<String>()
-        .trim()
-        .to_string()
+        .collect();
+    let value = value.trim().trim_end_matches(['.', ' ']);
+    if value.is_empty() || value == "." || value == ".." {
+        return "Unknown".into();
+    }
+    let stem = value.split('.').next().unwrap_or("").to_ascii_uppercase();
+    if matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || ["COM", "LPT"].iter().any(|prefix| {
+            stem.strip_prefix(prefix)
+                .is_some_and(|n| n.len() == 1 && n.as_bytes()[0].is_ascii_digit())
+        })
+    {
+        format!("_{value}")
+    } else {
+        value.into()
+    }
 }
 
 /// Look up a transcode target by display name (case-insensitive).
@@ -172,7 +186,11 @@ pub struct SyncTrack {
 /// Organize destination: `Artist/Album/NN - Title.<ext>`, sanitized.
 pub fn organize_relative_path(track: &SyncTrack, extension: &str) -> std::path::PathBuf {
     let number = format!("{:02}", track.track_no.min(99));
-    let file = format!("{number} - {}.{extension}", sanitize_filename(&track.title));
+    let file = format!(
+        "{number} - {}.{}",
+        sanitize_filename(&track.title),
+        sanitize_filename(extension)
+    );
     std::path::PathBuf::from(sanitize_filename(&track.artist))
         .join(sanitize_filename(&track.album))
         .join(file)
@@ -224,12 +242,45 @@ pub fn execute_sync(
     on_progress: &mut dyn FnMut(SyncProgress),
     transcode_one: Option<&TranscodeOne>,
 ) -> Result<SyncReport, SyncError> {
+    execute_sync_cancellable(
+        dest_root,
+        tracks,
+        overwrite,
+        transcode_target,
+        on_progress,
+        transcode_one,
+        &|| false,
+    )
+}
+
+/// Cancellation is checked between files and every copy buffer. Partial files
+/// remain temporary; only complete output is committed to the destination.
+#[allow(clippy::too_many_arguments)]
+pub fn execute_sync_cancellable(
+    dest_root: &std::path::Path,
+    tracks: &[SyncTrack],
+    overwrite: bool,
+    transcode_target: Option<TranscodeTarget>,
+    on_progress: &mut dyn FnMut(SyncProgress),
+    transcode_one: Option<&TranscodeOne>,
+    cancelled: &dyn Fn() -> bool,
+) -> Result<SyncReport, SyncError> {
+    use std::io::{Read, Write};
+    std::fs::create_dir_all(dest_root).map_err(|e| SyncError(e.to_string()))?;
+    let root = dest_root
+        .canonicalize()
+        .map_err(|e| SyncError(e.to_string()))?;
     let mut report = SyncReport {
         copied: 0,
         transcoded: 0,
         skipped: 0,
     };
     for (index, track) in tracks.iter().enumerate() {
+        if cancelled() {
+            return Err(SyncError(
+                "Copy cancelled; completed files remain intact.".into(),
+            ));
+        }
         on_progress(SyncProgress {
             done: index,
             total: tracks.len(),
@@ -245,25 +296,99 @@ pub fn execute_sync(
                 .unwrap_or("bin")
                 .to_string(),
         };
-        let dest = dest_root.join(organize_relative_path(track, &extension));
+        let dest = root.join(organize_relative_path(track, &extension));
         if dest.exists() && !overwrite {
             report.skipped += 1;
             continue;
         }
-        if let Some(parent) = dest.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| SyncError(format!("cannot create {}: {e}", parent.display())))?;
+        let relative = organize_relative_path(track, &extension);
+        let mut current = root.clone();
+        if let Some(parent) = relative.parent() {
+            for component in parent.components() {
+                let std::path::Component::Normal(name) = component else {
+                    return Err(SyncError("Invalid destination component".into()));
+                };
+                current.push(name);
+                match std::fs::symlink_metadata(&current) {
+                    Ok(_) => {
+                        if !current
+                            .canonicalize()
+                            .map_err(|e| SyncError(e.to_string()))?
+                            .starts_with(&root)
+                        {
+                            return Err(SyncError(
+                                "Destination symlink escapes the selected folder".into(),
+                            ));
+                        }
+                    }
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                        std::fs::create_dir(&current).map_err(|e| SyncError(e.to_string()))?
+                    }
+                    Err(error) => return Err(SyncError(error.to_string())),
+                }
+            }
+        }
+        let parent = dest
+            .parent()
+            .ok_or_else(|| SyncError("Destination has no parent".into()))?;
+        if !parent
+            .canonicalize()
+            .map_err(|e| SyncError(e.to_string()))?
+            .starts_with(&root)
+        {
+            return Err(SyncError(
+                "Destination symlink escapes the selected folder".into(),
+            ));
+        }
+        if dest.exists() && source.canonicalize().ok() == dest.canonicalize().ok() {
+            return Err(SyncError(
+                "Source and destination refer to the same file".into(),
+            ));
+        }
+        let mut output =
+            tempfile::NamedTempFile::new_in(parent).map_err(|e| SyncError(e.to_string()))?;
+        if transcode_target.is_some() {
+            let convert = transcode_one
+                .ok_or_else(|| SyncError("transcode requested but no converter given".into()))?;
+            convert(&source, output.path())
+                .map_err(|e| SyncError(format!("transcode failed for {}: {e}", track.title)))?;
+        } else {
+            let mut input = std::fs::File::open(&source).map_err(|e| SyncError(e.to_string()))?;
+            let mut buffer = vec![0u8; 1024 * 1024];
+            loop {
+                if cancelled() {
+                    return Err(SyncError("Copy cancelled; partial output removed.".into()));
+                }
+                let count = input
+                    .read(&mut buffer)
+                    .map_err(|e| SyncError(e.to_string()))?;
+                if count == 0 {
+                    break;
+                }
+                output
+                    .write_all(&buffer[..count])
+                    .map_err(|e| SyncError(e.to_string()))?;
+            }
+        }
+        if cancelled() {
+            return Err(SyncError("Copy cancelled; partial output removed.".into()));
+        }
+        output
+            .as_file()
+            .sync_all()
+            .map_err(|e| SyncError(e.to_string()))?;
+        if overwrite {
+            output
+                .persist(&dest)
+                .map_err(|e| SyncError(e.to_string()))?;
+        } else {
+            output
+                .persist_noclobber(&dest)
+                .map_err(|e| SyncError(e.to_string()))?;
         }
         if transcode_target.is_some() {
-            let convert = transcode_one.ok_or_else(|| {
-                SyncError("transcode requested but no converter given".to_string())
-            })?;
-            convert(&source, &dest)
-                .map_err(|e| SyncError(format!("transcode failed for {}: {e}", track.title)))?;
             report.transcoded += 1;
         } else {
-            std::fs::copy(&source, &dest)
-                .map_err(|e| SyncError(format!("copy failed for {}: {e}", track.title)))?;
             report.copied += 1;
         }
     }
@@ -277,14 +402,85 @@ pub fn execute_sync(
 
 /// Map a `file://` URL to a local path. Anything else is unsupported.
 pub fn file_url_to_path(url: &str) -> Option<std::path::PathBuf> {
-    url.strip_prefix("file://")
-        .filter(|rest| !rest.is_empty())
-        .map(std::path::PathBuf::from)
+    orange_core::paths::file_url_to_path(url)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn names_cannot_escape_destination_or_use_windows_devices() {
+        let track = SyncTrack {
+            source_url: String::new(),
+            artist: "..".into(),
+            album: "CON".into(),
+            title: "../NUL\0".into(),
+            track_no: 1,
+        };
+        let path = organize_relative_path(&track, "../wav");
+        assert!(path
+            .components()
+            .all(|c| matches!(c, std::path::Component::Normal(_))));
+        assert_eq!(sanitize_filename("COM1.txt"), "_COM1.txt");
+        assert_eq!(sanitize_filename("..."), "Unknown");
+    }
+
+    #[test]
+    fn cancelled_copy_never_commits_partial_output() {
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("Música.wav");
+        std::fs::write(&source, vec![42u8; 3 * 1024 * 1024]).unwrap();
+        let destination = root.path().join("device");
+        let checks = std::cell::Cell::new(0);
+        let cancel = || {
+            checks.set(checks.get() + 1);
+            checks.get() > 2
+        };
+        assert!(execute_sync_cancellable(
+            &destination,
+            &[sync_track(&source)],
+            false,
+            None,
+            &mut |_| {},
+            None,
+            &cancel
+        )
+        .is_err());
+        assert!(!destination
+            .join("Miles Davis/Kind of Blue/01 - So What.wav")
+            .exists());
+        assert_eq!(
+            std::fs::read_dir(destination.join("Miles Davis/Kind of Blue"))
+                .unwrap()
+                .count(),
+            0
+        );
+        assert_eq!(std::fs::metadata(source).unwrap().len(), 3 * 1024 * 1024);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn destination_symlink_cannot_write_outside_selected_folder() {
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("a.wav");
+        std::fs::write(&source, b"audio").unwrap();
+        let destination = root.path().join("device");
+        let outside = root.path().join("outside");
+        std::fs::create_dir_all(&destination).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+        std::os::unix::fs::symlink(&outside, destination.join("Miles Davis")).unwrap();
+        assert!(execute_sync(
+            &destination,
+            &[sync_track(&source)],
+            false,
+            None,
+            &mut |_| {},
+            None
+        )
+        .is_err());
+        assert!(!outside.join("Kind of Blue").exists());
+    }
 
     #[test]
     fn device_families() {
@@ -377,7 +573,7 @@ tmpfs /run/user/1000 tmpfs rw,nosuid 0 0\n";
 
     fn sync_track(source: &std::path::Path) -> SyncTrack {
         SyncTrack {
-            source_url: format!("file://{}", source.display()),
+            source_url: orange_core::paths::path_to_file_url(source),
             artist: "Miles Davis".to_string(),
             album: "Kind of Blue".to_string(),
             title: "So What".to_string(),
@@ -455,8 +651,10 @@ tmpfs /run/user/1000 tmpfs rw,nosuid 0 0\n";
     #[test]
     fn file_url_mapping() {
         assert_eq!(
-            file_url_to_path("file:///music/a.flac"),
-            Some(std::path::PathBuf::from("/music/a.flac"))
+            file_url_to_path(&orange_core::paths::path_to_file_url(
+                &std::env::temp_dir().join("Música.flac")
+            )),
+            Some(std::env::temp_dir().join("Música.flac"))
         );
         assert!(file_url_to_path("https://example.com/a.mp3").is_none());
         assert!(file_url_to_path("file://").is_none());

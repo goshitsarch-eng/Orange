@@ -9,17 +9,18 @@ members = [
   "crates/orange-theme",
   "crates/orange-app",
 ]
+exclude = ["vendor/glib"]
 resolver = "2"
 
 [workspace.package]
-version = "3.0.0"
+version = "3.1.0-alpha.1"
 edition = "2021"
-rust-version = "1.85"
+rust-version = "1.89"
 license = "GPL-3.0-or-later"
 homepage = "https://github.com/goshitsarch-eng/Orange"
 
-# Shared house rule (mirrors gosh-flatpak-manager / gosh-net-radio):
-# default builds and `cargo test` use only crates.io dependencies so they work
-# offline and without system SDKs. The full COSMIC UI (`ui`) and real audio
-# output (`gst`) are opt-in features, always enabled in the Flatpak manifest
-# and CI. Nothing here depends on Qt: `cargo run` launches with no Qt installed.
+# Canonical desktop UI: Dioxus Desktop. Domain tests can use --no-default-features.
+
+# Backport the upstream VariantStrIter safety fix required by GTK 3 bindings.
+[patch.crates-io]
+glib = {path="vendor/glib"}

@@ -14,9 +14,9 @@ pub mod cd;
 pub mod devices;
 pub mod discord;
 pub mod mpris;
-#[cfg(feature = "dbus")]
+#[cfg(all(feature = "dbus", target_os = "linux"))]
 pub mod mpris_client;
-#[cfg(feature = "dbus")]
+#[cfg(all(feature = "dbus", target_os = "linux"))]
 pub mod mpris_server;
 #[cfg(feature = "online")]
 pub mod net;
@@ -26,5 +26,5 @@ pub mod radio;
 pub mod scrobble;
 #[cfg(feature = "tags")]
 pub mod tagger;
-#[cfg(feature = "dbus")]
+#[cfg(all(feature = "dbus", target_os = "linux"))]
 pub mod udisks;

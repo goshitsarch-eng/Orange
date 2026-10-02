@@ -12,7 +12,7 @@ use crate::online::Secret;
 use crate::scrobble::{canonical_param_string, lastfm_scrobble_params};
 
 /// Required contact User-Agent for the Radio Browser / MusicBrainz APIs.
-pub const USER_AGENT: &str = "Orange/3.0.0 (https://github.com/goshitsarch-eng/Orange)";
+pub const USER_AGENT: &str = "Orange/3.1.0-alpha.1 (https://github.com/goshitsarch-eng/Orange)";
 
 /// Shared client: contact UA plus a sane timeout, no cookie store.
 pub fn new_client() -> Result<reqwest::Client, NetError> {
@@ -20,7 +20,7 @@ pub fn new_client() -> Result<reqwest::Client, NetError> {
         .user_agent(USER_AGENT)
         .timeout(std::time::Duration::from_secs(15))
         .build()
-        .map_err(|e| NetError(e.to_string()))
+        .map_err(|e| NetError(e.without_url().to_string()))
 }
 
 /// Network failure (message only: URLs may carry credentials in query).
@@ -67,17 +67,22 @@ pub async fn search_stations(
     query: &str,
     limit: u32,
 ) -> Result<Vec<Station>, NetError> {
-    let url = format!("{base}/json/stations/search?name={query}&limit={limit}&hidebroken=true");
+    let url = format!("{base}/json/stations/search");
     client
         .get(url)
+        .query(&[
+            ("name", query.to_owned()),
+            ("limit", limit.min(100).to_string()),
+            ("hidebroken", "true".into()),
+        ])
         .send()
         .await
-        .map_err(|e| NetError(e.to_string()))?
+        .map_err(|e| NetError(e.without_url().to_string()))?
         .error_for_status()
-        .map_err(|e| NetError(e.to_string()))?
+        .map_err(|e| NetError(e.without_url().to_string()))?
         .json::<Vec<Station>>()
         .await
-        .map_err(|e| NetError(e.to_string()))
+        .map_err(|e| NetError(e.without_url().to_string()))
 }
 
 /// Register a stream click (mirrors the 2.1.5 click counter).
@@ -96,12 +101,12 @@ pub async fn register_station_click(
         .get(url)
         .send()
         .await
-        .map_err(|e| NetError(e.to_string()))?
+        .map_err(|e| NetError(e.without_url().to_string()))?
         .error_for_status()
-        .map_err(|e| NetError(e.to_string()))?
+        .map_err(|e| NetError(e.without_url().to_string()))?
         .json::<Click>()
         .await
-        .map_err(|e| NetError(e.to_string()))?;
+        .map_err(|e| NetError(e.without_url().to_string()))?;
     Ok(click.url)
 }
 
@@ -131,19 +136,23 @@ pub async fn fetch_lyrics(
     album: &str,
     duration_secs: i64,
 ) -> Result<LrclibHit, NetError> {
-    let url = format!(
-        "https://lrclib.net/api/get?artist_name={artist}&track_name={track}&album_name={album}&duration={duration_secs}"
-    );
+    let url = "https://lrclib.net/api/get";
     client
         .get(url)
+        .query(&[
+            ("artist_name", artist.to_owned()),
+            ("track_name", track.to_owned()),
+            ("album_name", album.to_owned()),
+            ("duration", duration_secs.to_string()),
+        ])
         .send()
         .await
-        .map_err(|e| NetError(e.to_string()))?
+        .map_err(|e| NetError(e.without_url().to_string()))?
         .error_for_status()
-        .map_err(|e| NetError(e.to_string()))?
+        .map_err(|e| NetError(e.without_url().to_string()))?
         .json::<LrclibHit>()
         .await
-        .map_err(|e| NetError(e.to_string()))
+        .map_err(|e| NetError(e.without_url().to_string()))
 }
 
 // ---------------------------------------------------------------------------
@@ -187,12 +196,12 @@ pub async fn search_recording(
         .get(url)
         .send()
         .await
-        .map_err(|e| NetError(e.to_string()))?
+        .map_err(|e| NetError(e.without_url().to_string()))?
         .error_for_status()
-        .map_err(|e| NetError(e.to_string()))?
+        .map_err(|e| NetError(e.without_url().to_string()))?
         .json::<Search>()
         .await
-        .map_err(|e| NetError(e.to_string()))?;
+        .map_err(|e| NetError(e.without_url().to_string()))?;
     Ok(search.recordings)
 }
 
@@ -213,12 +222,12 @@ pub async fn lookup_discid(
         .get(url)
         .send()
         .await
-        .map_err(|e| NetError(e.to_string()))?
+        .map_err(|e| NetError(e.without_url().to_string()))?
         .error_for_status()
-        .map_err(|e| NetError(e.to_string()))?
+        .map_err(|e| NetError(e.without_url().to_string()))?
         .json::<DiscidLookup>()
         .await
-        .map_err(|e| NetError(e.to_string()))
+        .map_err(|e| NetError(e.without_url().to_string()))
 }
 
 /// Cover Art Archive front-cover URL for a release MBID (follows redirect).
@@ -235,13 +244,13 @@ pub async fn fetch_cover(
         .get(cover_art_url(release_mbid))
         .send()
         .await
-        .map_err(|e| NetError(e.to_string()))?
+        .map_err(|e| NetError(e.without_url().to_string()))?
         .error_for_status()
-        .map_err(|e| NetError(e.to_string()))?
+        .map_err(|e| NetError(e.without_url().to_string()))?
         .bytes()
         .await
         .map(|bytes| bytes.to_vec())
-        .map_err(|e| NetError(e.to_string()))
+        .map_err(|e| NetError(e.without_url().to_string()))
 }
 
 /// AcoustID lookup response (first recording wins).
@@ -281,12 +290,12 @@ pub async fn acoustid_lookup(
         .get(url)
         .send()
         .await
-        .map_err(|e| NetError(e.to_string()))?
+        .map_err(|e| NetError(e.without_url().to_string()))?
         .error_for_status()
-        .map_err(|e| NetError(e.to_string()))?
+        .map_err(|e| NetError(e.without_url().to_string()))?
         .json::<AcoustidResult>()
         .await
-        .map_err(|e| NetError(e.to_string()))
+        .map_err(|e| NetError(e.without_url().to_string()))
 }
 
 // ---------------------------------------------------------------------------
@@ -295,16 +304,29 @@ pub async fn acoustid_lookup(
 
 /// Submit one Last.fm scrobble. The API secret is only used inside the
 /// signature closure; the session key travels as a form field over TLS.
+pub struct LastfmSubmission<'a> {
+    pub api_key: &'a str,
+    pub api_secret: &'a Secret,
+    pub session_key: &'a str,
+    pub artist: &'a str,
+    pub track: &'a str,
+    pub album: &'a str,
+    pub timestamp: i64,
+}
+
 pub async fn submit_lastfm(
     client: &reqwest::Client,
-    api_key: &str,
-    api_secret: &Secret,
-    session_key: &str,
-    artist: &str,
-    track: &str,
-    album: &str,
-    timestamp: i64,
+    submission: LastfmSubmission<'_>,
 ) -> Result<(), NetError> {
+    let LastfmSubmission {
+        api_key,
+        api_secret,
+        session_key,
+        artist,
+        track,
+        album,
+        timestamp,
+    } = submission;
     let params = lastfm_scrobble_params(api_key, session_key, artist, track, album, timestamp);
     let borrowed: Vec<(&str, &str)> = params
         .iter()
@@ -325,9 +347,9 @@ pub async fn submit_lastfm(
         .form(&form)
         .send()
         .await
-        .map_err(|e| NetError(e.to_string()))?
+        .map_err(|e| NetError(e.without_url().to_string()))?
         .error_for_status()
-        .map_err(|e| NetError(e.to_string()))?;
+        .map_err(|e| NetError(e.without_url().to_string()))?;
     Ok(())
 }
 
@@ -350,7 +372,7 @@ pub fn listenbrainz_payload(
                 "additional_info": {
                     "recording_mbid": recording_mbid,
                     "submission_client": "Orange",
-                    "submission_client_version": "3.0.0",
+                    "submission_client_version": orange_core::version::VERSION,
                 },
             },
         }],
@@ -378,9 +400,9 @@ pub async fn submit_listenbrainz(
         .json(&payload)
         .send()
         .await
-        .map_err(|e| NetError(e.to_string()))?
+        .map_err(|e| NetError(e.without_url().to_string()))?
         .error_for_status()
-        .map_err(|e| NetError(e.to_string()))?;
+        .map_err(|e| NetError(e.without_url().to_string()))?;
     Ok(())
 }
 
@@ -408,9 +430,9 @@ pub async fn submit_subsonic(
         .get(url)
         .send()
         .await
-        .map_err(|e| NetError(e.to_string()))?
+        .map_err(|e| NetError(e.without_url().to_string()))?
         .error_for_status()
-        .map_err(|e| NetError(e.to_string()))?;
+        .map_err(|e| NetError(e.without_url().to_string()))?;
     Ok(())
 }
 

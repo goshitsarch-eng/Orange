@@ -16,38 +16,28 @@
   <developer id="io.github.goshitsarch-eng">
     <name>Gosh</name>
   </developer>
-  <translation type="qt">strawberry</translation>
+
   <content_rating type="oars-1.1" />
   <categories>
     <category>AudioVideo</category>
     <category>Audio</category>
     <category>Player</category>
-    <category>KDE</category>
   </categories>
   <description>
-    <p>
-      Orange is a music player and music collection organizer. It is aimed at music collectors and audiophiles. Orange is free software released under GPL. Version 3 is a native libcosmic app written in Rust with GStreamer audio, forked from Strawberry (itself forked from Clementine in 2018). Made by Gosh.
-    </p>
-    <p>Features:</p>
+    <p>Orange is a music player and collection organizer written in Rust with Dioxus Desktop and GStreamer. Made by Gosh; based on the Strawberry and Clementine projects.</p>
+    <p>This is an alpha migration. Verified capabilities and platform limitations are documented in PLATFORM_SUPPORT.md.</p>
     <ul>
-      <li>Play and organize music</li>
-      <li>Supports most popular audio formats and CD playback</li>
-      <li>Native desktop notifications</li>
-      <li>Playlist management and playlists in multiple formats</li>
-      <li>Smart and dynamic playlists</li>
-      <li>Advanced audio output and device configuration for bit-perfect playback on Linux</li>
-      <li>Edit tags on audio files</li>
-      <li>Automatically retrieve tags from MusicBrainz</li>
-      <li>Album cover art from Last.fm, Musicbrainz, Discogs, Musixmatch, Deezer, Tidal, Qobuz and Spotify</li>
-      <li>Lyrics from multiple sources</li>
-      <li>Audio analyzer and equalizer</li>
-      <li>Transfer music to mass-storage USB players, MTP compatible devices and iPod Nano/Classic</li>
-      <li>Scrobbler with support for Last.fm and ListenBrainz</li>
-      <li>Streaming support for Subsonic-compatible servers</li>
-      <li>Unofficial streaming support for Tidal, Spotify and Qobuz</li>
+      <li>Browse and search a local music collection</li>
+      <li>Manage a play queue and saved playlists</li>
+      <li>Import M3U, PLS and XSPF playlists; export M3U</li>
+      <li>Internet radio and saved custom stations</li>
+      <li>Light, dark and system appearance</li>
+      <li>Audio tag editing, equalizer and conversion</li>
+      <li>Copy tracks to a selected folder or mounted device</li>
     </ul>
   </description>
   <releases>
+        <release version="3.1.0-alpha.1" date="2026-10-01" type="development"/>
         <release version="3.0.0" date="2026-09-06"/>
         <release version="2.1.5" date="2026-09-01"/>
         <release version="2.1.4" date="2026-08-31"/>

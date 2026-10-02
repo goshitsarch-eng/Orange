@@ -1,4 +1,4 @@
-//! About dialog content: 3.0.0, Made by Gosh, upstream credits.
+//! About dialog content: 3.1.0-alpha.1, Made by Gosh, upstream credits.
 
 use orange_core::version::{MAKER, UPSTREAM_CREDIT, VERSION};
 
@@ -33,11 +33,11 @@ mod tests {
 
     #[test]
     fn about_shows_version_and_maker() {
-        assert_eq!(title(), "Orange 3.0.0");
+        assert_eq!(title(), "Orange 3.1.0-alpha.1");
         assert_eq!(maker_line(), "Made by Gosh");
         assert_eq!(footer(), "Made by Gosh");
         let body = body();
-        assert!(body.contains("3.0.0"));
+        assert!(body.contains("3.1.0-alpha.1"));
         assert!(body.contains("Made by Gosh"));
         assert!(body.contains("Strawberry"));
         assert!(body.contains("Clementine"));

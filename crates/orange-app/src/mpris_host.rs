@@ -90,7 +90,14 @@ impl MprisHost {
             self.generation += 1;
         }
         let metadata = current.map(|track| {
-            MprisMetadata::from_song(&track.title, "", "", 0, self.generation as usize, "")
+            MprisMetadata::from_song(
+                &track.title,
+                &track.artist,
+                &track.album,
+                track.length_ns,
+                self.generation as usize,
+                "",
+            )
         });
         let status = match player.state() {
             EngineState::Playing => orange_media::mpris::PlaybackStatus::Playing,
@@ -106,6 +113,18 @@ impl MprisHost {
             state.can_go_previous = player.current().is_some();
         });
         changed
+    }
+
+    pub fn sync_modes(&self, repeat: u8, shuffle: u8) {
+        self.shared.update(|state| {
+            state.shuffle = shuffle > 0;
+            state.loop_status = match repeat {
+                2 => "Track",
+                1 | 3 => "Playlist",
+                _ => "None",
+            }
+            .into();
+        });
     }
 
     /// Spawn the MPRIS server on its own thread + runtime, forwarding to

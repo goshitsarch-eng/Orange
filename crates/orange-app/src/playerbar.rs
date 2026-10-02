@@ -51,26 +51,11 @@ impl PlayerBarLayout {
     }
 }
 
-/// Analyzer bar heights in 0.0–1.0. Live spectrum values win; otherwise a
-/// resting floor (stopped) or a phase-shifted placeholder (playing).
-pub fn analyzer_bars(playing: bool, phase: u32, live: &[f32], bands: usize) -> Vec<f32> {
-    if bands == 0 {
-        return Vec::new();
-    }
-    if !live.is_empty() {
-        return (0..bands)
-            .map(|i| live.get(i).copied().unwrap_or(0.08).clamp(0.04, 1.0))
-            .collect();
-    }
-    if !playing {
-        return vec![0.08; bands];
-    }
+/// Analyzer heights from actual spectrum data. Missing values rest at the
+/// floor; this helper never invents a signal while audio is playing.
+pub fn analyzer_bars(_playing: bool, _phase: u32, live: &[f32], bands: usize) -> Vec<f32> {
     (0..bands)
-        .map(|i| {
-            let t = (phase as f32).mul_add(0.17, i as f32 * 0.55);
-            let wave = (t.sin() * 0.5 + 0.5) * ((i as f32 * 0.31).cos().mul_add(0.25, 0.55));
-            wave.clamp(0.06, 1.0)
-        })
+        .map(|i| live.get(i).copied().unwrap_or(0.08).clamp(0.04, 1.0))
         .collect()
 }
 

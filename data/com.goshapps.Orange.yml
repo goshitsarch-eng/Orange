@@ -1,25 +1,9 @@
-# Orange 3.0.0 Flatpak manifest (Rust + libcosmic, no Qt/KDE runtime).
-#
-# Single manifest builds BOTH architectures: pass the arch explicitly, never
-# hardcode one here (no arch-specific paths, no x86_64-only .so):
-#   flatpak-builder --arch=x86_64  --repo=repo-x64   build-x64   data/com.goshapps.Orange.yml
-#   flatpak-builder --arch=aarch64 --repo=repo-arm64 build-arm64 data/com.goshapps.Orange.yml
-# Run flatpak-builder from the repository root: the `dir` source below
-# points at `.` (the whole tree, including Cargo.lock for --locked builds).
-#
-# Toolchain notes:
-# - The pinned libcosmic needs rustc 1.93+, so the manifest rides runtime
-#   25.08 whose rust-stable SDK extension is newer than that (the 23.08
-#   extension is stuck at 1.81 and can no longer build the workspace).
-# - The 25.08 SDK/Runtime ship the full GStreamer set (base/good/bad/ugly and
-#   libav), which is what bit-perfect playback, Analyzer input, and the
-#   transcode targets (MP3/AAC/FLAC/Vorbis/Opus/Speex/WavPack/ASF) build
-#   against. No Qt Widgets/Network/SQL/D-Bus, Boost, GLib, or single-instance
-#   helper runtime remains.
+# Orange Dioxus Desktop; GNOME supplies GTK/WebKit host libraries.
+# Dioxus renders the interface; GTK is only the Linux WebView host.
 app-id: com.goshapps.Orange
-runtime: org.freedesktop.Platform
-runtime-version: "25.08"
-sdk: org.freedesktop.Sdk
+runtime: org.gnome.Platform
+runtime-version: "49"
+sdk: org.gnome.Sdk
 command: orange
 
 sdk-extensions:
@@ -28,18 +12,13 @@ sdk-extensions:
 finish-args:
   - --share=ipc
   - --share=network
-  - --socket=x11
   - --socket=wayland
   - --socket=pulseaudio
   - --socket=fallback-x11
   - --device=dri
-  - --device=all
-  - --filesystem=home
   - --filesystem=xdg-music
-  - --filesystem=xdg-download
   - --talk-name=org.freedesktop.Notifications
   - --own-name=org.mpris.MediaPlayer2.orange
-  - --talk-name=org.mpris.MediaPlayer2.*
 
 build-options:
   append-path: /usr/lib/sdk/rust-stable/bin
@@ -58,7 +37,7 @@ cleanup:
   - "*.la"
 
 modules:
-  # Build-time gate: the freedesktop 25.08 SDK must provide the full
+  # Build-time gate: the GNOME SDK must provide the full
   # GStreamer stack (base/good/bad/ugly/libav). Fails the build on either
   # arch when an expected encoder is missing, so bit-perfect playback and
   # every transcode target (MP3/AAC/FLAC/Vorbis/Opus/Speex/WavPack/ASF)
@@ -66,7 +45,7 @@ modules:
   - name: check-gstreamer
     buildsystem: simple
     build-commands:
-      - pkg-config --exists gstreamer-1.0 gstreamer-base-1.0 gstreamer-audio-1.0 gstreamer-app-1.0
+      - pkg-config --exists gtk+-3.0 webkit2gtk-4.1 gstreamer-1.0 gstreamer-base-1.0 gstreamer-audio-1.0 gstreamer-app-1.0
       - for e in flacenc vorbisenc opusenc wavpackenc lamemp3enc voaacenc speexenc avdec_aac; do gst-inspect-1.0 "$e" > /dev/null || (echo "missing GStreamer element: $e (need base/good/bad/ugly/libav)" && exit 1); done
       - gst-inspect-1.0 asfmux > /dev/null || echo "warning: asfmux (ASF muxer) not found; ASF transcode target degraded"
     sources:
@@ -81,7 +60,7 @@ modules:
         CARGO_HOME: /run/build/orange/cargo
         CARGO_NET_OFFLINE: "true"
     build-commands:
-      - cargo --offline fetch --manifest-path Cargo.toml
+      - cargo --offline fetch --locked --manifest-path Cargo.toml
       - cargo --offline build --release --locked --features orange-app/full
       - install -Dm755 target/release/orange /app/bin/orange
       # Canonical Orange KDE icons (unchanged from 2.1.5) into the Flatpak.

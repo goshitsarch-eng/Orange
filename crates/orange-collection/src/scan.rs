@@ -22,18 +22,39 @@ pub fn is_audio_path(path: &Path) -> bool {
 /// Recursively scan `root` for audio files. Hidden entries and symlinks
 /// are skipped so a scan cannot loop or pick up cache files.
 pub fn scan_directory(root: &Path) -> Vec<ScannedFile> {
+    scan_directory_checked(root, &|| false).unwrap_or_default()
+}
+
+/// A destructive rescan must fail rather than replace a collection with partial data.
+pub fn scan_directory_checked(
+    root: &Path,
+    cancelled: &dyn Fn() -> bool,
+) -> std::io::Result<Vec<ScannedFile>> {
     let mut out = Vec::new();
     let mut stack = vec![root.to_path_buf()];
     let mut visited = 0usize;
     const MAX_ENTRIES: usize = 250_000;
     while let Some(dir) = stack.pop() {
-        let Ok(entries) = fs::read_dir(&dir) else {
-            continue;
-        };
-        for entry in entries.flatten() {
+        if cancelled() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Interrupted,
+                "Scan cancelled",
+            ));
+        }
+        let entries = fs::read_dir(&dir)?;
+        for entry in entries {
+            let entry = entry?;
+            if cancelled() {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Interrupted,
+                    "Scan cancelled",
+                ));
+            }
             visited += 1;
             if visited > MAX_ENTRIES {
-                return out;
+                return Err(std::io::Error::other(
+                    "Collection exceeds the 250,000-entry scan limit",
+                ));
             }
             let path = entry.path();
             let name = entry.file_name();
@@ -41,9 +62,7 @@ pub fn scan_directory(root: &Path) -> Vec<ScannedFile> {
             if name.starts_with('.') {
                 continue;
             }
-            let Ok(meta) = entry.metadata() else {
-                continue;
-            };
+            let meta = entry.metadata()?;
             if meta.file_type().is_symlink() {
                 continue;
             }
@@ -68,7 +87,7 @@ pub fn scan_directory(root: &Path) -> Vec<ScannedFile> {
         }
     }
     out.sort_by(|a, b| a.url.cmp(&b.url));
-    out
+    Ok(out)
 }
 
 /// Build a [`Song`] from a filesystem path using folder layout as tags:
