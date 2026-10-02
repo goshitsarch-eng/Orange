@@ -35,6 +35,8 @@ mount namespace; WebKit's sandbox was not disabled.
 
 Actual Linux light/dark captures are in `docs/screenshots/`; resizing down to
 720×560 was inspected with the content panes scrolling and controls reflowing.
+The exact extracted release binary also launched at GTK scale 2, with correct
+logical-size persistence and minimum-window inspection (see linux-hidpi.png).
 Retina, Windows DPI, accessibility/screen-reader behavior and system-theme
 changes from a real desktop remain manual QA gates.
 
@@ -42,7 +44,13 @@ changes from a real desktop remain manual QA gates.
 
 The session proxy returned CONNECT 403 for `api.github.com`,
 `gstreamer.freedesktop.org`, `flathub.org`/`dl.flathub.org`. Actions HTML is readable and native Git push preflight succeeds; the API remains denied.
-Any remote job outcome is recorded separately when observed. Normal Git checkout access is separate
+[Actions run 36950731642](https://github.com/goshitsarch-eng/Orange/actions/runs/36950731642)
+was triggered by commit `e291eb468` on `codex/dioxus-desktop-migration`.
+All seven native/Flatpak jobs were refused before startup because GitHub reports:
+"The job was not started because your account is locked due to a billing issue."
+The run is marked Failure, with no artifacts. This is an account blocker, not
+an executed compiler/test failure. Resolve the owner’s GitHub billing lock and
+rerun this workflow before claiming native CI or packaging success. Normal Git checkout access is separate
 from API/Actions access; no token was requested or substituted. Windows/macOS
 runners and native installer testing are required to close those gates.
 

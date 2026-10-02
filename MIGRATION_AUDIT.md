@@ -87,7 +87,7 @@ feature is declared intentionally removed without a justification.
 | Theme light/dark/system | PARTIAL | theme/lib.rs, app/ui.rs | Mode not saved; defaults override OS behavior | IMPROVED: persisted choices, CSS system media query; actual light/dark/small-window captures; native OS theme-change QA pending | WebView system theme + settings |
 | About/preferences/lyrics pane | PARTIAL | app/ui.rs | About routes to settings; only stored lyrics shown | MIGRATED: actual dialogs, retained identity/stored lyrics; optional LRCLIB; WebView QA; live lookup pending | Accessible dialogs, online lookup optional |
 | Keyboard shortcuts/menus | PARTIAL | app/ui.rs | No centralized keyboard command system | PARTIAL: native Muda menus, OS modifier boundary, editable clipboard conventions; every shortcut/menu not yet certified | Ctrl vs Command; native app menu |
-| Window state/high DPI | PARTIAL: saved logical dimensions and scale handling; X11 resize verified; Retina/Windows DPI pending | app/ui.rs | Fixed assumptions; no saved size | UNKNOWN | OS lifecycle/scale, resize QA |
+| Window state/high DPI | UNKNOWN | app/ui.rs | Fixed assumptions; no saved size | PARTIAL: saved logical dimensions; actual release GUI at scale 2 and minimum 600×400/720×560 logical sizes verified; Retina/Windows DPI pending | OS lifecycle/scale, resize QA |
 | Tag editor dialog | NOT IMPLEMENTED | app/dialogs.rs, media/tagger.rs | Validation model and writer exist, no rendered editor | IMPROVED: rendered editor, atomic writer and validation; actual Unicode WAV tag write/rescan QA | Native file access, explicit edits |
 | Transcode dialog | NOT IMPLEMENTED | app/dialogs.rs, media/backend_gst.rs | Real converter exists, no rendered workflow | IMPROVED: real format/output/cancel workflow; FLAC/MP3 backend regressions; actual native Save dialog produced valid FLAC output from a disposable WAV | Runtime encoders and safe output |
 | USB copy/sync | PARTIAL | media/devices.rs | Real executor; Devices page only claims support | MIGRATED: selected-folder copy with safe names/atomic cancellation; actual portal copy of two tracks matched source SHA-256; direct hardware protocols deferred | User-selected destination; no false hardware claims |
@@ -100,8 +100,8 @@ feature is declared intentionally removed without a justification.
 | Spotify/Tidal/Qobuz | PARTIAL | media/online.rs, Qt streaming/ | Rust enum/model claims only; Qt has implementations | DEFERRED: legacy Qt implementations and Rust provider models retained; complete account/streaming migration required | Accounts and provider access required |
 | Discord Rich Presence | PARTIAL | media/discord.rs | Unix socket helper, not UI-integrated | DEFERRED in desktop: Unix helper retained; Windows named pipes and enabled-setting lifecycle required | Windows named-pipe equivalent needed |
 | Desktop metadata/icons | WORKING | dist/unix/, data/icons/ | Catalog identity com.goshapps.Orange | MIGRATED: Linux validation passes; Windows resources/macOS identity recipes; native packaging validation pending | Windows resources, macOS bundle metadata |
-| Flatpak | PARTIAL/BLOCKED: GNOME 49 offline manifest, restricted permissions and 630 checksum-matched sources; Flathub denied | data/com.goshapps.Orange.yml | Broad permissions; actual sandbox not yet tested | UNKNOWN | Portals, WebKit subprocesses, offline sources |
-| Qt advanced features | DEFERRED: source/forms retained; additional static inventory below; Qt runtime parity not established | src/{covermanager,lyrics,device,organize,streaming,globalshortcuts,osd,context,...} | Legacy implementation retained; no comprehensive runtime parity proof | UNKNOWN | Do not remove until feature parity is demonstrated |
+| Flatpak | UNKNOWN | data/com.goshapps.Orange.yml | Broad permissions; actual sandbox not yet tested | PARTIAL/BLOCKED: GNOME 49 offline manifest, restricted permissions and 630 checksum-matched sources; Flathub denied | Portals, WebKit subprocesses, offline sources |
+| Qt advanced features | UNKNOWN | src/{covermanager,lyrics,device,organize,streaming,globalshortcuts,osd,context,...} | Legacy implementation retained; no comprehensive runtime parity proof | DEFERRED: source/forms retained; additional static inventory below; Qt runtime parity not established | Do not remove until feature parity is demonstrated |
 
 ## Confirmed defects and guardrails
 
@@ -199,6 +199,11 @@ production definition of done is met. No legacy form is deleted by this change.
 - Linux release archive/checksum generated; SHA-256 verified after extraction.
   The extracted binary reports the alpha version and reads the actual isolated
   collection/playlist counts. Archives require documented system native libraries.
+- Exact extracted release binary SHA-256 matches `target/release/orange`. Its
+  actual native window was launched at GTK scale 2: 2200×1480 physical pixels
+  for 1100×740 logical pixels. Resizing to 1440×1120 correctly saved 720×560
+  logical pixels, and minimum 600×400 logical layout was visually inspected.
+  This is Linux/X11 scale evidence, not a Windows DPI or Retina certification.
 - Dependency audit: zero known vulnerabilities; four transitive maintenance/
   conditional soundness warnings remain documented in PLATFORM_SUPPORT.md.
   All **630** registry-package SHA-256 values match the regenerated Flatpak
@@ -213,3 +218,14 @@ Windows/macOS installers, physical audio, Wayland/Retina/screen readers,
 Flathub sandbox execution, authenticated services and advanced Qt parity remain
 release gates. Configured workflows are not evidence of successful jobs. No
 stable release has been published and no reference implementation retired.
+
+## Remote CI attempt
+
+The alpha branch was pushed normally through the configured Git proxy.
+[Actions run 36950731642](https://github.com/goshitsarch-eng/Orange/actions/runs/36950731642)
+accepted the workflow but refused all five desktop and two Flatpak jobs before
+startup: **"The job was not started because your account is locked due to a
+billing issue."** No native build, test, installer or Flatpak step executed and
+no remote artifact was generated. Publish was correctly skipped on a branch.
+This account issue must be resolved by the repository owner; workflow changes
+cannot remove it. No CI success is claimed.

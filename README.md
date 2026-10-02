@@ -44,8 +44,8 @@ WKWebView; Windows uses WebView2.
 
 CI is configured to produce Windows x86_64 installer/ZIP, macOS Apple Silicon
 and Intel `.app`/DMG/ZIP, Linux x86_64/aarch64 archives, and Flatpak bundles for
-both Linux architectures. Each artifact has a SHA-256 sidecar. These jobs have
-not been run or certified in this cloud session; no new release was published.
+both Linux architectures. Each artifact has a SHA-256 sidecar. The first remote run was refused before any job started because GitHub reports
+an account billing lock; no native CI result is certified and no new release was published.
 A stable release must not be tagged until the platform and parity gates pass.
 Linux archives require the system libraries in BUILDING.md; they do not bundle
 a distribution's WebKit or C library. Windows packages include GStreamer and

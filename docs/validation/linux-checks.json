@@ -32,7 +32,42 @@
     "RUSTSEC-2026-0097"
   ],
   "flatpak_registry_checksums_matched": 630,
-  "native_platform_ci": "configured; results must be observed on GitHub",
+  "native_platform_ci": {
+    "url": "https://github.com/goshitsarch-eng/Orange/actions/runs/36950731642",
+    "source_commit": "e291eb4682887011a512c18206f643bd77b00233",
+    "conclusion": "failure",
+    "executed_jobs": 0,
+    "blocked_jobs": 7,
+    "reason": "GitHub account locked due to a billing issue"
+  },
   "physical_audio": "not verified",
-  "flatpak_runtime": "blocked by Flathub access"
+  "flatpak_runtime": "blocked by Flathub access",
+  "linux_packaged_gui": {
+    "binary_sha256": "5cb427f7edd34a76c91059d85c51e3e28b53e73d38e84643b7883f9670807e0b",
+    "archive_checksum": "verified",
+    "native_window": "launched",
+    "scale": 2,
+    "physical_size": [
+      2200,
+      1480
+    ],
+    "logical_size": [
+      1100,
+      740
+    ],
+    "resized_persistence": [
+      720,
+      560
+    ],
+    "minimum_logical_size": [
+      600,
+      400
+    ]
+  },
+  "native_folder_workflows": {
+    "import": "11 actual fixture tracks added",
+    "remove": "original two-song collection and source files retained",
+    "copy": "2 tracks; copied hashes match sources",
+    "conversion": "native Save dialog; valid FLAC created"
+  }
 }

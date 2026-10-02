@@ -94,8 +94,9 @@ with (CONTENTS / "Info.plist").open("wb") as file:
         "LSMinimumSystemVersion": "13.0", "NSHumanReadableCopyright": "Made by Gosh · GPL-3.0-or-later",
         "CFBundleDocumentTypes": [{"CFBundleTypeName": "Audio and playlists", "CFBundleTypeRole": "Viewer", "CFBundleTypeExtensions": ["flac", "mp3", "wav", "ogg", "m3u", "m3u8", "pls", "xspf"]}],
     }, file)
-for name in ("COPYING", "README.md", "PLATFORM_SUPPORT.md"):
+for name in ("COPYING", "README.md", "PLATFORM_SUPPORT.md", "BUILDING.md", "MIGRATION_AUDIT.md", "ARCHITECTURE.md", "CONTRIBUTING.md", "CHANGELOG.md"):
     shutil.copy2(name, CONTENTS / "Resources" / name)
+shutil.copytree("docs", CONTENTS / "Resources/docs")
 for binary in reversed(list(mapped.values())):
     run("codesign", "--force", "--sign", "-", str(binary))
 run("codesign", "--force", "--deep", "--sign", "-", str(APP))

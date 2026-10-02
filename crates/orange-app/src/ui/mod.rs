@@ -139,14 +139,47 @@ fn App() -> Element {
     qa::install(context);
     rsx! {
         style { {include_str!("theme.css")} }
-        div { class:"app", "data-theme":theme(), onkeydown:move|event|chrome::shortcut(event,context),
-            ondragover:move|event|event.prevent_default(),
-            ondrop:move|event|{event.prevent_default();let paths=event.files().iter().map(|f|f.path()).collect::<Vec<_>>();if !paths.is_empty(){dispatch.call(Action::OpenFiles(paths));}},
+        div {
+            class: "app",
+            "data-theme": theme(),
+            onkeydown: move |event| chrome::shortcut(event, context),
+            ondragover: move |event| event.prevent_default(),
+            ondrop: move |event| {
+                event.prevent_default();
+                let paths = event.files().iter().map(|f| f.path()).collect::<Vec<_>>();
+                if !paths.is_empty() {
+                    dispatch.call(Action::OpenFiles(paths));
+                }
+            },
             chrome::Header {}
-            div { class:"workspace", chrome::Sidebar {} main { id:"main-content",match page(){
-                Page::Library=>rsx!{library::Library {}},Page::Queue=>rsx!{pages::Queue {}},Page::Playlists=>rsx!{pages::Playlists {}},
-                Page::Radio=>rsx!{pages::Radio {}},Page::Files=>rsx!{pages::Files {}},Page::Devices=>rsx!{pages::Devices {}},Page::Settings=>rsx!{pages::SettingsPage {}}
-            }}}
+            div { class: "workspace",
+                chrome::Sidebar {}
+                main { id: "main-content",
+                    match page() {
+                        Page::Library => rsx! {
+                            library::Library {}
+                        },
+                        Page::Queue => rsx! {
+                            pages::Queue {}
+                        },
+                        Page::Playlists => rsx! {
+                            pages::Playlists {}
+                        },
+                        Page::Radio => rsx! {
+                            pages::Radio {}
+                        },
+                        Page::Files => rsx! {
+                            pages::Files {}
+                        },
+                        Page::Devices => rsx! {
+                            pages::Devices {}
+                        },
+                        Page::Settings => rsx! {
+                            pages::SettingsPage {}
+                        },
+                    }
+                }
+            }
             chrome::Status {}
             dialogs::Host {}
         }

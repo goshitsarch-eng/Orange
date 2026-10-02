@@ -3,6 +3,7 @@ $ErrorActionPreference = 'Stop'
 Set-Location (Join-Path $PSScriptRoot '../..')
 $version = (Select-String '^version = "([^"]+)"' Cargo.toml).Matches[0].Groups[1].Value
 $stage = Join-Path (Get-Location) "target/packages/orange-$version-windows-x86_64"
+if (Test-Path $stage) {Remove-Item -Recurse -Force $stage}
 New-Item -ItemType Directory -Force $stage | Out-Null
 Copy-Item target/release/orange.exe $stage
 Copy-Item "$GStreamerRoot/bin/*.dll" $stage
@@ -11,7 +12,8 @@ Copy-Item -Recurse "$GStreamerRoot/lib/gstreamer-1.0" "$stage/lib/"
 Copy-Item -Recurse "$GStreamerRoot/libexec/gstreamer-1.0" "$stage/libexec/"
 # GIO/TLS modules can be required by network source plugins.
 if (Test-Path "$GStreamerRoot/lib/gio") {Copy-Item -Recurse "$GStreamerRoot/lib/gio" "$stage/lib/"}
-Copy-Item COPYING,README.md,PLATFORM_SUPPORT.md,BUILDING.md $stage
+Copy-Item COPYING,README.md,PLATFORM_SUPPORT.md,BUILDING.md,MIGRATION_AUDIT.md,ARCHITECTURE.md,CONTRIBUTING.md,CHANGELOG.md $stage
+Copy-Item -Recurse docs "$stage/docs"
 if (Test-Path "$GStreamerRoot/share/licenses") {Copy-Item -Recurse "$GStreamerRoot/share/licenses" "$stage/licenses"}
 Invoke-WebRequest 'https://go.microsoft.com/fwlink/p/?LinkId=2124703' -OutFile "$stage/MicrosoftEdgeWebview2Setup.exe"
 $signature = Get-AuthenticodeSignature "$stage/MicrosoftEdgeWebview2Setup.exe"
