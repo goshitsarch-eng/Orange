@@ -1,21 +1,19 @@
 #!/usr/bin/env python3
-"""Static checks for data/com.goshapps.Orange.yml (no flatpak-builder needed).
-
-Asserts the multi-arch contract: freedesktop 25.08 runtime, Rust toolchain,
-full GStreamer plugin set, no Qt/KDE SDK, no hardcoded architecture, and the
-canonical Orange icon/desktop/metainfo install paths.
-"""
+"""Validate runtime, native dependency gates, metadata and minimal permissions."""
 import sys
 
-REQUIRED_RUNTIME = "org.freedesktop.Platform"
-# Must stay newer than libcosmic's MSRV (1.93+): the 23.08 rust-stable
-# extension is stuck at 1.81 and cannot build the workspace.
-REQUIRED_VERSION = "25.08"
+REQUIRED_RUNTIME = "org.gnome.Platform"
+# GNOME 49 is based on freedesktop 25.08 and supplies WebKit.
+REQUIRED_VERSION = "49"
 REQUIRED_APP_ID = "com.goshapps.Orange"
 # SDK/runtime tokens that must never appear (Qt/KDE SDKs, arch-specific
 # library paths). Plain words like "KDE icons" stay allowed: the canonical
 # Orange KDE icons are required payload, not a runtime dependency.
 FORBIDDEN = [
+    "--filesystem=home",
+    "--device=all",
+    "--talk-name=org.mpris.MediaPlayer2.*",
+    "libcosmic",
     "org.kde",
     "KF5",
     "KF6",
@@ -30,6 +28,8 @@ FORBIDDEN = [
 # The full plugin sets must be pinned by the build-time gst-inspect gate,
 # and each set must be named so reviewers can see the coverage claim.
 REQUIRED_GST = [
+    "webkit2gtk-4.1",
+    "gtk+-3.0",
     "gst-inspect-1.0",
     "base/good/bad/ugly",
     "libav",
@@ -52,8 +52,8 @@ def main() -> int:
             failures.append(message)
 
     check(f"app-id: {REQUIRED_APP_ID}" in text, "missing app-id com.goshapps.Orange")
-    check(REQUIRED_RUNTIME in text, "missing freedesktop runtime")
-    check(REQUIRED_VERSION in text, "missing runtime-version 25.08")
+    check(REQUIRED_RUNTIME in text, "missing GNOME WebKit runtime")
+    check(REQUIRED_VERSION in text, "missing runtime-version 49")
     check("rust" in text.lower(), "missing Rust toolchain module")
     check("com.goshapps.Orange.svg" in text, "missing canonical SVG icon install")
     check("com.goshapps.Orange.png" in text, "missing canonical PNG icon installs")

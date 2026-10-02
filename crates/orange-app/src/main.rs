@@ -1,9 +1,9 @@
-//! `orange` binary: native COSMIC window by default (Strawberry-style
+//! `orange` binary: Dioxus Desktop window by default (Strawberry-style
 //! collection + playlist), MPRIS daemon with `--serve`, one-shot remotes
 //! for the desktop actions.
 //!
-//! - `orange --version` prints `orange 3.0.0`.
-//! - `orange` (and `orange FILES...`) opens the native libcosmic window
+//! - `orange --version` prints `orange 3.1.0-alpha.1`.
+//! - `orange` (and `orange FILES...`) opens the Dioxus Desktop window
 //!   (requires the `ui` feature; always enabled in the Flatpak). Matches
 //!   `Exec=orange %U` in the desktop file.
 //! - `orange --headless` opens the existing Orange collection read-only
@@ -83,19 +83,41 @@ fn path_to_uri(arg: &str) -> String {
     if arg.contains("://") {
         return arg.to_string();
     }
-    let path = std::path::Path::new(arg);
-    let absolute = if path.is_absolute() {
-        path.to_path_buf()
-    } else {
-        std::env::current_dir()
-            .unwrap_or_else(|_| std::path::PathBuf::from("."))
-            .join(path)
-    };
-    format!("file://{}", absolute.display())
+    orange_core::paths::path_to_file_url(std::path::Path::new(arg))
 }
 
 fn main() {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "orange_app=info".into()),
+        )
+        .with_target(false)
+        .init();
     let args: Vec<String> = std::env::args().skip(1).collect();
+    if let Some(flag) = args.iter().find(|arg| {
+        arg.starts_with('-')
+            && ![
+                "--version",
+                "-V",
+                "--help",
+                "-h",
+                "--headless",
+                "--ui",
+                "--serve",
+                "--play-pause",
+                "--play",
+                "--pause",
+                "--stop",
+                "--stop-after-current",
+                "--previous",
+                "--next",
+            ]
+            .contains(&arg.as_str())
+    }) {
+        eprintln!("orange: unknown option {flag}; use --help");
+        std::process::exit(2);
+    }
     match parse_args(&args) {
         Command::Version => println!("{}", version::version_line()),
         Command::Help => print_help(),
@@ -130,29 +152,29 @@ fn print_help() {
 }
 
 fn run_ui(uris: Vec<String>) {
-    #[cfg(feature = "ui")]
+    #[cfg(feature = "desktop")]
     {
         if let Err(e) = orange_app::ui::run(uris) {
-            eprintln!("orange: failed to start COSMIC shell: {e}");
+            eprintln!("orange: failed to start Dioxus window: {e}");
             std::process::exit(1);
         }
     }
-    #[cfg(not(feature = "ui"))]
+    #[cfg(not(feature = "desktop"))]
     {
         let _ = uris;
         eprintln!(
-            "orange: this build has no window; printing a collection summary. Rebuild with --features orange-app/ui (Flatpak builds include it)."
+            "orange: this build has no window; printing a collection summary. Rebuild with --features orange-app/desktop (Flatpak builds include it)."
         );
         run_headless();
     }
 }
 
 fn run_serve(uris: Vec<String>) -> i32 {
-    #[cfg(feature = "dbus")]
+    #[cfg(all(feature = "dbus", target_os = "linux"))]
     {
-        return orange_app::mpris_host::serve_forever(uris);
+        orange_app::mpris_host::serve_forever(uris)
     }
-    #[cfg(not(feature = "dbus"))]
+    #[cfg(not(all(feature = "dbus", target_os = "linux")))]
     {
         let _ = uris;
         eprintln!(
@@ -163,11 +185,11 @@ fn run_serve(uris: Vec<String>) -> i32 {
 }
 
 fn run_media_key(flag: &str) -> i32 {
-    #[cfg(feature = "dbus")]
+    #[cfg(all(feature = "dbus", target_os = "linux"))]
     {
-        return dispatch_media_key(flag);
+        dispatch_media_key(flag)
     }
-    #[cfg(not(feature = "dbus"))]
+    #[cfg(not(all(feature = "dbus", target_os = "linux")))]
     {
         let _ = flag;
         eprintln!(
@@ -178,7 +200,7 @@ fn run_media_key(flag: &str) -> i32 {
 }
 
 /// Tokio-backed MPRIS dispatch (feature `dbus` only).
-#[cfg(feature = "dbus")]
+#[cfg(all(feature = "dbus", target_os = "linux"))]
 fn dispatch_media_key(flag: &str) -> i32 {
     use orange_media::mpris::BUS_NAME;
     use orange_media::mpris_client::{media_key_on, send_stop_after_current, MediaKey};
@@ -215,13 +237,9 @@ fn dispatch_media_key(flag: &str) -> i32 {
 /// Headless launch: read-only summary of the existing collection.
 fn run_headless() {
     println!("{} — Made by {}", orange_app::about::title(), MAKER);
-    let data_home = std::env::var("XDG_DATA_HOME").unwrap_or_else(|_| {
-        let home = std::env::var("HOME").unwrap_or_else(|_| String::from("~"));
-        format!("{home}/.local/share")
-    });
-    let db_path = identity::collection_db_path(&data_home);
-    println!("Collection: {db_path}");
-    let path = std::path::Path::new(&db_path);
+    let db_path = identity::collection_db_path(orange_core::paths::data_home());
+    println!("Collection: {}", db_path.display());
+    let path = db_path.as_path();
     if !path.exists() {
         println!("No Orange collection yet. Add music directories in the app to build one.");
         println!("Strawberry data (if any) is left in place, never moved or deleted.");
@@ -229,8 +247,15 @@ fn run_headless() {
     }
     match orange_db::open_collection(path, orange_db::OpenMode::ReadOnly) {
         Ok(conn) => {
-            let songs = orange_db::count_rows(&conn, "songs").unwrap_or(-1);
-            let playlists = orange_db::count_rows(&conn, "playlists").unwrap_or(-1);
+            let (songs, playlists) = match orange_db::count_rows(&conn, "songs").and_then(|songs| {
+                orange_db::count_rows(&conn, "playlists").map(|playlists| (songs, playlists))
+            }) {
+                Ok(counts) => counts,
+                Err(error) => {
+                    eprintln!("orange: could not count collection rows: {error}");
+                    std::process::exit(1);
+                }
+            };
             println!("Songs: {songs}");
             println!("Playlists: {playlists}");
         }

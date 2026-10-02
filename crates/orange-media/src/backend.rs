@@ -14,6 +14,8 @@
 pub enum AudioSink {
     #[default]
     Auto,
+    /// Explicit silent output for automation/headless processing, never selected implicitly.
+    Null,
     Pulse {
         device: Option<String>,
     },
@@ -27,6 +29,7 @@ impl AudioSink {
     pub fn element(&self) -> String {
         match self {
             Self::Auto => "autoaudiosink".to_string(),
+            Self::Null => "fakesink sync=true".to_string(),
             Self::Pulse { device: None } => "pulsesink".to_string(),
             Self::Pulse { device: Some(d) } => format!("pulsesink device={}", quote(d)),
             Self::Alsa { device: None } => "alsasink".to_string(),

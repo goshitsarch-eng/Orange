@@ -99,7 +99,7 @@ pub fn parse_managed_objects(
 ) -> (Vec<OpticalDrive>, Vec<RemovableVolume>) {
     let mut drives = Vec::new();
     let mut volumes = Vec::new();
-    for (path, _interfaces) in objects {
+    for path in objects.keys() {
         let Some(block) = interface_props(objects, path, "org.freedesktop.UDisks2.Block") else {
             continue;
         };

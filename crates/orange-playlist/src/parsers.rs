@@ -18,7 +18,7 @@ pub fn parse_m3u(text: &str) -> Vec<ParsedEntry> {
     let mut pending_title = String::new();
     let mut pending_length: Option<i64> = None;
     for line in text.lines() {
-        let line = line.trim();
+        let line = line.trim().trim_start_matches('\u{feff}');
         if line.is_empty() {
             continue;
         }
@@ -46,54 +46,55 @@ pub fn write_m3u(entries: &[ParsedEntry]) -> String {
         out.push_str(&format!(
             "#EXTINF:{},{}\n{}\n",
             entry.length_secs.unwrap_or(-1),
-            entry.title,
-            entry.url
+            entry.title.replace(['\r', '\n'], " "),
+            entry.url.replace(['\r', '\n'], "")
         ));
     }
     out
 }
 
-/// Minimal XSPF parse: track `location` + `title` pairs.
+/// Parse XML independently of whitespace and decode entities. Invalid XML
+/// produces no tracks for legacy callers; interactive imports use the checked API.
 pub fn parse_xspf(text: &str) -> Vec<ParsedEntry> {
-    let mut entries = Vec::new();
-    let mut location: Option<String> = None;
-    let mut title = String::new();
-    for line in text.lines() {
-        let line = line.trim();
-        if let Some(rest) = tag_content(line, "location") {
-            if location.is_some() {
-                entries.push(ParsedEntry {
-                    url: location.take().unwrap(),
-                    title: std::mem::take(&mut title),
-                    length_secs: None,
-                });
-            }
-            location = Some(rest);
-        } else if let Some(rest) = tag_content(line, "title") {
-            if location.is_some() && title.is_empty() {
-                title = rest;
-            }
-        }
-    }
-    if let Some(url) = location {
-        entries.push(ParsedEntry {
-            url,
-            title,
-            length_secs: None,
-        });
-    }
-    entries
+    parse_xspf_checked(text).unwrap_or_default()
 }
 
-fn tag_content(line: &str, tag: &str) -> Option<String> {
-    let open = format!("<{tag}>");
-    let close = format!("</{tag}>");
-    let start = line.find(open.as_str())? + open.len();
-    let end = line.find(close.as_str())?;
-    if end < start {
-        return None;
+pub fn parse_xspf_checked(text: &str) -> Result<Vec<ParsedEntry>, String> {
+    let doc = roxmltree::Document::parse_with_options(
+        text,
+        roxmltree::ParsingOptions {
+            allow_dtd: false,
+            nodes_limit: 100_000,
+            ..Default::default()
+        },
+    )
+    .map_err(|error| format!("Invalid XSPF: {error}"))?;
+    if doc.root_element().tag_name().name() != "playlist" {
+        return Err("XSPF root must be a playlist".into());
     }
-    Some(line[start..end].trim().to_string())
+    Ok(doc
+        .descendants()
+        .filter(|node| node.is_element() && node.tag_name().name() == "track")
+        .filter_map(|node| {
+            let value = |name| {
+                node.children()
+                    .find(|child| child.is_element() && child.tag_name().name() == name)
+                    .and_then(|child| child.text())
+            };
+            let url = value("location")?.trim().to_owned();
+            if url.is_empty() {
+                return None;
+            }
+            Some(ParsedEntry {
+                url,
+                title: value("title").unwrap_or("").to_owned(),
+                length_secs: value("duration")
+                    .and_then(|v| v.parse::<i64>().ok())
+                    .filter(|v| *v >= 0)
+                    .map(|v| v / 1000),
+            })
+        })
+        .collect())
 }
 
 /// Minimal PLS parse: `FileN=` + optional `TitleN=` pairs.
@@ -148,6 +149,20 @@ impl From<ParsedEntry> for PlaylistItem {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn xspf_handles_compact_namespaced_xml_entities_and_crlf() {
+        let entries = parse_xspf_checked("<playlist xmlns='http://xspf.org/ns/0/'><trackList>\r\n<track><location>https://example.org/a?x=1&amp;y=2</location><title>A &amp; B</title><duration>190000</duration></track></trackList></playlist>").unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].url, "https://example.org/a?x=1&y=2");
+        assert_eq!(entries[0].title, "A & B");
+        assert_eq!(entries[0].length_secs, Some(190));
+        assert!(parse_xspf_checked("<playlist><track>").is_err());
+        assert!(parse_xspf_checked(
+            "<!DOCTYPE playlist [<!ENTITY x SYSTEM 'file:///etc/passwd'>]><playlist>&x;</playlist>"
+        )
+        .is_err());
+    }
 
     #[test]
     fn m3u_round_trip() {

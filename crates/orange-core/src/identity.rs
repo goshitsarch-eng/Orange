@@ -33,28 +33,16 @@ pub const STRAWBERRY_DB_FILENAME: &str = "strawberry.db";
 
 /// App data directory for Orange, e.g. `~/.local/share/orange/orange`.
 /// Mirrors `StandardPaths::WritableLocation(AppDataLocation)`.
-pub fn app_data_dir(data_home: &str) -> String {
-    format!(
-        "{}/{}/{}",
-        data_home.trim_end_matches('/'),
-        SETTINGS_ORG,
-        SETTINGS_APP
-    )
+pub fn app_data_dir(base: impl AsRef<std::path::Path>) -> std::path::PathBuf {
+    base.as_ref().join(SETTINGS_ORG).join(SETTINGS_APP)
 }
 
-/// Full path of the Orange collection database.
-pub fn collection_db_path(data_home: &str) -> String {
-    format!("{}/{}", app_data_dir(data_home), DB_FILENAME)
+pub fn collection_db_path(base: impl AsRef<std::path::Path>) -> std::path::PathBuf {
+    app_data_dir(base).join(DB_FILENAME)
 }
 
-/// Cache directory for Orange, e.g. `~/.cache/orange/orange`.
-pub fn cache_dir(cache_home: &str) -> String {
-    format!(
-        "{}/{}/{}",
-        cache_home.trim_end_matches('/'),
-        SETTINGS_ORG,
-        SETTINGS_APP
-    )
+pub fn cache_dir(base: impl AsRef<std::path::Path>) -> std::path::PathBuf {
+    base.as_ref().join(SETTINGS_ORG).join(SETTINGS_APP)
 }
 
 /// True when `path` points inside a legacy Strawberry data/config tree.
@@ -81,11 +69,19 @@ mod tests {
     #[test]
     fn orange_paths_do_not_collide_with_strawberry() {
         let db = collection_db_path("/home/user/.local/share");
-        assert_eq!(db, "/home/user/.local/share/orange/orange/orange.db");
-        assert!(!is_strawberry_legacy_path(&db));
+        assert_eq!(
+            db,
+            std::path::Path::new("/home/user/.local/share")
+                .join("orange")
+                .join("orange")
+                .join("orange.db")
+        );
+        assert!(!is_strawberry_legacy_path(&db.to_string_lossy()));
         assert_eq!(
             cache_dir("/home/user/.cache"),
-            "/home/user/.cache/orange/orange"
+            std::path::Path::new("/home/user/.cache")
+                .join("orange")
+                .join("orange")
         );
     }
 

@@ -1,8 +1,8 @@
-//! Version and maker branding. Single source of truth for 3.0.0.
+//! Version and maker branding. Single source of truth for 3.1.0-alpha.1.
 
 /// Orange 3 version. Must match Cargo workspace version, `--version`,
 /// About, AppStream releases, README, and Changelog.
-pub const VERSION: &str = "3.0.0";
+pub const VERSION: &str = "3.1.0-alpha.1";
 /// Maker string shown in About, AppStream developer, and footer.
 pub const MAKER: &str = "Gosh";
 /// Upstream credit kept from 2.1.5: Orange is a fork of Strawberry
@@ -10,7 +10,7 @@ pub const MAKER: &str = "Gosh";
 pub const UPSTREAM_CREDIT: &str =
     "Based on Strawberry (strawberrymusicplayer/strawberry), itself forked from Clementine (2018).";
 
-/// `orange 3.0.0` line printed by `--version`.
+/// `orange 3.1.0-alpha.1` line printed by `--version`.
 pub fn version_line() -> String {
     format!("orange {}", VERSION)
 }
@@ -21,8 +21,8 @@ mod tests {
 
     #[test]
     fn version_is_3_0_0() {
-        assert_eq!(VERSION, "3.0.0");
-        assert_eq!(version_line(), "orange 3.0.0");
+        assert_eq!(VERSION, "3.1.0-alpha.1");
+        assert_eq!(version_line(), "orange 3.1.0-alpha.1");
         // Workspace Cargo.toml must agree; checked by orange-app's version test.
         assert_eq!(env!("CARGO_PKG_VERSION"), VERSION);
     }

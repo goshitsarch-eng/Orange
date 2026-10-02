@@ -1,0 +1,38 @@
+{
+  "full-tests-final": {
+    "passed": 175,
+    "failed": 0,
+    "ignored": 2
+  },
+  "core-tests-final": {
+    "passed": 141,
+    "failed": 0,
+    "ignored": 0
+  },
+  "compat-tests-final": {
+    "passed": 12,
+    "failed": 0,
+    "ignored": 0
+  },
+  "glib-release-test": {
+    "passed": 1,
+    "failed": 0,
+    "ignored": 0
+  },
+  "date": "2026-10-02",
+  "toolchain": "rustc 1.99.0",
+  "platform": "Debian 13 x86_64",
+  "fmt": "passed",
+  "clippy_all_targets_all_features_deny_warnings": "passed",
+  "known_security_vulnerabilities": 0,
+  "security_warning_advisories": [
+    "RUSTSEC-2025-0057",
+    "RUSTSEC-2024-0436",
+    "RUSTSEC-2024-0370",
+    "RUSTSEC-2026-0097"
+  ],
+  "flatpak_registry_checksums_matched": 630,
+  "native_platform_ci": "configured; results must be observed on GitHub",
+  "physical_audio": "not verified",
+  "flatpak_runtime": "blocked by Flathub access"
+}

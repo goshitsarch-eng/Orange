@@ -41,7 +41,11 @@ pub fn list_directories(conn: &Connection) -> Result<Vec<MusicDirectory>, DbErro
 
 /// Insert a music folder if it is not already present. Returns the row id.
 pub fn add_directory(conn: &Connection, path: &str) -> Result<i64, DbError> {
-    let path = path.trim_end_matches('/');
+    let path = if path == "/" {
+        path
+    } else {
+        path.trim_end_matches('/')
+    };
     if let Some(id) = conn
         .query_row(
             "SELECT ROWID FROM directories WHERE path = ?1",
@@ -61,8 +65,10 @@ pub fn add_directory(conn: &Connection, path: &str) -> Result<i64, DbError> {
 
 /// Remove a directory and every song that belongs to it.
 pub fn remove_directory(conn: &Connection, id: i64) -> Result<(), DbError> {
-    conn.execute("DELETE FROM songs WHERE directory_id = ?1", params![id])?;
-    conn.execute("DELETE FROM directories WHERE ROWID = ?1", params![id])?;
+    let tx = conn.unchecked_transaction()?;
+    tx.execute("DELETE FROM songs WHERE directory_id = ?1", params![id])?;
+    tx.execute("DELETE FROM directories WHERE ROWID = ?1", params![id])?;
+    tx.commit()?;
     Ok(())
 }
 
@@ -73,6 +79,22 @@ pub fn replace_directory_songs(
     songs: &[Song],
 ) -> Result<usize, DbError> {
     let tx = conn.unchecked_transaction()?;
+    let retained = {
+        let mut query = tx.prepare("SELECT url, ROWID, playcount, skipcount, lastplayed, rating FROM songs WHERE directory_id = ?1")?;
+        let rows = query.query_map(params![directory_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                (
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, i64>(3)?,
+                    row.get::<_, i64>(4)?,
+                    row.get::<_, f64>(5)?,
+                ),
+            ))
+        })?;
+        rows.collect::<Result<std::collections::HashMap<_, _>, _>>()?
+    };
     tx.execute(
         "DELETE FROM songs WHERE directory_id = ?1",
         params![directory_id],
@@ -80,13 +102,13 @@ pub fn replace_directory_songs(
     {
         let mut stmt = tx.prepare(
             "INSERT INTO songs (
-                title, album, artist, albumartist, track, disc, year, genre,
+                ROWID, title, album, artist, albumartist, track, disc, year, genre,
                 composer, performer, grouping, comment, lyrics, beginning, length,
                 bitrate, samplerate, bitdepth, url, filesize, mtime, directory_id,
                 unavailable, playcount, skipcount, lastplayed, rating,
                 effective_albumartist, fingerprint
             ) VALUES (
-                ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8,
+                ?29, ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8,
                 ?9, ?10, ?11, ?12, ?13, ?14, ?15,
                 ?16, ?17, ?18, ?19, ?20, ?21, ?22,
                 0, ?23, ?24, ?25, ?26,
@@ -94,6 +116,7 @@ pub fn replace_directory_songs(
             )",
         )?;
         for song in songs {
+            let previous = retained.get(&song.url);
             stmt.execute(params![
                 song.title,
                 song.album,
@@ -117,12 +140,13 @@ pub fn replace_directory_songs(
                 song.filesize,
                 song.mtime,
                 directory_id,
-                song.playcount,
-                song.skipcount,
-                song.lastplayed,
-                song.rating as i64,
+                previous.map(|v| v.1).unwrap_or(song.playcount),
+                previous.map(|v| v.2).unwrap_or(song.skipcount),
+                previous.map(|v| v.3).unwrap_or(song.lastplayed),
+                previous.map(|v| v.4).unwrap_or(song.rating),
                 song.effective_albumartist(),
                 song.fingerprint,
+                previous.map(|v| v.0),
             ])?;
         }
     }
@@ -151,7 +175,7 @@ pub fn load_songs(conn: &Connection) -> Result<Vec<Song>, DbError> {
 }
 
 fn song_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Song> {
-    let rating_int: i64 = row.get(26)?;
+    let rating: f64 = row.get(26)?;
     Ok(Song {
         title: row.get::<_, Option<String>>(0)?.unwrap_or_default(),
         album: row.get::<_, Option<String>>(1)?.unwrap_or_default(),
@@ -179,7 +203,7 @@ fn song_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Song> {
         playcount: row.get(23)?,
         skipcount: row.get(24)?,
         lastplayed: row.get(25)?,
-        rating: rating_int as f64,
+        rating,
         fingerprint: row.get::<_, Option<String>>(27)?.unwrap_or_default(),
         ..Song::default()
     })
@@ -251,11 +275,103 @@ pub fn load_playlist_songs(conn: &Connection, playlist_id: i64) -> Result<Vec<So
     Ok(out)
 }
 
+/// Set a normalized rating without changing audio tags.
+pub fn set_rating(conn: &Connection, url: &str, rating: f64) -> Result<(), DbError> {
+    let value = if rating.is_finite() {
+        rating.clamp(-1.0, 1.0)
+    } else {
+        -1.0
+    };
+    conn.execute(
+        "UPDATE songs SET rating=?1 WHERE url=?2",
+        params![value, url],
+    )?;
+    Ok(())
+}
+/// Record completed playback for smart playlists.
+pub fn record_play(conn: &Connection, url: &str, now: i64) -> Result<(), DbError> {
+    conn.execute(
+        "UPDATE songs SET playcount=COALESCE(playcount,0)+1,lastplayed=?1 WHERE url=?2",
+        params![now, url],
+    )?;
+    Ok(())
+}
+
+/// Store a new named playlist using the existing schema in one transaction.
+pub fn save_playlist(conn: &Connection, name: &str, songs: &[Song]) -> Result<i64, DbError> {
+    let tx = conn.unchecked_transaction()?;
+    tx.execute("INSERT INTO playlists (name, is_favorite, ui_order) VALUES (?1, 0, (SELECT COALESCE(MAX(ui_order),0)+1 FROM playlists))", params![name])?;
+    let id = tx.last_insert_rowid();
+    for song in songs {
+        tx.execute("INSERT INTO playlist_items (playlist, type, title, artist, album, albumartist, track, year, genre, length, url) VALUES (?1, 0, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",params![id,song.title,song.artist,song.album,song.albumartist,song.track,song.year,song.genre,song.length_ns,song.url])?;
+    }
+    tx.commit()?;
+    Ok(id)
+}
+
+pub fn delete_playlist(conn: &Connection, id: i64) -> Result<(), DbError> {
+    let tx = conn.unchecked_transaction()?;
+    tx.execute("DELETE FROM playlist_items WHERE playlist=?1", params![id])?;
+    tx.execute("DELETE FROM playlists WHERE ROWID=?1", params![id])?;
+    tx.commit()?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::{open_collection, OpenMode};
     use orange_core::song::Song;
+
+    #[test]
+    fn rescan_preserves_fractional_rating_statistics_and_identity() {
+        let conn = open_collection(&temp_path("retained"), OpenMode::ReadWrite).unwrap();
+        let directory = add_directory(&conn, "/music").unwrap();
+        let mut song = sample("Blue", "Miles", "Kind of Blue");
+        replace_directory_songs(&conn, directory, &[song.clone()]).unwrap();
+        conn.execute(
+            "UPDATE songs SET rating=0.8, playcount=19, skipcount=3, lastplayed=123456",
+            [],
+        )
+        .unwrap();
+        let id: i64 = conn
+            .query_row("SELECT ROWID FROM songs", [], |r| r.get(0))
+            .unwrap();
+        song.title = "Retagged title".into();
+        replace_directory_songs(&conn, directory, &[song]).unwrap();
+        let loaded = load_songs(&conn).unwrap();
+        assert_eq!(loaded[0].title, "Retagged title");
+        assert_eq!(
+            (
+                loaded[0].playcount,
+                loaded[0].skipcount,
+                loaded[0].lastplayed
+            ),
+            (19, 3, 123456)
+        );
+        assert!((loaded[0].rating - 0.8).abs() < 0.0001);
+        assert_eq!(
+            conn.query_row("SELECT ROWID FROM songs", [], |r| r.get::<_, i64>(0))
+                .unwrap(),
+            id
+        );
+    }
+
+    #[test]
+    fn playlist_create_delete_preserves_song_data() {
+        let conn = open_collection(&temp_path("crud"), OpenMode::ReadWrite).unwrap();
+        let id = save_playlist(
+            &conn,
+            "日本 · Jazz",
+            &[sample("Blue", "Miles", "Kind of Blue")],
+        )
+        .unwrap();
+        assert_eq!(load_playlist_songs(&conn, id).unwrap()[0].title, "Blue");
+        assert_eq!(list_playlists(&conn).unwrap()[0].name, "日本 · Jazz");
+        delete_playlist(&conn, id).unwrap();
+        assert!(list_playlists(&conn).unwrap().is_empty());
+        assert!(load_playlist_songs(&conn, id).unwrap().is_empty());
+    }
 
     fn temp_path(name: &str) -> std::path::PathBuf {
         let mut p = std::env::temp_dir();

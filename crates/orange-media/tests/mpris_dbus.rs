@@ -4,11 +4,18 @@
 //! remote client would: reads Identity/PlaybackStatus/Metadata and sends
 //! PlayPause. Skips gracefully without a session bus.
 
-#![cfg(feature = "dbus")]
+#![cfg(all(feature = "dbus", target_os = "linux"))]
 
 use std::collections::HashMap;
 use std::sync::mpsc;
 use std::time::Duration;
+
+async fn bounded<T>(stage: &str, future: impl std::future::Future<Output = T>) -> T {
+    eprintln!("MPRIS round-trip: {stage}");
+    tokio::time::timeout(Duration::from_secs(10), future)
+        .await
+        .unwrap_or_else(|_| panic!("MPRIS timed out during {stage}"))
+}
 
 use orange_media::mpris::{MprisMetadata, PlaybackStatus, OBJECT_PATH};
 use orange_media::mpris_client::{media_key_on, read_identity, MediaKey};
@@ -52,7 +59,7 @@ async fn mpris_round_trip() {
     // Wait for the name to appear (server startup is async).
     let deadline = std::time::Instant::now() + Duration::from_secs(10);
     let identity = loop {
-        match read_identity(&client, &bus_name).await {
+        match bounded("read identity", read_identity(&client, &bus_name)).await {
             Ok(identity) => break identity,
             Err(_) if std::time::Instant::now() < deadline => {
                 tokio::time::sleep(Duration::from_millis(100)).await;
@@ -62,24 +69,34 @@ async fn mpris_round_trip() {
     };
     assert_eq!(identity, "Orange Music Player");
 
-    let player = zbus::Proxy::new(
-        &client,
-        bus_name.as_str(),
-        OBJECT_PATH,
-        "org.mpris.MediaPlayer2.Player",
+    let player = bounded(
+        "create player proxy",
+        zbus::Proxy::new(
+            &client,
+            bus_name.as_str(),
+            OBJECT_PATH,
+            "org.mpris.MediaPlayer2.Player",
+        ),
     )
     .await
     .unwrap();
-    let status: String = player.get_property("PlaybackStatus").await.unwrap();
+    let status: String = bounded("read status", player.get_property("PlaybackStatus"))
+        .await
+        .unwrap();
     assert_eq!(status, "Playing");
     let metadata: HashMap<String, zbus::zvariant::OwnedValue> =
-        player.get_property("Metadata").await.unwrap();
+        bounded("read metadata", player.get_property("Metadata"))
+            .await
+            .unwrap();
     let title = String::try_from(metadata.get("xesam:title").unwrap().clone()).unwrap();
     assert_eq!(title, "So What");
 
-    media_key_on(&client, &bus_name, MediaKey::PlayPause)
-        .await
-        .unwrap();
+    bounded(
+        "play/pause",
+        media_key_on(&client, &bus_name, MediaKey::PlayPause),
+    )
+    .await
+    .unwrap();
     let command = rx.recv_timeout(Duration::from_secs(5)).unwrap();
     assert_eq!(command, MprisCommand::PlayPause);
 

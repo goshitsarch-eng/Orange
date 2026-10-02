@@ -98,10 +98,20 @@ fn into_owned(value: std::borrow::Cow<'_, str>) -> String {
 }
 
 /// Write `patch` into `path`, creating a primary tag when missing.
-/// Only `Some` fields change; everything else is preserved byte-wise by
-/// lofty's in-place update.
+/// Only `Some` fields change. Edit a temporary copy, then replace the original
+/// atomically after checking that it has not changed during the operation.
 pub fn write_tags(path: &Path, patch: &TagPatch) -> Result<(), TagError> {
-    let mut tagged = Probe::open(path)?.read()?;
+    let original = path.canonicalize()?;
+    let before = std::fs::metadata(&original)?;
+    if before.permissions().readonly() {
+        return Err(TagError("Audio file is read-only".into()));
+    }
+    let parent = original
+        .parent()
+        .ok_or_else(|| TagError("Audio file has no parent directory".into()))?;
+    let temporary = tempfile::NamedTempFile::new_in(parent)?;
+    std::fs::copy(&original, temporary.path())?;
+    let mut tagged = Probe::open(temporary.path())?.guess_file_type()?.read()?;
     if tagged.primary_tag().is_none() {
         let tag_type = tagged.file_type().primary_tag_type();
         tagged.insert_tag(Tag::new(tag_type));
@@ -133,8 +143,20 @@ pub fn write_tags(path: &Path, patch: &TagPatch) -> Result<(), TagError> {
     let mut file = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
-        .open(path)?;
+        .open(temporary.path())?;
     tagged.save_to(&mut file, WriteOptions::default())?;
+    file.sync_all()?;
+    drop(file);
+    let after = std::fs::metadata(&original)?;
+    if before.len() != after.len() || before.modified()? != after.modified()? {
+        return Err(TagError(
+            "Audio file changed during editing; original preserved".into(),
+        ));
+    }
+    std::fs::set_permissions(temporary.path(), before.permissions())?;
+    temporary
+        .persist(original)
+        .map_err(|error| TagError(error.to_string()))?;
     Ok(())
 }
 

@@ -5,6 +5,8 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 homepage.workspace = true
-description = "Orange 3.0 core identity, version, codecs, song model, appearance mode (no external deps)"
+description = "Orange portable identity, paths, codecs and song models"
 
 [dependencies]
+directories = "6"
+url = "2"

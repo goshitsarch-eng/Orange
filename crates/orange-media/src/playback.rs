@@ -66,7 +66,7 @@ impl QueuedTrack {
 }
 
 /// The player: queue + cursor + state. UI-agnostic.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Player {
     queue: Vec<QueuedTrack>,
     cursor: Option<usize>,
@@ -85,6 +85,18 @@ impl Player {
 
     pub fn state(&self) -> EngineState {
         self.state
+    }
+
+    pub fn stop_behaviour(&self) -> StopBehaviour {
+        self.stop_behaviour
+    }
+    pub fn restore_cursor(&mut self, index: Option<usize>) {
+        self.cursor = index.filter(|i| *i < self.queue.len());
+        self.state = if self.queue.is_empty() {
+            EngineState::Empty
+        } else {
+            EngineState::Idle
+        };
     }
 
     pub fn current(&self) -> Option<&QueuedTrack> {

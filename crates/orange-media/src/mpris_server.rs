@@ -10,8 +10,8 @@
 use std::collections::HashMap;
 use std::sync::{mpsc, Arc, Mutex};
 
+use zbus::interface;
 use zbus::zvariant::{Array, ObjectPath, OwnedValue, Value};
-use zbus::{interface, Connection};
 
 use crate::mpris::{self, MprisMetadata, PlaybackStatus};
 
@@ -349,22 +349,20 @@ impl OrangeIface {
 /// Serve MPRIS on `bus_name` until the future is cancelled. Owns the name;
 /// returns when the connection drops or the task is aborted.
 pub async fn serve(bus_name: String, state: SharedState, tx: CommandSender) -> zbus::Result<()> {
-    let conn = Connection::session().await?;
-    conn.request_name(bus_name).await?;
-    conn.object_server()
-        .at(mpris::OBJECT_PATH, RootIface { tx: tx.clone() })
-        .await?;
-    conn.object_server()
-        .at(
+    // Register every interface before publishing the name. Clients may ask
+    // for properties immediately when NameOwnerChanged announces readiness.
+    let _connection = zbus::connection::Builder::session()?
+        .name(bus_name)?
+        .serve_at(mpris::OBJECT_PATH, RootIface { tx: tx.clone() })?
+        .serve_at(
             mpris::OBJECT_PATH,
             PlayerIface {
                 state,
                 tx: tx.clone(),
             },
-        )
-        .await?;
-    conn.object_server()
-        .at(mpris::OBJECT_PATH, OrangeIface { tx })
+        )?
+        .serve_at(mpris::OBJECT_PATH, OrangeIface { tx })?
+        .build()
         .await?;
     std::future::pending::<()>().await;
     #[allow(unreachable_code)]

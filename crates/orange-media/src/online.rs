@@ -1,17 +1,13 @@
-//! Online services: scrobbling, cover/lyrics providers, streaming.
-//! Mirrors `scrobbler`, `covermanager`, `lyrics`, `streaming`, `subsonic`,
-//! `tidal`, `qobuz`, `spotify`, and `tagfetcher` (AcoustID + MusicBrainz).
-//!
-//! Privacy rules, enforced by construction:
-//! - Credentials live in OS-keyring-shaped opaque [`Secret`] handles and are
-//!   never `Display`/`Debug`-printed, never logged, never serialized.
-//! - Unofficial Tidal/Spotify/Qobuz integrations behave as in 2.1.5.
-//! - Zero telemetry: no usage, crash, or analytics reporting of any kind.
+//! Retained online-service models and validation helpers.
+//! Provider names describe the legacy inventory; they do not establish complete
+//! desktop authentication or streaming support. Real HTTP clients live in `net`.
+//! `Secret` redacts Debug output but holds an in-memory String. It is not an OS
+//! keyring, encrypted storage, or a guarantee that callers cannot expose bytes.
+//! No telemetry is added by these models.
 
 use std::fmt;
 
-/// An opaque credential handle. Deliberately has no content accessors on the
-/// hot path: only the authenticated request builder consumes it.
+/// An in-memory credential value with redacted Debug output.
 #[derive(Clone)]
 pub struct Secret {
     inner: String,
@@ -30,9 +26,8 @@ impl Secret {
         format!("{scheme} {}", self.inner)
     }
 
-    /// Run `f` with the raw secret (for HMAC/MD5 signing flows such as
-    /// Last.fm `api_sig` and Subsonic tokens). The bytes never escape except
-    /// through `f`'s return value, which must be a signature, never the key.
+    /// Borrow the value for request signing. Callers must avoid logging or
+    /// persisting raw bytes. This closure is not a security boundary.
     pub fn use_secret<R>(&self, f: impl FnOnce(&str) -> R) -> R {
         f(&self.inner)
     }

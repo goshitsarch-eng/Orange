@@ -5,10 +5,11 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 homepage.workspace = true
-description = "Orange 3.0 playback state, GStreamer backend, tags, online services, devices, MPRIS"
+description = "Orange playback state, GStreamer backend, tags, online services, devices, MPRIS"
 
 [dependencies]
-orange-core = { version = "3.0.0", path = "../orange-core" }
+tempfile = "3"
+orange-core = { version = "3.1.0-alpha.1", path = "../orange-core" }
 
 [features]
 default = []
@@ -38,11 +39,11 @@ sys = ["dep:libc"]
 full = ["gst", "online", "dbus", "tags", "crypto", "sys"]
 
 [dependencies.gstreamer]
-version = "0.24"
+version = "0.21"
 optional = true
 
 [dependencies.gstreamer-audio]
-version = "0.24"
+version = "0.21"
 optional = true
 
 [dependencies.reqwest]

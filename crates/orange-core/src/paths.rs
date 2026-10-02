@@ -1,62 +1,81 @@
-//! Filesystem helpers: XDG locations, `file://` URLs, default music folder.
+//! Native user directories, standard file URLs and default music folder.
 
 use std::path::{Path, PathBuf};
 
-/// `$XDG_DATA_HOME` or `~/.local/share`.
-pub fn data_home() -> String {
-    std::env::var("XDG_DATA_HOME").unwrap_or_else(|_| {
-        let home = std::env::var("HOME").unwrap_or_else(|_| String::from("~"));
-        format!("{home}/.local/share")
-    })
-}
-
-/// `$XDG_CACHE_HOME` or `~/.cache`.
-pub fn cache_home() -> String {
-    std::env::var("XDG_CACHE_HOME").unwrap_or_else(|_| {
-        let home = std::env::var("HOME").unwrap_or_else(|_| String::from("~"));
-        format!("{home}/.cache")
-    })
-}
-
-/// Default music folder: `$XDG_MUSIC_DIR`, else `~/Music`.
-pub fn music_dir() -> PathBuf {
-    if let Ok(dir) = std::env::var("XDG_MUSIC_DIR") {
-        let trimmed = dir.trim();
-        if !trimmed.is_empty() {
-            return PathBuf::from(trimmed);
-        }
+/// Native per-user data base; Linux preserves XDG locations.
+pub fn data_home() -> PathBuf {
+    if let Some(profile) = profile_dir() {
+        return profile.join("data");
     }
-    let home = std::env::var("HOME").unwrap_or_else(|_| String::from("."));
-    PathBuf::from(home).join("Music")
+    directories::BaseDirs::new()
+        .map(|d| d.data_dir().to_owned())
+        .unwrap_or_else(|| std::env::temp_dir().join("orange-no-home").join("data"))
 }
 
-/// Encode a local path as a `file://` URL (spaces and non-ASCII percent-encoded).
+pub fn cache_home() -> PathBuf {
+    if let Some(profile) = profile_dir() {
+        return profile.join("cache");
+    }
+    directories::BaseDirs::new()
+        .map(|d| d.cache_dir().to_owned())
+        .unwrap_or_else(|| std::env::temp_dir().join("orange-no-home").join("cache"))
+}
+
+pub fn config_home() -> PathBuf {
+    if let Some(profile) = profile_dir() {
+        return profile.join("config");
+    }
+    directories::BaseDirs::new()
+        .map(|d| d.config_dir().to_owned())
+        .unwrap_or_else(|| std::env::temp_dir().join("orange-no-home").join("config"))
+}
+
+/// Explicit isolated profile for QA and development, never an implicit
+/// executable-relative configuration directory.
+fn profile_dir() -> Option<PathBuf> {
+    std::env::var_os("ORANGE_PROFILE_DIR")
+        .map(PathBuf::from)
+        .filter(|path| path.is_absolute())
+}
+
+pub fn home_dir() -> PathBuf {
+    directories::BaseDirs::new()
+        .map(|d| d.home_dir().to_owned())
+        .unwrap_or_else(std::env::temp_dir)
+}
+
+pub fn music_dir() -> PathBuf {
+    if let Some(dir) = std::env::var_os("XDG_MUSIC_DIR").filter(|d| !d.is_empty()) {
+        return PathBuf::from(dir);
+    }
+    directories::UserDirs::new()
+        .map(|d| d.audio_dir().unwrap_or(d.home_dir()).to_owned())
+        .unwrap_or_else(std::env::temp_dir)
+}
+
+/// Standards-compliant file URL encoding, including Windows drive/UNC paths.
 pub fn path_to_file_url(path: &Path) -> String {
     let absolute = if path.is_absolute() {
-        path.to_path_buf()
+        path.to_owned()
     } else {
         std::env::current_dir()
-            .unwrap_or_else(|_| PathBuf::from("."))
+            .unwrap_or_else(|_| std::env::temp_dir())
             .join(path)
     };
-    let raw = absolute.to_string_lossy();
-    let mut out = String::from("file://");
-    for &byte in raw.as_bytes() {
-        match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'/' | b'-' | b'_' | b'.' | b'~' => {
-                out.push(byte as char);
-            }
-            other => out.push_str(&format!("%{other:02X}")),
-        }
-    }
-    out
+    url::Url::from_file_path(absolute)
+        .map(|u| u.to_string())
+        .unwrap_or_default()
 }
 
-/// Decode a `file://` URL back to a local path. Remote URLs return `None`.
-pub fn file_url_to_path(url: &str) -> Option<PathBuf> {
-    let rest = url.strip_prefix("file://")?;
-    let decoded = percent_decode(rest)?;
-    Some(PathBuf::from(decoded))
+pub fn file_url_to_path(value: &str) -> Option<PathBuf> {
+    if value == "file://" {
+        return None;
+    }
+    let parsed = url::Url::parse(value).ok()?;
+    if parsed.scheme() != "file" || parsed.query().is_some() || parsed.fragment().is_some() {
+        return None;
+    }
+    parsed.to_file_path().ok()
 }
 
 fn percent_decode(input: &str) -> Option<String> {
@@ -96,9 +115,9 @@ mod tests {
 
     #[test]
     fn file_url_round_trip_encodes_spaces() {
-        let path = Path::new("/home/u/Music/Kind of Blue/01 So What.flac");
-        let url = path_to_file_url(path);
-        assert!(url.starts_with("file:///home/u/Music/"));
+        let path = std::env::temp_dir().join("Música 日本/Kind of Blue/01 So What.flac");
+        let url = path_to_file_url(&path);
+        assert!(url.starts_with("file:///"));
         assert!(url.contains("Kind%20of%20Blue"));
         assert!(url.contains("01%20So%20What.flac"));
         assert_eq!(file_url_to_path(&url).unwrap(), path);

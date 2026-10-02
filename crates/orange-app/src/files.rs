@@ -42,8 +42,7 @@ impl FileBrowser {
     }
 
     pub fn home() -> Self {
-        let home = std::env::var("HOME").unwrap_or_else(|_| String::from("."));
-        Self::at(PathBuf::from(home))
+        Self::at(orange_core::paths::home_dir())
     }
 
     pub fn refresh(&mut self) {
@@ -80,10 +79,14 @@ impl FileBrowser {
     }
 }
 
-fn list_entries(dir: &Path) -> Result<Vec<FsEntry>, String> {
+pub fn list_entries(dir: &Path) -> Result<Vec<FsEntry>, String> {
     let mut entries = Vec::new();
     let read = fs::read_dir(dir).map_err(|e| e.to_string())?;
-    for entry in read.flatten() {
+    for (count, entry) in read.enumerate() {
+        if count >= 50_000 {
+            return Err("This folder exceeds the 50,000-entry browsing limit.".into());
+        }
+        let entry = entry.map_err(|error| error.to_string())?;
         let name = entry.file_name();
         let name = name.to_string_lossy();
         if name.starts_with('.') {
