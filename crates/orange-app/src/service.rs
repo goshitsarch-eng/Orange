@@ -59,16 +59,7 @@ pub fn start(db: PathBuf, settings_path: PathBuf, uris: Vec<String>) -> Result<H
         .spawn(move || {
             let mut worker = Worker::new(db, settings_path, loop_tx, out);
             if !uris.is_empty() {
-                worker.apply(Action::Play(
-                    uris.into_iter()
-                        .map(|url| Song {
-                            title: orange_core::paths::url_file_stem(&url),
-                            url,
-                            ..Song::default()
-                        })
-                        .collect(),
-                    0,
-                ));
+                worker.apply(Action::OpenUris(uris));
             }
             worker.publish();
             while !worker.shutdown {
@@ -335,7 +326,11 @@ impl Worker {
             }
             Action::RemoveQueue(index) => {
                 self.history();
+                let removed_current = self.player.cursor() == Some(index);
                 self.player.remove_at(index);
+                if removed_current {
+                    self.restart();
+                }
             }
             Action::ClearQueue => {
                 self.history();
@@ -465,6 +460,11 @@ impl Worker {
                 }
                 self.apply(Action::Play(songs, 0));
             }
+            Action::OpenUris(uris) => match songs_from_uris(uris) {
+                Ok(songs) if !songs.is_empty() => self.apply(Action::Play(songs, 0)),
+                Ok(_) => self.fail("The selected playlist contains no tracks."),
+                Err(error) => self.fail(error),
+            },
             Action::BrowseFolder(path) => {
                 let tx = self.commands.clone();
                 self.job(false, move |_| {
@@ -1067,6 +1067,31 @@ pub fn next_index(
         }
     })
 }
+fn songs_from_uris(uris: Vec<String>) -> Result<Vec<Song>, String> {
+    let mut songs = Vec::new();
+    for url in uris {
+        if let Some(path) = orange_core::paths::file_url_to_path(&url) {
+            if matches!(
+                path.extension()
+                    .and_then(|extension| extension.to_str())
+                    .unwrap_or("")
+                    .to_ascii_lowercase()
+                    .as_str(),
+                "m3u" | "m3u8" | "pls" | "xspf"
+            ) {
+                songs.extend(read_playlist(&path)?);
+                continue;
+            }
+        }
+        songs.push(Song {
+            title: orange_core::paths::url_file_stem(&url),
+            url,
+            ..Song::default()
+        });
+    }
+    Ok(songs)
+}
+
 fn read_playlist(path: &Path) -> Result<Vec<Song>, String> {
     use std::io::Read;
     const LIMIT: u64 = 8 * 1024 * 1024;
@@ -1103,7 +1128,11 @@ fn read_playlist(path: &Path) -> Result<Vec<Song>, String> {
                 )
             };
             Song {
-                title: entry.title,
+                title: if entry.title.trim().is_empty() {
+                    orange_core::paths::url_file_stem(&url)
+                } else {
+                    entry.title
+                },
                 url,
                 length_ns: entry.length_secs.unwrap_or(0).saturating_mul(1_000_000_000),
                 ..Song::default()
@@ -1138,6 +1167,58 @@ fn network_wait<T>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn launch_expands_local_playlists_in_order_and_preserves_remote_streams() {
+        let root = tempfile::tempdir().unwrap();
+        let m3u = root.path().join("Música 日本.M3U8");
+        let pls = root.path().join("radio.pls");
+        let xspf = root.path().join("tracks.xspf");
+        std::fs::write(
+            &m3u,
+            "#EXTM3U\r\n日本.wav\r\n#EXTINF:3,Named track\r\nsecond.wav\r\n",
+        )
+        .unwrap();
+        std::fs::write(
+            &pls,
+            "[playlist]\nFile1=https://example.org/radio\nTitle1=Radio\nNumberOfEntries=1\n",
+        )
+        .unwrap();
+        std::fs::write(&xspf, "<playlist xmlns=\"http://xspf.org/ns/0/\"><trackList><track><location>last.flac</location><duration>4000</duration></track></trackList></playlist>").unwrap();
+        let literal = orange_core::paths::path_to_file_url(&root.path().join("literal.wav"));
+        let remote = "https://example.org/live.m3u8";
+        let songs = songs_from_uris(vec![
+            literal.clone(),
+            orange_core::paths::path_to_file_url(&m3u),
+            orange_core::paths::path_to_file_url(&pls),
+            orange_core::paths::path_to_file_url(&xspf),
+            remote.into(),
+        ])
+        .unwrap();
+        assert_eq!(songs.len(), 6);
+        assert_eq!(songs[0].url, literal);
+        assert_eq!(
+            songs[1].url,
+            orange_core::paths::path_to_file_url(&root.path().join("日本.wav"))
+        );
+        assert_eq!(songs[1].title, "日本");
+        assert_eq!(songs[2].title, "Named track");
+        assert_eq!(songs[2].length_ns, 3_000_000_000);
+        assert_eq!(songs[3].title, "Radio");
+        assert_eq!(songs[4].title, "last");
+        assert_eq!(songs[4].length_ns, 4_000_000_000);
+        assert_eq!(songs[5].url, remote);
+    }
+    #[test]
+    fn launch_rejects_invalid_playlist_before_returning_a_partial_queue() {
+        let root = tempfile::tempdir().unwrap();
+        let broken = root.path().join("broken.xspf");
+        std::fs::write(&broken, "<playlist><trackList>").unwrap();
+        let result = songs_from_uris(vec![
+            "https://example.org/radio".into(),
+            orange_core::paths::path_to_file_url(&broken),
+        ]);
+        assert!(result.unwrap_err().contains("Invalid XSPF"));
+    }
     #[test]
     fn export_commits_complete_file_without_overwriting_existing_data() {
         let root = tempfile::tempdir().unwrap();

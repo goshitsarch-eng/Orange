@@ -57,6 +57,11 @@ pub fn run(uris: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
         })
         .with_custom_event_handler(move |event, _| {
             use dioxus::desktop::tao::event::{Event, WindowEvent};
+            if let Event::Opened { urls } = event {
+                let _ = events.dispatch(Action::OpenUris(
+                    urls.iter().map(ToString::to_string).collect(),
+                ));
+            }
             if let Event::WindowEvent { event, .. } = event {
                 match event {
                     WindowEvent::ScaleFactorChanged { scale_factor, .. } => {

@@ -80,7 +80,7 @@ feature is declared intentionally removed without a justification.
 | Saved playlists | PARTIAL | db/library.rs, app/ui.rs | Read existing lists; create/delete not wired | IMPROVED: transactional create/delete/load; Unicode CRUD and undo/redo UI QA | Transactions, import/export |
 | Playlist add/remove buttons | DEAD | app/ui.rs:639 | Remove maps to Noop; add opens music import | IMPROVED: rendered Save/Delete controls dispatch real DB jobs; UI QA | Commands shared by menus/buttons |
 | Smart playlists | WORKING | app/library.rs, smartplaylists/ | Top rated/recent/never/most played helpers | MIGRATED: retained generators; all five views; ratings/play statistics persist; domain tests | Restore statistics updates |
-| Playlist parsers/undo | PARTIAL | playlist/parsers.rs, undo.rs | Library-only; XSPF parser line-based | IMPROVED: native import/export entry points; checked XSPF, BOM/CRLF M3U; parser/atomic-export tests | CRLF, URLs, invalid XML, path resolution |
+| Playlist parsers/undo | PARTIAL | playlist/parsers.rs, undo.rs | Library-only; XSPF parser line-based | IMPROVED: native import/export and launch entry points; checked XSPF, BOM/CRLF M3U; parser/atomic-export tests | CRLF, URLs, invalid XML, path resolution |
 | Radio Paradise/SomaFM | WORKING | media/radio.rs, app/ui.rs | Station list and play commands; live network unverified | MIGRATED: real presets and play commands retained; live networking unverified | Explicit networking permission |
 | Custom radio | PARTIAL | app/ui.rs | In-memory only, lost on restart | IMPROVED: validated HTTP(S), visible errors, saved stations; WebView/restart QA | Persist validated HTTP(S) URLs |
 | Files browser/play folder | WORKING | app/files.rs | Custom filesystem browser, no native open dialog | MIGRATED: native dialogs, async folder browser/up/audio rows, folder play and drop; Unicode navigation QA | Native/portal dialogs and drop |
@@ -175,10 +175,10 @@ production definition of done is met. No legacy form is deleted by this change.
   GStreamer 1.26.2. Default and optimized canonical app builds complete.
 - `cargo fmt --all -- --check` and Clippy on the whole workspace/all
   targets/all features with `-D warnings` pass.
-- Full-feature suite: **175 passed, 0 failed, 2 ignored**. A private D-Bus
+- Full-feature suite: **177 passed, 0 failed, 2 ignored**. A private D-Bus
   session ensures the MPRIS round-trip actually executes. The two ignored
   tests require live radio/lyrics Internet services and were not run.
-- Domain-only suite: **141 passed, 0 failed**. SQLite suite against the
+- Domain-only suite: **143 passed, 0 failed**. SQLite suite against the
   independent CPython schema-22 fixture: **12 passed, 0 failed**.
 - Optimized GLib iterator regression: **1 passed**. Real GStreamer pipelines
   cover fake-sink playback, decode, FLAC/MP3 conversion and tag I/O.
@@ -186,7 +186,9 @@ production definition of done is met. No legacy form is deleted by this change.
   WAV fixtures. Search, queue controls, repeat, volume, saved playlist CRUD,
   undo/redo, radio validation/persistence, navigation, themes, dialogs,
   rating/rescan retention and real tag writes have passed. The final run passed **27 assertions**, including Unicode folder browsing and
-  initial rating/repeat selection. Exact final assertions are saved under `docs/validation/`.
+  initial rating/repeat selection. A separate native playlist-launch test passed
+  **4 assertions** for queue expansion, Unicode titles, untitled entry fallback and
+  absence of parser/audio errors. Exact final assertions are saved under `docs/validation/`.
 - Native conversion through the rendered dialog and OS Save picker produced
   a real FLAC file from the disposable WAV without modifying the source.
 - Native queue copy through the selected-folder portal completed for two tracks;

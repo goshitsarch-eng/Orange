@@ -1,11 +1,11 @@
 {
   "full-tests-final": {
-    "passed": 175,
+    "passed": 177,
     "failed": 0,
     "ignored": 2
   },
   "core-tests-final": {
-    "passed": 141,
+    "passed": 143,
     "failed": 0,
     "ignored": 0
   },
@@ -43,7 +43,7 @@
   "physical_audio": "not verified",
   "flatpak_runtime": "blocked by Flathub access",
   "linux_packaged_gui": {
-    "binary_sha256": "5cb427f7edd34a76c91059d85c51e3e28b53e73d38e84643b7883f9670807e0b",
+    "binary_sha256": "971e873da0d288e1755834d3ac22fef04a051626a7e57061345dd4e05f74eab6",
     "archive_checksum": "verified",
     "native_window": "launched",
     "scale": 2,

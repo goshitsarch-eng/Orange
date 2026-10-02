@@ -28,6 +28,7 @@ pub enum Action {
     SavePlaylist(String),
     DeletePlaylist(i64),
     OpenFiles(Vec<PathBuf>),
+    OpenUris(Vec<String>),
     PlayFolder(PathBuf),
     BrowseFolder(PathBuf),
     FolderListed(PathBuf, Vec<crate::files::FsEntry>),

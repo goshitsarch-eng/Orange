@@ -25,6 +25,12 @@ navigation, all appearance choices, About/lyrics dialogs, rating changes and
 background rescanning. The final rerun and exact test totals are recorded in
 MIGRATION_AUDIT.md.
 
+A separate native launch test verifies that a local M3U argument opens a real
+two-track queue, preserves Unicode titles, names untitled entries, and produces
+no parser/audio error. Local M3U/PLS/XSPF arguments use the checked import path;
+remote streaming URLs pass through. Native open events use the same command,
+but macOS Finder associations still require a native runner check.
+
 GStreamer output used a synchronized `fakesink` explicitly selected by
 `ORANGE_AUDIO_OUTPUT=null`; this tests decoding/state transitions but does not
 prove physical sound. Native folder dialogs opened and cancellation was tested;

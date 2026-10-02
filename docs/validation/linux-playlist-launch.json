@@ -1,0 +1,14 @@
+{
+  "checks": [
+    "Playlist launch expands into two queue tracks",
+    "Playlist title survives native launch",
+    "Untitled entry uses its Unicode-safe file stem",
+    "Playlist argument produces no audio or parser error"
+  ],
+  "ok": true,
+  "version": "3.1.0-alpha.1",
+  "date": "2026-10-02",
+  "platform": "Debian 13 x86_64, WebKitGTK native desktop, X11/Xvfb",
+  "audio_output": "GStreamer synchronized fakesink",
+  "qa_feature": "ui-qa (not included in ordinary release)"
+}
