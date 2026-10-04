@@ -1,0 +1,305 @@
+//! Headless and MPRIS commands; no frontend or UI dependencies.
+use orange_core::identity;
+use orange_core::version::{self, MAKER};
+
+/// Parsed command line. Pure and unit-tested below.
+#[derive(Debug, PartialEq, Eq)]
+enum Command {
+    Version,
+    Help,
+    Ui { uris: Vec<String> },
+    Serve { uris: Vec<String> },
+    MediaKey(String),
+    Headless,
+}
+
+/// Split arguments into a [`Command`]. First match wins, mirroring the
+/// desktop file (`Exec=orange --play-pause`, ...).
+fn parse_args(args: &[String]) -> Command {
+    if args.iter().any(|a| a == "--version" || a == "-V") {
+        return Command::Version;
+    }
+    if args.iter().any(|a| a == "--help" || a == "-h") {
+        return Command::Help;
+    }
+    if args.iter().any(|a| a == "--headless") {
+        return Command::Headless;
+    }
+    if args.iter().any(|a| a == "--ui") {
+        let uris = collect_uris(args);
+        return Command::Ui { uris };
+    }
+    if let Some(position) = args.iter().position(|a| a == "--serve") {
+        let uris = args[position + 1..]
+            .iter()
+            .filter(|arg| !arg.starts_with("--"))
+            .map(|arg| path_to_uri(arg))
+            .collect();
+        return Command::Serve { uris };
+    }
+    for flag in [
+        "--play-pause",
+        "--play",
+        "--pause",
+        "--stop",
+        "--stop-after-current",
+        "--previous",
+        "--next",
+    ] {
+        if args.iter().any(|a| a == flag) {
+            return Command::MediaKey(flag.to_string());
+        }
+    }
+    Command::Ui {
+        uris: collect_uris(args),
+    }
+}
+
+/// Non-flag arguments as `file://` (or pass-through) URIs.
+fn collect_uris(args: &[String]) -> Vec<String> {
+    args.iter()
+        .filter(|arg| !arg.starts_with("--") && *arg != "-V" && *arg != "-h")
+        .map(|arg| path_to_uri(arg))
+        .collect()
+}
+
+/// CLI path to `file://` URI. Remote URLs pass through untouched.
+fn path_to_uri(arg: &str) -> String {
+    if arg.contains("://") {
+        return arg.to_string();
+    }
+    orange_core::paths::path_to_file_url(std::path::Path::new(arg))
+}
+
+fn main() {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "orange_app=info".into()),
+        )
+        .with_target(false)
+        .init();
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    if let Some(flag) = args.iter().find(|arg| {
+        arg.starts_with('-')
+            && ![
+                "--version",
+                "-V",
+                "--help",
+                "-h",
+                "--headless",
+                "--ui",
+                "--serve",
+                "--play-pause",
+                "--play",
+                "--pause",
+                "--stop",
+                "--stop-after-current",
+                "--previous",
+                "--next",
+            ]
+            .contains(&arg.as_str())
+    }) {
+        eprintln!("orange: unknown option {flag}; use --help");
+        std::process::exit(2);
+    }
+    match parse_args(&args) {
+        Command::Version => println!("{}", version::version_line()),
+        Command::Help => print_help(),
+        Command::Ui { uris } => run_ui(uris),
+        Command::Serve { uris } => {
+            std::process::exit(run_serve(uris));
+        }
+        Command::MediaKey(flag) => {
+            std::process::exit(run_media_key(&flag));
+        }
+        Command::Headless => run_headless(),
+    }
+}
+
+fn print_help() {
+    println!(
+        "Orange Music Player {} — Made by {}\n\n\
+     Usage: orange [OPTION] [FILES...]\n\n\
+     Options:\n  \
+     --version   print version and exit\n  \
+     --help      print this help and exit\n  \
+     --ui        use the Orange desktop executable for the native window\n  \
+     --headless  print a read-only collection summary and exit\n  \
+     --serve     publish MPRIS and play FILES/the queue (needs `dbus`)\n  \
+     --play-pause/--play/--pause/--stop/--previous/--next\n                 control the running instance over MPRIS\n  \
+     --stop-after-current\n                 stop when the current track ends\n\n\
+     With no option, orange opens the collection window. Your Strawberry\n\
+     data is left untouched.",
+        version::VERSION,
+        MAKER
+    );
+}
+
+fn run_ui(_uris: Vec<String>) {
+    eprintln!("Use the Orange desktop executable to open music. orange-cli provides headless and remote commands.");
+    std::process::exit(2);
+}
+
+fn run_serve(uris: Vec<String>) -> i32 {
+    #[cfg(all(feature = "dbus", target_os = "linux"))]
+    {
+        orange_services::mpris_host::serve_forever(uris)
+    }
+    #[cfg(not(all(feature = "dbus", target_os = "linux")))]
+    {
+        let _ = uris;
+        eprintln!(
+            "orange: this build has no MPRIS daemon; rebuild with --features orange-cli/dbus."
+        );
+        2
+    }
+}
+
+fn run_media_key(flag: &str) -> i32 {
+    #[cfg(all(feature = "dbus", target_os = "linux"))]
+    {
+        dispatch_media_key(flag)
+    }
+    #[cfg(not(all(feature = "dbus", target_os = "linux")))]
+    {
+        let _ = flag;
+        eprintln!(
+            "orange: this build has no MPRIS client; rebuild with --features orange-cli/dbus."
+        );
+        2
+    }
+}
+
+/// Tokio-backed MPRIS dispatch (feature `dbus` only).
+#[cfg(all(feature = "dbus", target_os = "linux"))]
+fn dispatch_media_key(flag: &str) -> i32 {
+    use orange_media::mpris::BUS_NAME;
+    use orange_media::mpris_client::{media_key_on, send_stop_after_current, MediaKey};
+
+    let runtime = match tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(runtime) => runtime,
+        Err(e) => {
+            eprintln!("orange: async runtime failed: {e}");
+            return 1;
+        }
+    };
+    let result = runtime.block_on(async {
+        let conn = zbus::Connection::session()
+            .await
+            .map_err(|e| format!("no session bus: {e}"))?;
+        if flag == "--stop-after-current" {
+            return send_stop_after_current(&conn, BUS_NAME).await;
+        }
+        let key = MediaKey::parse(flag).ok_or_else(|| format!("unknown flag: {flag}"))?;
+        media_key_on(&conn, BUS_NAME, key).await
+    });
+    match result {
+        Ok(()) => 0,
+        Err(e) => {
+            eprintln!("orange: {flag} failed ({e}); is Orange running?");
+            1
+        }
+    }
+}
+
+/// Headless launch: read-only summary of the existing collection.
+fn run_headless() {
+    println!("Orange Music Player — Made by {}", MAKER);
+    let db_path = identity::collection_db_path(orange_core::paths::data_home());
+    println!("Collection: {}", db_path.display());
+    let path = db_path.as_path();
+    if !path.exists() {
+        println!("No Orange collection yet. Add music directories in the app to build one.");
+        println!("Strawberry data (if any) is left in place, never moved or deleted.");
+        return;
+    }
+    match orange_db::open_collection(path, orange_db::OpenMode::ReadOnly) {
+        Ok(conn) => {
+            let (songs, playlists) = match orange_db::count_rows(&conn, "songs").and_then(|songs| {
+                orange_db::count_rows(&conn, "playlists").map(|playlists| (songs, playlists))
+            }) {
+                Ok(counts) => counts,
+                Err(error) => {
+                    eprintln!("orange: could not count collection rows: {error}");
+                    std::process::exit(1);
+                }
+            };
+            println!("Songs: {songs}");
+            println!("Playlists: {playlists}");
+        }
+        Err(e) => {
+            eprintln!("orange: could not open collection read-only: {e}");
+            std::process::exit(1);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn args(flags: &[&str]) -> Vec<String> {
+        flags.iter().map(|flag| flag.to_string()).collect()
+    }
+
+    #[test]
+    fn parses_every_flag() {
+        assert_eq!(parse_args(&args(&["--version"])), Command::Version);
+        assert_eq!(parse_args(&args(&["-V"])), Command::Version);
+        assert_eq!(parse_args(&args(&["--help"])), Command::Help);
+        assert_eq!(parse_args(&args(&["--ui"])), Command::Ui { uris: vec![] });
+        assert_eq!(parse_args(&args(&["--headless"])), Command::Headless);
+        assert_eq!(parse_args(&args(&[])), Command::Ui { uris: vec![] });
+        assert_eq!(
+            parse_args(&args(&["--play-pause"])),
+            Command::MediaKey("--play-pause".to_string())
+        );
+        assert_eq!(
+            parse_args(&args(&["--stop-after-current"])),
+            Command::MediaKey("--stop-after-current".to_string())
+        );
+        let opened = parse_args(&args(&["/music/a.flac"]));
+        let Command::Ui { uris } = opened else {
+            panic!("expected Ui, got {opened:?}");
+        };
+        assert_eq!(uris.len(), 1);
+        assert!(uris[0].ends_with("/music/a.flac"));
+    }
+
+    #[test]
+    fn serve_collects_files() {
+        let command = parse_args(&args(&["--serve", "/music/a.flac", "https://x/y.opus"]));
+        let Command::Serve { uris } = command else {
+            panic!("expected Serve, got {command:?}");
+        };
+        assert_eq!(uris.len(), 2);
+        assert!(uris[0].starts_with("file://"));
+        assert!(uris[0].ends_with("/music/a.flac"));
+        assert_eq!(uris[1], "https://x/y.opus");
+        assert_eq!(
+            parse_args(&args(&["--serve"])),
+            Command::Serve { uris: vec![] }
+        );
+    }
+
+    #[test]
+    fn desktop_actions_all_parse() {
+        // Every Exec= line in dist/unix/com.goshapps.Orange.desktop.
+        for flag in [
+            "--play-pause",
+            "--stop",
+            "--stop-after-current",
+            "--previous",
+            "--next",
+        ] {
+            assert!(
+                matches!(parse_args(&args(&[flag])), Command::MediaKey(_)),
+                "{flag}"
+            );
+        }
+    }
+}

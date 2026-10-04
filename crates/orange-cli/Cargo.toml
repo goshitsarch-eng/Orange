@@ -1,0 +1,20 @@
+[package]
+name = "orange-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+orange-core = {path="../orange-core"}
+orange-db = {path="../orange-db"}
+orange-media = {path="../orange-media"}
+orange-services = {path="../orange-services"}
+tracing-subscriber = {version="0.3",features=["env-filter"]}
+tokio = {version="1",features=["rt","time","sync","macros"],optional=true}
+zbus = {version="5",default-features=false,features=["tokio"],optional=true}
+
+[features]
+default = ["native"]
+dbus = ["dep:tokio","dep:zbus","orange-media/dbus","orange-services/dbus"]
+native = ["dbus","orange-services/native","orange-media/full"]

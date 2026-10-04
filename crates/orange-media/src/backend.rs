@@ -53,7 +53,7 @@ pub fn encoder_chain(target_name: &str) -> Option<EncoderChain> {
             encoder: "lamemp3enc",
             muxer: None,
         }),
-        // fdkaacenc preferred over avenc_aac; both verified present.
+        // Prefer fdkaacenc; the live backend resolves avenc_aac when needed.
         "aac" => Some(EncoderChain {
             encoder: "fdkaacenc",
             muxer: Some("mp4mux"),

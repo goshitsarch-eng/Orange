@@ -22,3 +22,6 @@ repo-arm64
 /dist/scripts/maketarball.sh
 /debian/changelog
 _codeql_detected_source_root
+
+/.flatpak-input
+**/__pycache__/

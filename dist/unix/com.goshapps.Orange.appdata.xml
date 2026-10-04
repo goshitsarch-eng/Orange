@@ -24,7 +24,7 @@
     <category>Player</category>
   </categories>
   <description>
-    <p>Orange is a music player and collection organizer written in Rust with Dioxus Desktop and GStreamer. Made by Gosh; based on the Strawberry and Clementine projects.</p>
+    <p>Orange is a music player and collection organizer built with Flutter and a Rust audio and collection core. Made by Gosh; based on the Strawberry and Clementine projects.</p>
     <p>This is an alpha migration. Verified capabilities and platform limitations are documented in PLATFORM_SUPPORT.md.</p>
     <ul>
       <li>Browse and search a local music collection</li>

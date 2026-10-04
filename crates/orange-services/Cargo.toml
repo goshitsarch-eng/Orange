@@ -1,0 +1,31 @@
+[package]
+name = "orange-services"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+description = "Orange UI-independent application services and compatible persistence"
+
+[dependencies]
+orange-core = { path = "../orange-core" }
+orange-db = { path = "../orange-db" }
+orange-collection = { path = "../orange-collection" }
+orange-playlist = { path = "../orange-playlist" }
+orange-smartplaylists = { path = "../orange-smartplaylists" }
+orange-media = { path = "../orange-media" }
+serde = { version = "1", features = ["derive", "rc"] }
+serde_json = "1"
+tempfile = "3"
+tracing = "0.1"
+tokio = { version = "1", optional = true, features = ["rt", "time", "sync", "macros"] }
+notify-rust = { version = "4", optional = true, default-features = false, features = ["z-with-tokio"] }
+
+[features]
+default = []
+gst = ["orange-media/gst"]
+tags = ["orange-media/tags"]
+online = ["orange-media/online", "dep:tokio"]
+dbus = ["orange-media/dbus", "dep:tokio"]
+notify = ["dep:notify-rust"]
+native = ["gst", "tags", "online", "dbus", "orange-media/full"]

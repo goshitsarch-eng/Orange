@@ -3,7 +3,7 @@
 import sys
 
 REQUIRED_RUNTIME = "org.gnome.Platform"
-# GNOME 49 is based on freedesktop 25.08 and supplies WebKit.
+# GNOME 49 supplies the GTK Flutter embedding and GStreamer.
 REQUIRED_VERSION = "49"
 REQUIRED_APP_ID = "com.goshapps.Orange"
 # SDK/runtime tokens that must never appear (Qt/KDE SDKs, arch-specific
@@ -28,13 +28,12 @@ FORBIDDEN = [
 # The full plugin sets must be pinned by the build-time gst-inspect gate,
 # and each set must be named so reviewers can see the coverage claim.
 REQUIRED_GST = [
-    "webkit2gtk-4.1",
     "gtk+-3.0",
     "gst-inspect-1.0",
     "base/good/bad/ugly",
     "libav",
     "lamemp3enc",
-    "voaacenc",
+    "avenc_aac",
     "flacenc",
     "vorbisenc",
     "opusenc",
@@ -52,8 +51,11 @@ def main() -> int:
             failures.append(message)
 
     check(f"app-id: {REQUIRED_APP_ID}" in text, "missing app-id com.goshapps.Orange")
-    check(REQUIRED_RUNTIME in text, "missing GNOME WebKit runtime")
+    check(REQUIRED_RUNTIME in text, "missing GNOME GTK runtime")
     check(REQUIRED_VERSION in text, "missing runtime-version 49")
+    check("flutter build linux" in text, "missing offline Flutter build")
+    check("--offline --enforce-lockfile" in text, "missing locked offline Dart dependencies")
+    check("GTK_USE_PORTAL=1" in text, "missing portal dialogs")
     check("rust" in text.lower(), "missing Rust toolchain module")
     check("com.goshapps.Orange.svg" in text, "missing canonical SVG icon install")
     check("com.goshapps.Orange.png" in text, "missing canonical PNG icon installs")

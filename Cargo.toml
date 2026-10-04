@@ -8,6 +8,9 @@ members = [
   "crates/orange-media",
   "crates/orange-theme",
   "crates/orange-app",
+  "crates/orange-services",
+  "crates/orange-bridge",
+  "crates/orange-cli",
 ]
 exclude = ["vendor/glib"]
 resolver = "2"
@@ -19,7 +22,7 @@ rust-version = "1.89"
 license = "GPL-3.0-or-later"
 homepage = "https://github.com/goshitsarch-eng/Orange"
 
-# Canonical desktop UI: Dioxus Desktop. Domain tests can use --no-default-features.
+# Canonical desktop UI: desktop/ (Flutter). orange-app is the migration reference.
 
 # Backport the upstream VariantStrIter safety fix required by GTK 3 bindings.
 [patch.crates-io]

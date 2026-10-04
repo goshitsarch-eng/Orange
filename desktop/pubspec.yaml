@@ -1,0 +1,30 @@
+name: orange
+description: "Orange Music Player — native Flutter desktop with a Rust application core."
+publish_to: 'none'
+version: 3.1.0-alpha.1+1
+
+environment:
+  sdk: ^3.13.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_rust_bridge: 2.13.0
+  file_selector: 1.1.0
+  url_launcher: 6.3.3
+  window_manager: 0.5.2
+  desktop_drop: 0.8.4
+  path: ^1.9.1
+  freezed_annotation: 3.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  freezed: 4.0.2
+  build_runner: 2.16.1
+  integration_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true

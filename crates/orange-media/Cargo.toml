@@ -24,7 +24,6 @@ online = [
     "dep:serde",
     "dep:serde_json",
     "dep:tokio",
-    "dep:url",
     "crypto",
 ]
 # Session-bus integration: MPRIS2 server/client, UDisks2 drive enumeration.
@@ -68,7 +67,6 @@ features = ["rt", "time", "sync", "macros"]
 
 [dependencies.url]
 version = "2"
-optional = true
 
 [dependencies.zbus]
 version = "5"

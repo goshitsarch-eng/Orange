@@ -2,19 +2,16 @@
 //! The shared Dioxus UI lives in [`ui`] with optional native integrations.
 
 pub mod about;
-pub mod commands;
+pub use orange_services::commands;
 pub mod dialogs;
-pub mod files;
-pub mod library;
 #[cfg(all(feature = "dbus", target_os = "linux"))]
-pub mod mpris_host;
+pub use orange_services::mpris_host;
+pub use orange_services::{files, library};
 pub mod nav;
 #[cfg(feature = "notify")]
-pub mod notify;
+pub use orange_services::notify;
 pub mod playerbar;
-pub mod service;
-pub mod settings;
-pub mod state;
+pub use orange_services::{service, settings, state};
 
 #[cfg(feature = "desktop")]
 pub mod platform;
