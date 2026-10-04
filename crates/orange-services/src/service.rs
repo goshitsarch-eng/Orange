@@ -72,6 +72,11 @@ pub fn start(db: PathBuf, settings_path: PathBuf, uris: Vec<String>) -> Result<H
                 worker.publish();
             }
             worker.cancel.store(true, Ordering::Relaxed);
+            if let Some(job) = worker.job_thread.take() {
+                if job.join().is_err() {
+                    worker.fail("A background operation ended unexpectedly during shutdown.");
+                }
+            }
             worker.persist();
             #[cfg(feature = "gst")]
             if let Some(engine) = worker.engine.take() {
@@ -103,6 +108,7 @@ struct Worker {
     updates: Arc<Mutex<Option<Snapshot>>>,
     cancel: Arc<AtomicBool>,
     job: u64,
+    job_thread: Option<std::thread::JoinHandle<()>>,
     undo: Vec<Player>,
     redo: Vec<Player>,
     seed: u64,
@@ -164,6 +170,7 @@ impl Worker {
             updates,
             cancel: Arc::new(AtomicBool::new(false)),
             job: 0,
+            job_thread: None,
             undo: vec![],
             redo: vec![],
             seed: SystemTime::now()
@@ -248,15 +255,17 @@ impl Worker {
         self.snapshot.can_cancel = cancellable;
         self.snapshot.error = None;
         self.snapshot.status = "Working…".into();
-        if let Err(error) = std::thread::Builder::new()
+        match std::thread::Builder::new()
             .name("orange-file-job".into())
             .spawn(move || {
                 let result = work(flag);
                 let _ = tx.send(Action::JobFinished(id, result));
-            })
-        {
-            self.snapshot.busy = false;
-            self.fail(error.to_string());
+            }) {
+            Ok(thread) => self.job_thread = Some(thread),
+            Err(error) => {
+                self.snapshot.busy = false;
+                self.fail(error.to_string());
+            }
         }
     }
     fn apply(&mut self, action: Action) {
@@ -624,6 +633,11 @@ impl Worker {
             }
             Action::JobFinished(id, result) => {
                 if id == self.job {
+                    if let Some(thread) = self.job_thread.take() {
+                        if thread.join().is_err() {
+                            self.fail("A background operation ended unexpectedly.");
+                        }
+                    }
                     self.snapshot.busy = false;
                     self.snapshot.can_cancel = false;
                     self.refresh();

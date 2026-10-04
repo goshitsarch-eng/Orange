@@ -1,5 +1,213 @@
 # Orange migration audit
 
+## Flutter rewrite audit of the current checkout
+
+Reference: `eec53d8286870cf8b44eb2aa2efc3eba5d0737ed` on `master`.
+This section supersedes the historical migration claims below for the new
+Flutter/Dart/Rust request. No feature has yet been migrated to Flutter.
+The older inventory remains as evidence to preserve, not proof of current
+cross-platform functionality. Target responsibilities and verification gates
+are detailed in [the Flutter migration design](docs/flutter-migration.md).
+
+### Current source and architecture
+
+The supplied checkout is not solely a Linux application: its current canonical
+frontend is Rust/Dioxus Desktop, alongside retained Strawberry-derived Qt/C++
+sources. Neither its README nor previous audit proves Windows/macOS/Flatpak
+runtime readiness. The replacement requested here is Flutter, with Dart owning
+presentation and appropriate Rust services retained.
+
+`crates/orange-app/src/main.rs` parses version/help/headless/daemon/remote and
+file/URI launch commands. `ui/mod.rs` owns the Dioxus window and Signal-based
+presentation state; `ui/chrome.rs` owns transport/navigation/menu actions;
+`ui/library.rs`, `ui/pages.rs`, and `ui/dialogs.rs` render library, queue,
+playlists, radio, files, devices, settings and dialogs. These six UI modules
+contain 1,781 lines. `platform/mod.rs` owns RFD file dialogs, Muda menus,
+window icons and reveal/open operations.
+
+`service.rs` is a 1,264-line command owner with cancellable background I/O jobs,
+queue sequencing, settings persistence and GStreamer lifecycle. It publishes
+latest snapshots through an `Arc<Mutex<Option<Snapshot>>>`; consumers take
+snapshots rather than accumulate ticks. `commands.rs` defines typed commands.
+Presentation drafts and search/expansion fields also exist in Rust dialog and
+collection shell models; those must not become the Flutter backend API.
+
+The other seven crates contain portable identity/path/song models, rusqlite
+storage, scans/filtering/tree models, playlist formats/undo, smart playlists,
+media engines/providers and appearance helpers. Major dependencies include
+Dioxus 0.7.10, Wry/WebKitGTK, GTK bindings with the local GLib safety patch,
+GStreamer, lofty, rusqlite, Tokio, reqwest/rustls, zbus and notify-rust.
+The UI-free domain build does not require WebKit or GTK. Cargo's pinned lockfile
+and vendored patch were preserved during audit/setup.
+
+The Qt reference remains in `src/`, `tests/src/`, `CMakeLists.txt`, `dist/` and
+`debian/`. It includes advanced cover, device, organizer, streaming, shortcut,
+OSD and context workflows not proven equivalent in the current Rust frontend.
+The legacy form inventory below accounts for those surfaces; their runtime
+behavior remains UNKNOWN in this session. Do not delete them on the strength
+of a successful Dioxus smoke test.
+
+### Current run evidence
+
+Verified in this cloud instance on Debian 13 x86_64 with stable Rust 1.99.0:
+
+- Native `orange-app` debug build with `ui-qa` completed.
+- Portable workspace tests: **143 passed, 0 failed**.
+- Full-feature workspace tests in a private D-Bus session: **177 passed,
+  0 failed, 2 explicitly ignored Internet tests**.
+- `cargo fmt --all -- --check` and all-target/all-feature Clippy with warnings
+  denied passed.
+- The independently Python-authored SQLite compatibility fixture passed all
+  12 `orange-db` tests; the headless/version CLI also executed successfully.
+- The actual native WebView executed **27 successful UI assertions**, plus
+  **4 successful playlist-launch assertions** in `scripts/qa/run-linux.sh`.
+  This exercised real GStreamer decoding with a null sink, Unicode paths,
+  search, queue transport, playlists, undo/redo, repeat, volume, validation,
+  radio persistence, file navigation, theme changes, About/lyrics dialogs,
+  ratings, rescanning and tag writing. Conversion output selection was rendered;
+  this UI script does not perform a complete conversion/save-dialog workflow.
+
+Native dependencies are verified Debian packages extracted under
+`/workspace/orange-env/native` because the container is not system root.
+Build activation and helpers live outside the checkout. A private mount
+namespace overlays only WebKit's missing helper directory. WebKit's own
+sandbox remains enabled. An initial wrapper also isolated networking and
+produced a blank window/timeouts; keeping existing networking fixed the UI
+suite. An initial full test lacked `alsasink`; installing the verified
+`gstreamer1.0-alsa` package fixed it. These were setup failures, not confirmed
+repository regressions. The complete install script was rerun successfully.
+
+Physical sound, every native menu/shortcut, portal grants, clipboard,
+drag/drop, real online providers, Wayland, high-DPI/Retina, Windows, macOS,
+installer operation and actual Flatpak runtime remain unverified here.
+Previous session screenshots and CI claims below are historical and were
+not re-certified by this audit.
+
+### Feature responsibility and Flutter parity inventory
+
+The table below is the **pre-rewrite reference audit**. Its current-state column
+records behavior at the audited commit, not the new Flutter implementation.
+The former `orange-app` service files now live in `orange-services`.
+The current Flutter migration inventory follows this section; historical
+reference evidence must not be confused with Flutter certification.
+
+| Feature | Current state / source | Flutter/Dart responsibility | Rust responsibility / remaining gates |
+|---|---|---|---|
+| CLI and launch files | WORKING: `orange-app/src/main.rs`, native launch QA | Desktop lifecycle/open-file delivery | Preserve CLI/domain parsers; test Finder/Windows associations |
+| Window and seven source pages | WORKING on X11: `orange-app/src/ui/` | Widgets, layout, navigation, focus | No widget/window objects in core; native OS QA required |
+| Collection add/rescan/remove | PARTIAL: `orange-app/src/library.rs`, `orange-collection/src/scan.rs` | Folder selection, progress, cancellation controls | Transactional scanning; explicit folder permissions; portal tests |
+| Genre/artist/album search | WORKING: `orange-app/src/ui/library.rs`, `orange-collection/` | Inputs, selected filters, paged list presentation | Queries/filter rules; batch DTOs rather than whole library on ticks |
+| Tags and tag editor | WORKING in WAV QA: `orange-media/src/tagger.rs`, app UI dialogs | Draft fields and user-facing validation | Validate and atomically write tags; test other formats |
+| SQLite compatibility, ratings/statistics | WORKING: `orange-db/`, `data/schema/` | Rating interaction | Schema 23, additive migration, identity/statistic retention; external fixture gate |
+| Queue add/play/remove/clear | WORKING: `orange-media/src/playback.rs`, app service | Selection, virtual rows, actions | Single command owner and stable cursor/audio agreement |
+| Undo/redo queue changes | WORKING: app service, `orange-playlist/src/undo.rs` | Shared keyboard/menu Actions | Queue history rules; edit-field undo stays in Flutter |
+| Play/pause/stop/seek/volume | PARTIAL: `orange-media/src/backend_gst.rs` | Accessible transport widgets | GStreamer pipeline; actual speakers and every OS remain gates |
+| Repeat/shuffle/stop-after | PARTIAL: playback + app service | Mode controls | Sequencing/one-shot state; end-of-stream UI QA incomplete |
+| Equalizer and spectrum | PARTIAL: media DSP and app UI | Sliders and spectrum painting | DSP and live gain changes; physical/runtime QA |
+| Waveform/moodbar/normalization | PARTIAL: `orange-media/src/audio_fx.rs`, legacy `src/` | Appropriate visual controls | Retain algorithms; surface and test intended workflows |
+| Saved playlists CRUD | WORKING: `orange-db/src/library.rs`, app UI pages | Names/dialogs/list state | Transactional load/save/delete; Unicode preserved |
+| Smart playlists | PARTIAL: `orange-smartplaylists/`, app library | Five view choices | Rating/history generators; keep business rules in Rust |
+| M3U/PLS/XSPF import/export | WORKING parsers, M3U launch: `orange-playlist/` | Native file dialogs and progress | Checked parsing, path resolution and atomic export; platform paths |
+| Preset and custom radio | PARTIAL: `orange-media/src/radio.rs`, app settings | Station management and playback UI | Validate HTTP(S), persist stations and play streams; live network unverified |
+| Radio Browser search | PARTIAL: `orange-media/src/net.rs`, app service | Results/loading/error state | Provider engine; actual provider access/test fixtures |
+| Files browsing/folder playback | WORKING browser QA: `orange-app/src/files.rs` | Folder controls, native picker, drop UI | Async listing/import; selected-folder grants and URI conversion |
+| Copy to selected folder/device | PARTIAL: `orange-media/src/devices.rs`, app service | Destination selection, progress, cancel | Safe names, atomic copies, integrity; native grants/hardware QA |
+| Direct MTP/iPod | NOT IMPLEMENTED in current Rust UI: devices models, legacy device code | Verified capability UI only | Actual protocols/hardware required; do not remove legacy reference |
+| Audio CD | PARTIAL: `orange-media/src/cd.rs`, legacy sources | Drive/track selection | Linux ioctls and portable TOC abstraction; hardware/OS work required |
+| Light/dark/system | WORKING explicit choice: settings + UI CSS | Flutter ThemeData/ThemeMode and OS theme events | Compatible atomic preference persistence; system event tests |
+| Preferences and window state | PARTIAL: `orange-app/src/settings.rs` | Preference presentation and window lifecycle | Compatible settings reader/writer; size persistence via plugin |
+| About/lyrics dialogs | WORKING rendering: app UI dialogs | Dialogs, identity, accessible layout | Stored lyrics and optional LRCLIB engine; live lookup unverified |
+| Covers/AcoustID/MusicBrainz | PARTIAL/UNKNOWN: media network and legacy cover code | Results/art display | Existing provider/parsing engines; authentication/provider tests |
+| Audio conversion | PARTIAL: media GStreamer tests + app dialogs/service | Preset/output picker, progress/cancel | Safe conversion/encoders; native save-path and packaged plugins |
+| Keyboard/menu/context actions | PARTIAL: app `platform/mod.rs`, UI chrome/dialogs | Actions/Shortcuts, platform menus, focus | Shared domain operations; no Dioxus/Muda dependency in target core |
+| Clipboard/reveal/open URL | PARTIAL: app platform code | Flutter clipboard and platform adapters | Validate relevant inputs; avoid universal Linux shell commands |
+| Drag/drop | PARTIAL: app UI root | Native drop plugin and selected-file grants | Import/parse paths; Windows/macOS/Flatpak tests required |
+| Accessibility/resizing/DPI | PARTIAL: app UI and window builder | Semantics, focus traversal, adaptive layout | No native layout responsibility; OS/screens-reader QA |
+| Notifications | PARTIAL: `orange-app/src/notify.rs` | Evaluate reliable desktop plugin and permission lifecycle | Track events; existing notifications are not runtime proof |
+| MPRIS/UDisks | PARTIAL: `orange-media/src/mpris*`, `udisks.rs` | Capability/status UI | Opt-in Linux adapters, live private-bus tests; avoid universal assumptions |
+| Last.fm/ListenBrainz/Subsonic | PARTIAL: `orange-media/src/net.rs`, `scrobble.rs` | Credential entry + OS secure storage/session presentation | Authentication/provider engine; no fake signed-in claims |
+| Spotify/Tidal/Qobuz | UNKNOWN/PARTIAL: media enums, legacy streaming code | Account and playback surfaces after verification | Legacy behavior inventory and working provider integrations |
+| Discord presence | PARTIAL: `orange-media/src/discord.rs` | Preference presentation | Unix implementation/Windows named pipes, lifecycle tests |
+| Advanced Qt forms/workflows | UNKNOWN: `src/`, form inventory below | Audit/recreate useful workflows | Retain domain behavior; each deferred feature remains a parity gate |
+| Identity/assets/desktop metadata | PARTIAL: `data/icons/`, `dist/` | Reuse Orange assets in Flutter runners | Consistent ID/version/license; test installed associations |
+| Native packaging and release | UNKNOWN current native targets: `.github/workflows/rust.yaml`, `scripts/package/` | Flutter bundle/runners | Rust library/plugin architecture matching; real CI/package tests |
+| Flatpak | UNKNOWN runtime: `data/com.goshapps.Orange.yml` | Flutter bundle, portal integrations | Offline native library/dependencies, least permissions; sandbox tests |
+
+### Concrete defects and risks found in source
+
+`orange-app/src/dialogs.rs` still describes COSMIC dialogs although its models
+are not rendered by COSMIC. `ScrobblerAuth::sign_in` transitions to SignedIn
+for nonempty local strings without contacting an authentication provider.
+It is a model, not evidence of working authentication; the Flutter UI must
+never expose this transition as a successful login. This was observed by
+source inspection and the existing model test, not a real provider attempt.
+The current frontend does not expose a complete account lifecycle.
+
+Rust's platform reveal helper invokes `explorer.exe` or `/usr/bin/open` using
+argument arrays; its Linux branch delegates to `open`. Optional fingerprinting
+invokes `fpcalc`. Media CD/device adapters include Linux `/dev` and `/proc`
+assumptions. Preserve argument safety and isolate those operations; do not
+translate them into portable-looking Dart shell strings.
+
+The current worker sends cloned settings and library references in snapshots.
+The target bridge must avoid serializing a full library on every playback tick.
+Settings currently mix persisted presentation preferences and queue state;
+split ownership/API without breaking the existing JSON format. Deleting the
+old frontend now would remove behavior before Flutter parity exists.
+
+### Flutter migration progress (2026-10-04)
+
+Flutter 3.47.6 / Dart 3.13.5 installed from the official stable Git tag
+`5fc346839b5d0eef006ed8404392afb4dfae428d`. Generated typed bridge 2.13.0 and
+native Linux debug/release bundles now build. The original SDK-domain block
+was resolved; the official release manifest still returned 404, so the
+verified official Git tag and Flutter's own artifact downloader were used.
+
+| Feature | Migration status | Implementation / evidence | Remaining gates |
+|---|---|---|---|
+| Core shell/navigation/menus/shortcuts | MIGRATED | desktop/lib/main.dart, commands/, ui/chrome.dart; native UI QA | Target OS menus, keyboard/focus/accessibility and DPI |
+| Collection/search/filter/smart views | VERIFIED on Linux fixture | services/library.rs, bridge query DTOs, library_page.dart; real scan/Unicode bridge tests and native search UI | Large-library timings, portals and native folder selection |
+| Queue/transport/undo/playlist CRUD | VERIFIED on Linux fixture | Rust worker + Flutter queue/catalog pages; native play/pause/stop/Unicode-save/clear/undo | EOS and manual context/menu/shortcut matrix |
+| SQLite/settings compatibility | VERIFIED scoped regression | Existing domain tests + real Dart close/reopen test | External live user profiles on each target |
+| Tags/copy/import/export | MIGRATED | Domain workers retained; native picker adapters; Rust regressions | Every Flutter dialog/permission workflow, all tag formats |
+| Audio conversion | VERIFIED installed targets through real bridge | Eight domain targets; runtime factory availability; actual conversion outputs | Packaged plugins, native output picker, target-specific codecs |
+| Themes/window size/resizing | VERIFIED under X11 | Native light/dark/system tests, 600x400/720x560/1280x800 screenshots | OS theme events, Retina/scaling and Wayland |
+| EQ/spectrum/ratings/repeat/shuffle/stop-after | MIGRATED | Flutter sliders/painter and typed commands; existing DSP/sequencing regressions | Physical audio and target-specific DSP QA |
+| Radio/lyrics/files/device-folder copy | MIGRATED | Flutter catalog pages; existing Rust service/provider jobs | Live providers, picker grants and removable hardware |
+| CLI/headless/MPRIS | MIGRATED | orange-cli bundled independently of UI; CLI and bus regressions | Desktop actions/install and remote live-instance QA |
+| Notifications | MIGRATED adapter | Existing notify-rust adapter retained in native bridge feature | Daemon/platform delivery and permissions |
+| Native dialogs/clipboard/drop/reveal | MIGRATED adapters | Official file_selector/url_launcher; window_manager/desktop_drop; Flutter edit conventions | Manual OS/Flatpak grants, already-running Finder open events |
+| Linux release archive | BUILT | Flutter bundle, native dependency closure, GStreamer/plugins/scanner, archive/checksum | VERIFIED without SDK paths: startup, Rust database, Ctrl+Q and persisted settings; other distribution baselines pending |
+| Windows/macOS packaging | IMPLEMENTED, UNVERIFIED | Native runner hooks; NSIS/ZIP; dylib relocation/ad-hoc signing/DMG/ZIP | Actual target builds, package installs and manual QA |
+| Flatpak | IMPLEMENTED, BLOCKED | Offline SDK/Pub/Cargo preparation, revised manifest and source generation | dl.flathub.org returns HTTP 403; runtime/encoder/portal install QA |
+| Remote CI/release | IMPLEMENTED, UNVERIFIED | Flutter target matrix; generated-binding, security, package/checksum gates | GitHub CLI access now works; no migration CI run or release published |
+| Advanced Qt/account/CD/MTP/iPod workflows | NOT IMPLEMENTED in Flutter | Reference inventory and protocol/domain sources retained | Audit intended live behavior, credentials/hardware and cross-platform implementation |
+
+Regression results after extraction: **149 portable Rust tests passed**;
+**183 full-feature Rust tests passed**, two Internet tests ignored;
+Dart/real-native-bridge/widget tests passed (5 tests), including installed
+conversion targets. Native Flutter UI QA passed the fixture workflow and
+resize/theme checks, seek/volume/repeat/shuffle/equalizer controls. The extracted release archive starts without SDK paths and exits through Ctrl+Q with saved settings (empty-profile startup 0.302 s; idle RSS 173276 KiB in this container). Full-workspace Clippy denies warnings and passes.
+`cargo audit` 0.22.2 reports no blocking vulnerabilities and four warnings:
+legacy-reference fxhash and rand 0.7.3, and compile-time paste/proc-macro-error
+through GStreamer/Lofty/GLib. The first two are absent from the Flutter bridge's
+native dependency tree. Retained GLib safety patch remains necessary for the
+old bindings; upgrading the media binding stack remains maintenance work.
+
+New fixes: strict credential-free HTTP(S) radio validation; owned background
+jobs joined on shutdown; runtime AAC encoder fallback; conversion dialog uses
+the domain capability table rather than invented/missing formats; bounded
+pages/revision polling; compact minimum-size library layout; independent
+row action hit targets and keyboard focus for application shortcuts; corrected repeat-mode value labels.
+
+The migration is **not production-complete**. Physical speakers, Wayland,
+Windows/macOS/Flatpak, live providers, file grants and retained advanced
+features remain open gates. Keep reference sources until those useful
+workflows have verified equivalents. The current release scripts and CI
+must not ship the reference frontends alongside Flutter.
+
+## Historical COSMIC-to-Dioxus migration record
+
 Baseline: `f5bf20195` (Orange 3.0.0). Audit begun before replacing the frontend.
 This is a living inventory, not a declaration of cross-platform release readiness.
 
@@ -231,3 +439,5 @@ billing issue."** No native build, test, installer or Flatpak step executed and
 no remote artifact was generated. Publish was correctly skipped on a branch.
 This account issue must be resolved by the repository owner; workflow changes
 cannot remove it. No CI success is claimed.
+
+Workflow structure and action/shell expressions pass actionlint 1.7.12. This is local lint evidence, not a remotely executed CI run.

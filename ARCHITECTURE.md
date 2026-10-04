@@ -1,50 +1,38 @@
-# Orange cross-platform architecture
+# Orange architecture
 
-Orange retains its Rust domain crates and SQLite schema. The canonical window
-will use stable Dioxus 0.7 Desktop: WebView2 on Windows, WKWebView on macOS,
-WebKitGTK on Linux. GTK is the Linux WebView host dependency, not the UI
-implementation. No Electron, Node, React or TypeScript application runtime.
+`desktop/` contains one Flutter frontend. Dart owns widgets, theming, navigation, focus, selection, dialog drafts, keyboard shortcuts, menus, window lifecycle and platform plugins. Rust owns collection scanning, SQLite compatibility, playlist formats, queue sequencing, audio/DSP, tags, conversion, safe file copying and network provider engines.
 
-The Dioxus component tree renders immutable snapshots and emits typed
-application commands. Menus, keyboard shortcuts, context actions and buttons
-share those commands. A dedicated service worker owns collection I/O,
-playback, queue sequencing and persistence. It sends bounded snapshots back
-to the UI; expensive scans/network/file operations never execute in rendering.
-Cancellation and worker shutdown must preserve data and stop owned pipelines.
+```mermaid
+flowchart TD
+  UI[Flutter widgets and theme] --> Dart[Dart presentation models and commands]
+  Dart --> Platform[File selector, window manager, URL launcher, desktop drop]
+  Dart --> Bridge[Generated typed asynchronous bridge]
+  Bridge --> Services[orange-services: worker, jobs and settings]
+  Services --> Core[Rust domain, collection, playlists, media and database crates]
+  Core --> Data[SQLite, settings, audio files and network providers]
+```
 
-`orange-core` contains portable paths/URLs and models; `orange-db` owns
-transactional compatibility; `orange-collection` scans and filters;
-`orange-playlist` owns parsers and queue operations; `orange-media` keeps the
-GStreamer audio/DSP and optional integrations. GStreamer is retained because
-the existing playback/transcoding tests exercise real behavior and it supports
-Windows/macOS/Linux natively. Packaged builds must supply its runtime/plugins.
+The bridge is `crates/orange-bridge`, using pinned flutter_rust_bridge 2.13.0. It depends on `orange-services`, not `orange-app`. The bridge dependency tree has no Dioxus, Wry, Muda or WebKit UI dependencies. Flutter's Linux embedding uses GTK internally. No application widget is implemented in GTK.
 
-`orange-app` contains commands/state/services, settings, platform integrations,
-and small frontend components. The platform boundary handles native dialogs,
-reveal/open operations, native menu conventions and OS capabilities. Remaining
-Linux-only MPRIS/UDisks/CD/Discord integrations are opt-in capabilities, not
-assumptions in portable UI code. UI labels must reflect real capabilities.
+An opaque `Session` is the sole native lifetime handle. Other API values are owned DTOs or explicit command enums; Rust pointers, SQLite connections and media pipelines never escape. Async generated calls run Rust work away from Flutter's UI isolate. The service worker serializes mutations; expensive scan/copy/conversion/provider jobs run on owned threads with cancellation. Shutdown cancels and joins an active job before settings/audio completion; timeouts are errors, not success.
 
-Settings use per-platform OS directories and atomic JSON replacement. Linux
-retains Orange's existing paths; useful legacy QSettings appearance/volume
-values are imported once without rewriting their source. Queue, custom radio,
-theme, equalizer and window state are saved. Invalid settings generate a
-diagnostic and are preserved; files are never silently overwritten as repairs.
-Existing SQLite schema/data and Strawberry paths retain their protections.
+Dart has separate playback, preferences, paged-library, queue and catalog models. A 250 ms poll transfers playback/preferences and revision numbers. Library pages (200 rows), queue and catalog transfer when relevant revisions change. Library queries have a maximum page limit of 1000 and 4 KiB search text. Search input is debounced; generations prevent stale results from replacing a newer query. Rust owns filtering and smart-view rules; Dart owns their presentation.
 
-Worker errors are explicit status/error state. Logs record diagnostic context
-without credentials or full authenticated URLs. No telemetry is added. User
-files change only through explicit import metadata, tag edit, export or sync
-commands. File/network inputs use typed PathBuf/URL validation and bounded
-parsers; external programs use argument arrays through a capability boundary.
+`DesktopCommands` unifies toolbar/menu/shortcut actions. OS adapters use official Flutter `file_selector` and `url_launcher`, plus maintained desktop `window_manager` and `desktop_drop` plugins. macOS registers a platform menu; Windows/Linux render desktop menus with Ctrl shortcuts, while macOS uses Command. File and URL values pass as arguments to APIs, never interpolated shell commands. Notifications retain the existing optional Rust adapter rather than adding another unverified platform plugin.
 
-Version 3.1.0-alpha.1 denotes an incomplete migration, not a stable release.
-CI checks domain logic on Windows/macOS/Linux and builds each native frontend.
-Release automation must gate publishing on successful artifacts and checksum
-generation. Flatpak uses GNOME's WebKitGTK-capable SDK/runtime, portal dialogs,
-explicit audio/network permissions and hermetic Cargo sources. Runtime QA and
-package installation are separate from successful host compilation.
+Rust `BridgeFailure` distinguishes validation, permission, corruption, missing files, network, cancellation, closed sessions, unsupported capabilities and internal failures. Immediate validation errors cross the bridge as typed errors; background service failures appear in playback status. Flutter displays those errors and supports cancellation. Diagnostic logs identify the Flutter/bridge source and Rust tracing target, without logging command payloads or credentials. Rust tracing respects `RUST_LOG`; generated bindings are the only handwritten-unsafe-free FFI layer.
 
-The latest-snapshot mailbox replaces its pending value instead of queuing every audio tick. Library selectors compare shared song vectors so spectrum/position updates do not refilter the collection. Settings writes are debounced; desktop shutdown waits for the command owner to persist settings and stop audio. Equalizer gains update the existing pipeline in place.
+Existing collection files, fractional ratings/statistics, Unicode playlists and compatible JSON preferences stay in the established Rust readers/writers. Rust's platform path module uses AppData on Windows, Application Support on macOS and XDG locations on Linux. `ORANGE_PROFILE_DIR` selects an isolated QA profile. Explicit `ORANGE_RUST_LIBRARY` overrides must be absolute; normal startup loads only the executable's bundle library.
 
-An explicit absolute ORANGE_PROFILE_DIR isolates QA on every OS. Runtime plugin paths are discovered only inside actual packaged resources; mutable settings remain in native user directories. The local GLib binding patch is documented in vendor/PATCHES.md.
+Regenerate bindings from the repository root:
+
+```sh
+cargo install flutter_rust_bridge_codegen --version 2.13.0 --locked
+RUST_LOG=info flutter_rust_bridge_codegen generate
+```
+
+`flutter_rust_bridge.yaml` controls both outputs and native features. Commit Rust/Dart/Freezed outputs together. CI regenerates and rejects differences. Do not hand-edit generated files.
+
+Linux/Windows CMake hooks compile the Rust library and CLI into the Flutter bundle. macOS's Xcode phase builds matching architectures and embeds both native products. Linux packaging copies the dependency closure and GStreamer plugins/scanner, excludes host glibc and graphics drivers, and records the build baseline. Windows bundles GStreamer DLLs/plugins and uses NSIS; macOS relocates non-system dylibs, includes plugins/scanner, verifies ad-hoc signing and builds DMG/ZIP. Flatpak stages the pinned Flutter SDK and locked Pub/Cargo sources before an offline build. These non-Linux packaging paths still require execution on their targets.
+
+`orange-app` and the historical Qt `src/` tree are audit references, not dependencies of the Flutter distribution. They are retained only until explicit parity/platform gates in MIGRATION_AUDIT.md close. Canonical developer commands and release CI now target Flutter. They must not be shipped as parallel frontends.

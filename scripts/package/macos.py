@@ -25,11 +25,13 @@ OUT = ROOT / "target/packages"
 APP = OUT / "Orange.app"
 if APP.exists():
     shutil.rmtree(APP)
-CONTENTS = APP / "Contents"
-FRAMEWORKS = CONTENTS / "Frameworks"
-for directory in (CONTENTS / "MacOS", CONTENTS / "Resources", CONTENTS / "Helpers", FRAMEWORKS):
-    directory.mkdir(parents=True, exist_ok=True)
-shutil.copy2("target/release/orange", CONTENTS / "MacOS/orange")
+source_app = ROOT / 'desktop/build/macos/Build/Products/Release/Orange.app'
+if not source_app.is_dir():
+    raise RuntimeError('Build the Flutter macOS release first')
+shutil.copytree(source_app, APP)
+CONTENTS = APP / 'Contents'
+FRAMEWORKS = CONTENTS / 'Frameworks'
+(CONTENTS / 'Helpers').mkdir(exist_ok=True)
 prefix = Path(run("brew", "--prefix", "gstreamer"))
 mapped = {}
 
@@ -69,8 +71,10 @@ for plugin in (prefix / "lib/gstreamer-1.0").glob("*.dylib"):
     install_binary(plugin, FRAMEWORKS / "gstreamer-1.0" / plugin.name)
 scanner = prefix / "libexec/gstreamer-1.0/gst-plugin-scanner"
 install_binary(scanner, CONTENTS / "Helpers/gst-plugin-scanner")
-relocate(CONTENTS / "MacOS/orange")
-for executable in (CONTENTS / "MacOS/orange", CONTENTS / "Helpers/gst-plugin-scanner"):
+relocate(CONTENTS / "MacOS/Orange")
+relocate(FRAMEWORKS / "liborange_bridge.dylib")
+relocate(CONTENTS / "MacOS/orange-cli")
+for executable in (CONTENTS / "MacOS/Orange", CONTENTS / "MacOS/orange-cli", CONTENTS / "Helpers/gst-plugin-scanner"):
     subprocess.check_call(["install_name_tool", "-add_rpath", "@executable_path/../Frameworks", str(executable)])
 # Modules loaded by GIO are outside the ordinary dylib dependency graph.
 gio_prefix = Path(run("brew", "--prefix", "glib-networking")) if subprocess.call(["brew", "--prefix", "glib-networking"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0 else None
@@ -84,16 +88,16 @@ for size in (16, 32, 128, 256, 512):
         suffix = "@2x" if scale == 2 else ""
         run("sips", "-z", str(size * scale), str(size * scale), "data/icons/128x128/com.goshapps.Orange.png", "--out", str(iconset / f"icon_{size}x{size}{suffix}.png"))
 run("iconutil", "-c", "icns", str(iconset), "-o", str(CONTENTS / "Resources/Orange.icns"))
-with (CONTENTS / "Info.plist").open("wb") as file:
-    plistlib.dump({
-        "CFBundleIdentifier": "com.goshapps.Orange", "CFBundleName": "Orange",
-        "CFBundleDisplayName": "Orange Music Player", "CFBundleExecutable": "orange",
-        "CFBundlePackageType": "APPL", "CFBundleIconFile": "Orange.icns",
-        "CFBundleShortVersionString": VERSION.split("-")[0], "CFBundleVersion": VERSION.split("-")[0],
-        "OrangeReleaseVersion": VERSION, "NSHighResolutionCapable": True,
-        "LSMinimumSystemVersion": "13.0", "NSHumanReadableCopyright": "Made by Gosh · GPL-3.0-or-later",
-        "CFBundleDocumentTypes": [{"CFBundleTypeName": "Audio and playlists", "CFBundleTypeRole": "Viewer", "CFBundleTypeExtensions": ["flac", "mp3", "wav", "ogg", "m3u", "m3u8", "pls", "xspf"]}],
-    }, file)
+with (CONTENTS / 'Info.plist').open('rb') as file:
+    metadata = plistlib.load(file)
+metadata.update({
+    'CFBundleIdentifier': 'com.goshapps.Orange', 'CFBundleDisplayName': 'Orange Music Player',
+    'CFBundleShortVersionString': VERSION.split('-')[0], 'OrangeReleaseVersion': VERSION,
+    'CFBundleDocumentTypes': [{'CFBundleTypeName': 'Audio and playlists', 'CFBundleTypeRole': 'Viewer',
+        'CFBundleTypeExtensions': ['flac', 'mp3', 'wav', 'ogg', 'm3u', 'm3u8', 'pls', 'xspf']}],
+})
+with (CONTENTS / 'Info.plist').open('wb') as file:
+    plistlib.dump(metadata, file)
 for name in ("COPYING", "README.md", "PLATFORM_SUPPORT.md", "BUILDING.md", "MIGRATION_AUDIT.md", "ARCHITECTURE.md", "CONTRIBUTING.md", "CHANGELOG.md"):
     shutil.copy2(name, CONTENTS / "Resources" / name)
 shutil.copytree("docs", CONTENTS / "Resources/docs")
@@ -101,7 +105,7 @@ for binary in reversed(list(mapped.values())):
     run("codesign", "--force", "--sign", "-", str(binary))
 run("codesign", "--force", "--deep", "--sign", "-", str(APP))
 run("codesign", "--verify", "--deep", "--strict", str(APP))
-run(str(CONTENTS / "MacOS/orange"), "--version")
+run(str(CONTENTS / "MacOS/orange-cli"), "--version")
 staging = OUT / f"orange-{VERSION}-macos-{ARCH}"
 if staging.exists():
     shutil.rmtree(staging)

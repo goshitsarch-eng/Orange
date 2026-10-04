@@ -423,9 +423,26 @@ pub struct TranscodeReport {
     pub bytes_written: u64,
 }
 
+/// Resolve installed factories, including the portable AAC fallback.
+pub fn available_encoder_chain(target: &str) -> Option<crate::backend::EncoderChain> {
+    gst::init().ok()?;
+    let mut chain = encoder_chain(target)?;
+    if chain.encoder == "fdkaacenc" && gst::ElementFactory::find(chain.encoder).is_none() {
+        chain.encoder = "avenc_aac";
+    }
+    if gst::ElementFactory::find(chain.encoder).is_none()
+        || chain
+            .muxer
+            .is_some_and(|mux| gst::ElementFactory::find(mux).is_none())
+    {
+        return None;
+    }
+    Some(chain)
+}
+
 /// Transcode `chain` to completion. The pipeline is built from the same
-/// encoder table as [`crate::backend::encoder_chain`], so the pure
-/// description and the live run cannot drift apart.
+/// encoder table as [`crate::backend::encoder_chain`], resolving the AAC
+/// fallback against installed factories through [`available_encoder_chain`].
 pub fn transcode_file(
     chain: &TranscodeChain,
     timeout: Duration,
@@ -439,7 +456,7 @@ pub fn transcode_file_cancellable(
     cancelled: &dyn Fn() -> bool,
 ) -> Result<TranscodeReport, GstError> {
     gst::init().map_err(|e| GstError(e.to_string()))?;
-    let table = encoder_chain(&chain.target_name)
+    let table = available_encoder_chain(&chain.target_name)
         .ok_or_else(|| GstError(format!("unknown transcode target: {}", chain.target_name)))?;
     if chain.input_uri.is_empty()
         || chain.input_uri.contains('"')
@@ -662,10 +679,15 @@ pub fn prepare_bundled_runtime() {
         directory.join("../Frameworks/gstreamer-1.0"),
         directory.join("../Helpers/gst-plugin-scanner"),
     );
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "windows")]
     let (plugins, scanner) = (
         directory.join("lib/gstreamer-1.0"),
         directory.join("libexec/gstreamer-1.0/gst-plugin-scanner.exe"),
+    );
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    let (plugins, scanner) = (
+        directory.join("lib/gstreamer-1.0"),
+        directory.join("libexec/gstreamer-1.0/gst-plugin-scanner"),
     );
     let gio = plugins.parent().map(|root| root.join("gio/modules"));
     if let Some(gio) = gio.filter(|path| path.is_dir()) {

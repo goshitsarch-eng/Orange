@@ -83,8 +83,13 @@ pub fn validate_custom_stream(name: &str, url: &str) -> Option<CustomStream> {
     if name.is_empty() || url.is_empty() {
         return None;
     }
-    let lower = url.to_ascii_lowercase();
-    if lower.starts_with("http://") || lower.starts_with("https://") {
+    let parsed = url::Url::parse(url).ok()?;
+    if matches!(parsed.scheme(), "http" | "https")
+        && parsed.host_str().is_some()
+        && parsed.username().is_empty()
+        && parsed.password().is_none()
+        && !url.chars().any(char::is_control)
+    {
         Some(CustomStream {
             name: name.to_string(),
             url: url.to_string(),
@@ -114,5 +119,8 @@ mod tests {
         assert!(validate_custom_stream("", "https://example.com/stream").is_none());
         assert!(validate_custom_stream("X", "file:///etc/passwd").is_none());
         assert!(validate_custom_stream("X", "javascript:alert(1)").is_none());
+        assert!(validate_custom_stream("X", "https://user:secret@example.org/stream").is_none());
+        assert!(validate_custom_stream("X", "http://").is_none());
+        assert!(validate_custom_stream("X", "https://example.org/\nstream").is_none());
     }
 }

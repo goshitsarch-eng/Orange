@@ -1,0 +1,29 @@
+[package]
+name = "orange-bridge"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+homepage.workspace = true
+description = "Typed Flutter API for Orange's UI-independent Rust services"
+
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[dependencies]
+flutter_rust_bridge = "=2.13.0"
+orange-services = { path = "../orange-services" }
+orange-core = { path = "../orange-core" }
+orange-collection = { path = "../orange-collection" }
+orange-media = { path = "../orange-media" }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+tempfile = "3"
+
+[features]
+default = []
+native = ["orange-services/native", "orange-services/notify", "orange-media/full"]
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(frb_expand)'] }

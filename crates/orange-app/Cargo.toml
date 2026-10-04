@@ -16,6 +16,7 @@ name = "orange_app"
 path = "src/lib.rs"
 
 [dependencies]
+orange-services = { path = "../orange-services" }
 orange-core = { version = "3.1.0-alpha.1", path = "../orange-core" }
 orange-db = { version = "3.1.0-alpha.1", path = "../orange-db" }
 orange-collection = { version = "3.1.0-alpha.1", path = "../orange-collection" }
@@ -38,16 +39,16 @@ default = ["full"]
 # One Dioxus Desktop frontend on Windows, macOS, and Linux.
 desktop = ["dep:png", "dep:dioxus", "dep:rfd", "dep:open", "dep:tokio"]
 ui = ["desktop"]
-online = ["orange-media/online"]
+online = ["orange-media/online", "orange-services/online"]
 ui-qa = ["desktop"]
 # Session-bus remote control: MPRIS2 server/client + serve/headless daemon.
-dbus = ["dep:zbus", "dep:tokio", "orange-media/dbus"]
+dbus = ["dep:zbus", "dep:tokio", "orange-media/dbus", "orange-services/dbus"]
 # Native desktop notifications (track changes, sync reports).
-notify = ["dep:notify-rust"]
+notify = ["dep:notify-rust", "orange-services/notify"]
 # Real audio output via GStreamer (UI transport and `orange --serve`).
-gst = ["orange-media/gst"]
+gst = ["orange-media/gst", "orange-services/gst"]
 # Tag reading while scanning a collection folder.
-tags = ["orange-media/tags"]
+tags = ["orange-media/tags", "orange-services/tags"]
 # Everything the Flatpak and `just test-full` enable.
 full = [
     "ui",

@@ -1,24 +1,7 @@
 # Contributing
 
-The canonical executable is the Rust/Dioxus workspace. Read MIGRATION_AUDIT.md
-and ARCHITECTURE.md before altering existing behavior. Legacy Qt/COSMIC sources
-are reference material until parity is proven, not an alternative default app.
+The canonical application is desktop/ (Flutter) with UI-independent Rust services and domain crates. Read ARCHITECTURE.md and MIGRATION_AUDIT.md before changing ownership or removing reference behavior. Follow BUILDING.md for dependencies, binding regeneration, meaningful Rust/Dart/native UI checks and packaging.
 
-Keep domain logic out of components. Add typed actions in `commands.rs`, implement
-behavior in the service/domain crates, and use the same actions from native menus,
-buttons, keyboard commands and remote controls. Long file/network work belongs in
-background jobs. Keep native paths as PathBuf, use standard file URLs, and isolate
-OS APIs in platform modules. Do not construct shell command strings.
+Keep widgets/presentation state in Dart and domain/persistence/media rules in Rust. Use typed coarse bridge commands and update generated Rust/Dart bindings together. Never hand-edit generated bindings or add a second frontend to release bundles. Test Unicode paths, cancellation, errors and persistence with the real Rust bridge when changing those boundaries.
 
-Preserve existing collections, statistics and configuration. Test cancellation
-and error paths before changing destructive operations. Useful behavior must have
-an explicit migration disposition; unverified backends must not become product
-capability claims. Native UI and packaging need native platform evidence.
-
-Use stable Rust and the lockfile. Required checks are formatting, Clippy with
-warnings denied, portable/full tests, database compatibility and native WebView
-QA as documented in BUILDING.md. Add focused regression tests for discovered
-bugs; do not substitute self-agreement tests for real file/database operations.
-Record platform limitations honestly and retain dependency licenses. Regenerate
-the Flatpak source list after lockfile changes. Do not tag a stable release while
-PLATFORM_SUPPORT.md lists unresolved release gates.
+Changes affecting native plugins, file grants, architecture, media runtime or packaging require actual OS/sandbox QA. Record missing evidence rather than marking targets supported from compilation alone. Do not publish or tag a complete cross-platform release while the inventory still has required parity/platform gates.

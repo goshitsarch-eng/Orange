@@ -1,0 +1,9 @@
+rust_input: crate::api
+rust_root: crates/orange-bridge
+dart_output: desktop/lib/bridge
+dart_root: desktop
+rust_features: [native]
+type_64bit_int: true
+web: false
+stop_on_error: true
+default_external_library_loader_web_prefix: ""
